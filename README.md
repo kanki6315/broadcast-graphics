@@ -6,7 +6,7 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 
 - `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and IBT-playback sources plus local diagnostic capture.
 - `apps/server`: authoritative live state, WebSocket ingestion/control, package discovery, and production static hosting.
-- `apps/web`: the operator panel and transparent browser-overlay routes.
+- `apps/web`: the operator panel and consolidated transparent browser overlay.
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
 
@@ -18,12 +18,10 @@ npm run dev:server
 npm run dev:web
 ```
 
-Open `http://localhost:5173/control`. The server starts a simulated session by default. Add an overlay to vMix/OBS with a transparent browser source such as:
+Open `http://localhost:5173/control`. The server starts a simulated session by default. Add the consolidated overlay to vMix/OBS as one transparent browser source. Every graphic taken from the control panel appears in this composition:
 
 ```text
-http://localhost:5173/overlay/timing-tower?package=apex
-http://localhost:5173/overlay/driver-focus?package=apex
-http://localhost:5173/overlay/race-status?package=apex
+http://localhost:5173/overlay?package=apex
 ```
 
 ### Windows telemetry client
