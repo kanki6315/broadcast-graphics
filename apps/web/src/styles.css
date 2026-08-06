@@ -248,7 +248,12 @@ kbd { margin-left: auto; border: 1px solid currentColor; padding: 2px 5px; font:
 .key-row-error td { height: auto; padding: 7px 10px; color: #8d211b; background: rgba(197, 49, 39, .08); text-align: left !important; font-weight: 600; }
 
 /* Browser-source overlays */
-body:has(.overlay-canvas) { background: transparent; overflow: hidden; }
+html.overlay-document,
+html.overlay-document body,
+html.overlay-document #root {
+  background: transparent;
+  overflow: hidden;
+}
 .overlay-canvas { position: fixed; inset: 0; opacity: 0; pointer-events: none; transition: opacity 180ms ease-out; font-variant-numeric: tabular-nums; }
 .overlay-canvas.is-active { opacity: 1; }
 .timing-overlay { position: absolute; top: 6vh; left: 3vw; width: min(360px, 30vw); }
