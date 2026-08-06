@@ -8,7 +8,8 @@ public sealed record TelemetryBridgeOptions(
     string ServerUrl,
     string IngestionKey,
     TelemetrySourceMode SourceMode,
-    string? IbtPath);
+    string? ReplayPath,
+    double ReplaySpeed);
 
 public sealed record TelemetryBridgeStatus(
     bool Running,
@@ -25,10 +26,12 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     private readonly object gate = new();
     private CancellationTokenSource? cancellation;
     private Task? runTask;
+    private IReplayControl? replayControl;
     private TelemetryBridgeStatus status = new(false, false, false, false, "Not connected", null, null);
 
     public event Action<TelemetryBridgeStatus>? StatusChanged;
     public event Action<string>? Log;
+    public event Action<ReplayProgress>? ReplayProgressChanged;
     public TelemetryBridgeStatus Status { get { lock (gate) return status; } }
 
     public Task StartAsync(TelemetryBridgeOptions options)
@@ -69,23 +72,46 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         }
     }
 
+    public void SetReplayPaused(bool paused)
+    {
+        IReplayControl? control;
+        lock (gate) control = replayControl;
+        if (paused) control?.Pause();
+        else control?.Resume();
+    }
+
+    public void RestartReplay()
+    {
+        IReplayControl? control;
+        lock (gate) control = replayControl;
+        control?.Restart();
+    }
+
     private async Task RunAsync(TelemetryBridgeOptions options, CancellationToken cancellationToken)
     {
-        var snapshots = Channel.CreateBounded<SessionState>(new BoundedChannelOptions(4)
+        var snapshots = Channel.CreateBounded<SessionState>(new BoundedChannelOptions(1)
         {
             SingleReader = true,
             SingleWriter = true,
-            FullMode = BoundedChannelFullMode.DropOldest
+            FullMode = BoundedChannelFullMode.Wait
         });
 
         await using ITelemetrySource source = options.SourceMode switch
         {
             TelemetrySourceMode.Simulation => new SimulatedTelemetrySource(diagnostics),
-            TelemetrySourceMode.IbtPlayback => new IracingSdkTelemetrySource(options.IbtPath, diagnostics),
-            _ => new IracingSdkTelemetrySource(null, diagnostics)
+            TelemetrySourceMode.DiagnosticReplay => new DiagnosticReplayTelemetrySource(
+                options.ReplayPath ?? throw new InvalidOperationException("Choose a diagnostic replay ZIP."),
+                options.ReplaySpeed,
+                diagnostics),
+            _ => new IracingSdkTelemetrySource(diagnostics)
         };
         source.ConnectionChanged += OnSourceConnectionChanged;
         source.Log += WriteLog;
+        if (source is IReplayControl control)
+        {
+            control.ProgressChanged += OnReplayProgressChanged;
+            lock (gate) replayControl = control;
+        }
 
         var sourceTask = PumpSourceAsync(source, snapshots.Writer, cancellationToken);
         var socketTask = SendToServerAsync(options, snapshots.Reader, cancellationToken);
@@ -103,6 +129,14 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         {
             source.ConnectionChanged -= OnSourceConnectionChanged;
             source.Log -= WriteLog;
+            if (source is IReplayControl finishedReplayControl)
+            {
+                finishedReplayControl.ProgressChanged -= OnReplayProgressChanged;
+                lock (gate)
+                {
+                    if (ReferenceEquals(replayControl, finishedReplayControl)) replayControl = null;
+                }
+            }
             UpdateStatus(current => current with
             {
                 Running = false,
@@ -227,6 +261,13 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         Log?.Invoke(message);
     }
 
+    private void OnReplayProgressChanged(ReplayProgress progress)
+    {
+        if (progress.IsComplete)
+            UpdateStatus(current => current with { Streaming = false, SourceLabel = "Diagnostic replay complete" });
+        ReplayProgressChanged?.Invoke(progress);
+    }
+
     private void UpdateStatus(Func<TelemetryBridgeStatus, TelemetryBridgeStatus> update)
     {
         TelemetryBridgeStatus next;
@@ -241,7 +282,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     private static string SourceLabel(TelemetryBridgeOptions options) => options.SourceMode switch
     {
         TelemetrySourceMode.Simulation => "Simulated telemetry",
-        TelemetrySourceMode.IbtPlayback => $"IBT playback — {Path.GetFileName(options.IbtPath)}",
+        TelemetrySourceMode.DiagnosticReplay => $"Diagnostic replay — {Path.GetFileName(options.ReplayPath)}",
         _ => "Live iRacing SDK"
     };
 

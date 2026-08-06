@@ -40,12 +40,13 @@ One live race-state model powers both the on-air graphics and the operator contr
 - Camera-group and focused-driver control are explicitly deferred beyond the first graphics-focused milestone.
 - Driver selection is part of the first control-panel information model so it can become the future hook for focused-driver camera control without redesigning the workflow.
 - The telemetry client must tolerate reconnects and avoid disrupting iRacing.
+- The telemetry client can validate and replay its own diagnostic ZIPs for troubleshooting and broadcast rehearsal, with explicit replay states, remote-server confirmation, and no automatic looping.
 - Authentication uses one administrator account, browser sessions for control, independently revocable ingestion keys for telemetry clients, and revocable view-only keys for browser overlays.
 - Exact deployment target and data-retention window remain open decisions.
 
 ## Evidence on Hand
 
-No brand assets, customer claims, benchmarks, production telemetry samples, or official iRacing SDK integration code are currently present. Demonstration data must be labeled as simulated.
+No brand assets, customer claims, or benchmarks are currently present. A user-provided Long Beach multi-class capture covering practice, qualifying, and race transitions is available for replay compatibility testing but is not stored in the repository. Demonstration data must be labeled as simulated.
 
 ## Product Principles
 

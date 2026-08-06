@@ -96,17 +96,65 @@
                     <ComboBox x:Name="SourceModeBox" Margin="0,0,0,12" SelectionChanged="SourceMode_SelectionChanged" AutomationProperties.Name="Telemetry source">
                         <ComboBoxItem Tag="Live" Content="Live iRacing SDK" />
                         <ComboBoxItem Tag="Simulation" Content="Simulated telemetry" />
-                        <ComboBoxItem Tag="IbtPlayback" Content="IBT recording playback" />
+                        <ComboBoxItem Tag="DiagnosticReplay" Content="Diagnostic replay" />
                     </ComboBox>
 
-                    <Grid x:Name="IbtFilePanel" Margin="0,0,0,16" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                        <TextBox x:Name="IbtPathBox" AutomationProperties.Name="IBT recording file" />
-                        <Button Grid.Column="1" Margin="8,0,0,0" Click="BrowseIbt_Click" Content="BROWSE…" />
-                    </Grid>
+                    <StackPanel x:Name="ReplayFilePanel" Margin="0,0,0,16" Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="DIAGNOSTIC CAPTURE" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBox x:Name="ReplayPathBox" IsReadOnly="True" AutomationProperties.Name="Diagnostic replay ZIP" />
+                            <Button x:Name="BrowseReplayButton" Grid.Column="1" Margin="8,0,0,0" Click="BrowseReplay_Click" Content="BROWSE…" />
+                        </Grid>
+                        <TextBlock x:Name="ReplayValidationText" Margin="0,7,0,0" Foreground="{StaticResource MutedBrush}" Text="Choose a diagnostic ZIP containing normalized telemetry." TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+
+                        <Border x:Name="ReplaySummaryPanel" Margin="0,10,0,0" Padding="10" BorderBrush="{StaticResource InkBrush}" BorderThickness="1" Background="#26B8C2BD" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Bold" FontSize="16" Text="REPLAY VERIFIED" />
+                                <TextBlock x:Name="ReplaySessionText" Margin="0,3,0,0" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock x:Name="ReplayTrackText" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="ReplayDetailsText" Margin="0,5,0,0" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Margin="0,12,0,5" Style="{StaticResource FieldLabel}" Text="PLAYBACK SPEED" />
+                        <ComboBox x:Name="ReplaySpeedBox" AutomationProperties.Name="Replay playback speed">
+                            <ComboBoxItem Tag="0.5" Content="0.5×" />
+                            <ComboBoxItem Tag="1" Content="1× — captured timing" />
+                            <ComboBoxItem Tag="2" Content="2×" />
+                            <ComboBoxItem Tag="-1" Content="Maximum — no timing delay" />
+                        </ComboBox>
+
+                        <Border x:Name="ReplayTransportPanel" Margin="0,12,0,0" Padding="10" BorderBrush="{StaticResource InkBrush}" BorderThickness="2" Visibility="Collapsed">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,7">
+                                    <TextBlock FontFamily="{StaticResource DisplayFont}" FontWeight="Bold" FontSize="16" Text="REPLAY CONTROL" />
+                                    <TextBlock x:Name="ReplayProgressText" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12" Text="00:00 / 00:00" AutomationProperties.LiveSetting="Polite" />
+                                </Grid>
+                                <ProgressBar x:Name="ReplayProgressBar" Minimum="0" Maximum="1" Value="0" AutomationProperties.Name="Replay progress" />
+                                <Grid Margin="0,9,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Button x:Name="ReplayPauseButton" Margin="0,0,4,0" MinHeight="36" Click="ReplayPause_Click" Content="PAUSE" />
+                                    <Button x:Name="ReplayRestartButton" Grid.Column="1" Margin="4,0,0,0" MinHeight="36" Click="ReplayRestart_Click" Content="RESTART" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
                     <Border x:Name="ErrorPanel" Margin="0,0,0,14" Padding="10" BorderBrush="{StaticResource ErrorBrush}" BorderThickness="1" Background="#0FC53127" Visibility="Collapsed" Focusable="True" AutomationProperties.LiveSetting="Assertive">
                         <TextBlock x:Name="ErrorText" Foreground="{StaticResource ErrorBrush}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <Border x:Name="ReplayWarningPanel" Margin="0,0,0,14" Padding="12" BorderBrush="{StaticResource OrangeBrush}" BorderThickness="2" Background="#12FF4B21" Visibility="Collapsed" Focusable="True" AutomationProperties.LiveSetting="Assertive">
+                        <StackPanel>
+                            <TextBlock FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="Bold" Text="CONFIRM REMOTE REPLAY" />
+                            <TextBlock x:Name="ReplayWarningText" Margin="0,3,0,10" TextWrapping="Wrap" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Button Margin="0,0,4,0" Click="CancelReplayWarning_Click" Content="CANCEL" />
+                                <Button Grid.Column="1" Margin="4,0,0,0" Style="{StaticResource PrimaryButton}" Click="ConfirmReplay_Click" Content="START REPLAY" />
+                            </Grid>
+                        </StackPanel>
                     </Border>
 
                     <Grid>

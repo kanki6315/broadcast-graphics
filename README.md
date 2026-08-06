@@ -4,7 +4,7 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 
 ## Components
 
-- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and IBT-playback sources plus local diagnostic capture.
+- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and diagnostic-replay sources plus local capture.
 - `apps/server`: authoritative live state, WebSocket ingestion/control, package discovery, and production static hosting.
 - `apps/web`: the operator panel and transparent browser-overlay routes.
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
@@ -45,11 +45,13 @@ dotnet run --project client/TelemetryClient -- --server https://broadcasts.arjun
 
 Use **Diagnostics** after connecting to capture the SDK variable inventory, raw session YAML, sampled selected telemetry, normalized server payloads, connection events, and client errors. Choose a sampling rate and a fixed duration, or choose **Manual stop** and finish with **Stop & Save**. Captures remain local and are saved as ZIP files; ingestion keys are never written into them.
 
-An iRacing telemetry recording can be replayed at real-time speed on a Windows development machine:
+Choose **Diagnostic replay** to stream a previously captured diagnostic ZIP without iRacing running. The client validates the capture, shows its session sequence, track, driver/class counts, duration, sample count, and format, then replays it at `0.5×`, captured `1×` timing, `2×`, or maximum speed. New captures use normalized output directly; compatible older captures containing SDK telemetry and session information are reconstructed with the current mapper. Replay can be paused, resumed, or restarted; it stops at the final sample and never loops.
 
 ```powershell
-dotnet run --project client/TelemetryClient -- --ibt C:\recordings\session.ibt --server http://localhost:8787
+dotnet run --project client/TelemetryClient -- --replay C:\captures\broadcast-diagnostics.zip --server http://localhost:8787
 ```
+
+Starting replay against a non-local server requires an explicit confirmation because replay replaces that server's current telemetry state. Diagnostic capture is disabled while an existing capture is being replayed.
 
 Create a self-contained, single-file `win-x64` release from PowerShell:
 

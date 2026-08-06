@@ -61,9 +61,7 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
     TelemetryVar.CarIdxBestLapTime,
     TelemetryVar.CarIdxOnPitRoad
 ])]
-public sealed class IracingSdkTelemetrySource(
-    string? ibtPath,
-    DiagnosticCapture diagnostics) : ITelemetrySource
+public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource
 {
     public event Action<bool, string>? ConnectionChanged;
     public event Action<string>? Log;
@@ -77,8 +75,7 @@ public sealed class IracingSdkTelemetrySource(
             FullMode = BoundedChannelFullMode.DropOldest
         });
         using var monitorCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        IBTOptions? ibtOptions = ibtPath is null ? null : new IBTOptions(ibtPath, playBackSpeedMultiplier: 1);
-        await using var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, ibtOptions);
+        await using var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance);
 
         TelemetrySessionInfo? sessionInfo = null;
         string? latestRawSessionInfo = null;
@@ -99,7 +96,18 @@ public sealed class IracingSdkTelemetrySource(
             OnTelemetryUpdate = telemetry =>
             {
                 diagnostics.TryRecordSampled("sdk-telemetry", "telemetry.ndjson", telemetry);
-                diagnostics.TryRecordOnce("variable-inventory", "variables.ndjson", new { variables = client.GetTelemetryVariables() });
+                diagnostics.TryRecordOnce("variable-inventory", "variables.ndjson", new
+                {
+                    variables = client.GetTelemetryVariables().Select(variable => new
+                    {
+                        type = variable.Type.FullName,
+                        variable.Length,
+                        variable.IsTimeValue,
+                        variable.Name,
+                        variable.Desc,
+                        variable.Units
+                    })
+                });
                 var rawSession = Volatile.Read(ref latestRawSessionInfo);
                 if (rawSession is not null)
                     diagnostics.TryRecordOnce("initial-session-info", "session-info.ndjson", new { yaml = rawSession, initial = true });
@@ -113,14 +121,16 @@ public sealed class IracingSdkTelemetrySource(
                 if (session is not null)
                 {
                     lastSnapshotTick = now;
-                    snapshots.Writer.TryWrite(MapSnapshot(telemetry, session));
+                    var snapshot = TelemetrySnapshotMapper.Map(telemetry, session);
+                    diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
+                    snapshots.Writer.TryWrite(snapshot);
                 }
                 return Task.CompletedTask;
             },
             OnConnectStateChanged = state =>
             {
                 var connected = string.Equals(state.ToString(), "Connected", StringComparison.OrdinalIgnoreCase);
-                var label = ibtPath is null ? $"iRacing SDK — {state}" : $"IBT playback — {state}";
+                var label = $"iRacing SDK — {state}";
                 ConnectionChanged?.Invoke(connected, label);
                 Log?.Invoke(label);
                 return Task.CompletedTask;
@@ -143,7 +153,7 @@ public sealed class IracingSdkTelemetrySource(
         {
             await monitorCancellation.CancelAsync();
             try { await monitorTask; } catch (OperationCanceledException) { }
-            ConnectionChanged?.Invoke(false, ibtPath is null ? "iRacing SDK disconnected" : "IBT playback stopped");
+            ConnectionChanged?.Invoke(false, "iRacing SDK disconnected");
         }
     }
 
@@ -170,7 +180,11 @@ public sealed class IracingSdkTelemetrySource(
         }
     }
 
-    private static SessionState MapSnapshot(TelemetryData telemetry, TelemetrySessionInfo info)
+}
+
+internal static class TelemetrySnapshotMapper
+{
+    public static SessionState Map(TelemetryData telemetry, TelemetrySessionInfo info, DateTimeOffset? capturedAt = null)
     {
         var sessionNumber = telemetry.SessionNum ?? info.SessionInfo?.CurrentSessionNum ?? 0;
         var session = info.SessionInfo?.Sessions?.FirstOrDefault(item => item.SessionNum == sessionNumber);
@@ -194,7 +208,7 @@ public sealed class IracingSdkTelemetrySource(
             NormalizeTotalLaps(telemetry.SessionLapsTotal),
             NormalizeTime(telemetry.SessionTimeRemain),
             NormalizeFlag(telemetry.SessionFlags),
-            DateTimeOffset.UtcNow.ToString("O"),
+            (capturedAt ?? DateTimeOffset.UtcNow).ToString("O"),
             drivers);
     }
 
