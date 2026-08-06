@@ -26,7 +26,7 @@ http://localhost:5173/overlay/driver-focus?package=apex
 http://localhost:5173/overlay/race-status?package=apex
 ```
 
-Build the Windows bridge with:
+Build the Windows bridge with the .NET 10 SDK:
 
 ```bash
 dotnet build client/TelemetryClient
