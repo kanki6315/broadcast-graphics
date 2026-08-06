@@ -1,0 +1,16 @@
+{
+  "name": "broadcast-graphics",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @racecontrol/protocol && npm run build -w @racecontrol/server && npm run build -w @racecontrol/web",
+    "dev:server": "npm run dev -w @racecontrol/server",
+    "dev:web": "npm run dev -w @racecontrol/web",
+    "test": "npm run test -w @racecontrol/server",
+    "typecheck": "npm run typecheck -w @racecontrol/protocol && npm run typecheck -w @racecontrol/server && npm run typecheck -w @racecontrol/web"
+  }
+}

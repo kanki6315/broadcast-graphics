@@ -1,0 +1,15 @@
+{
+  "id": "endurance",
+  "name": "Endurance Blue",
+  "clientName": "Example Endurance Client",
+  "version": "1.0.0",
+  "themeUrl": "/packages/endurance/theme.css",
+  "slots": {
+    "timing-tower": { "label": "Timing tower", "description": "Class-aware running order", "fields": [{ "key": "rows", "label": "Visible drivers", "type": "number", "default": 12, "min": 5, "max": 20 }, { "key": "showLastLap", "label": "Show last lap", "type": "boolean", "default": true }] },
+    "race-status": { "label": "Race status", "description": "Session and stint status", "fields": [{ "key": "showTrack", "label": "Show track", "type": "boolean", "default": true }] },
+    "driver-focus": { "label": "Driver focus", "description": "Focused driver and team", "fields": [{ "key": "subtitle", "label": "Subtitle", "type": "text", "default": "CURRENT STINT" }, { "key": "metric", "label": "Primary metric", "type": "select", "default": "interval", "options": [{ "label": "Best lap", "value": "bestLap" }, { "label": "Last lap", "value": "lastLap" }, { "label": "Interval", "value": "interval" }] }] },
+    "battle": { "label": "Battle", "description": "Two-car position comparison", "fields": [{ "key": "label", "label": "Headline", "type": "text", "default": "GAP ON TRACK" }] },
+    "flag": { "label": "Flag", "description": "Race-control notice", "fields": [{ "key": "message", "label": "Override message", "type": "text", "default": "" }] },
+    "lower-third": { "label": "Lower third", "description": "Production announcement", "fields": [{ "key": "headline", "label": "Headline", "type": "text", "default": "ENDURANCE UPDATE" }, { "key": "detail", "label": "Detail", "type": "text", "default": "" }] }
+  }
+}

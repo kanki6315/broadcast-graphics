@@ -1,0 +1,16 @@
+:root {
+  --gfx-ink: #f5f8fa;
+  --gfx-surface: rgba(8, 22, 34, 0.96);
+  --gfx-surface-soft: rgba(17, 39, 56, 0.95);
+  --gfx-accent: #35b8ff;
+  --gfx-muted: #9bb8c9;
+  --gfx-font-display: "Arial Narrow", "Roboto Condensed", sans-serif;
+  --gfx-font-data: "Segoe UI", sans-serif;
+  --gfx-cut: 0px;
+}
+
+.overlay-surface { color: var(--gfx-ink); font-family: var(--gfx-font-data); filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.4)); }
+.overlay-plate { background: linear-gradient(100deg, var(--gfx-surface), var(--gfx-surface-soft)); border-top: 3px solid var(--gfx-accent); }
+.overlay-accent { background: var(--gfx-accent); color: #06131d; }
+.overlay-rule { border-color: color-mix(in srgb, var(--gfx-muted), transparent 45%); }
+.overlay-title { font-family: var(--gfx-font-display); font-stretch: condensed; text-transform: uppercase; letter-spacing: 0.05em; }

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.impeccable/
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+apps/server/data/
+client/**/bin/
+client/**/obj/

@@ -1,0 +1,25 @@
+:root {
+  --gfx-ink: #f7f4ec;
+  --gfx-surface: rgba(18, 21, 23, 0.96);
+  --gfx-surface-soft: rgba(30, 34, 36, 0.94);
+  --gfx-accent: #ff4b21;
+  --gfx-muted: #b8c2bd;
+  --gfx-font-display: "Arial Narrow", "Roboto Condensed", sans-serif;
+  --gfx-font-data: "Segoe UI", sans-serif;
+  --gfx-cut: 10px;
+}
+
+.overlay-surface {
+  color: var(--gfx-ink);
+  font-family: var(--gfx-font-data);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
+}
+
+.overlay-plate {
+  background: var(--gfx-surface);
+  clip-path: polygon(0 0, calc(100% - var(--gfx-cut)) 0, 100% var(--gfx-cut), 100% 100%, var(--gfx-cut) 100%, 0 calc(100% - var(--gfx-cut)));
+}
+
+.overlay-accent { background: var(--gfx-accent); color: #111; }
+.overlay-rule { border-color: color-mix(in srgb, var(--gfx-muted), transparent 45%); }
+.overlay-title { font-family: var(--gfx-font-display); font-stretch: condensed; text-transform: uppercase; }
