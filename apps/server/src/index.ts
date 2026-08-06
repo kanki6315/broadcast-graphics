@@ -10,6 +10,7 @@ import type { ClientMessage, ServerMessage } from "@racecontrol/protocol";
 import { createAuthenticationStore } from "./auth-store.js";
 import { PackageRegistry } from "./package-registry.js";
 import { startSimulator } from "./simulator.js";
+import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
 import { StateStore } from "./state-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -37,7 +38,7 @@ await auth.initialize();
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
 const store = new StateStore(packages[0]?.id ?? "apex");
-const sockets = new Set<WebSocket>();
+const sockets = new Map<WebSocket, SocketRole>();
 const loginAttempts = new Map<string, { count: number; resetsAt: number }>();
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -184,15 +185,15 @@ function send(socket: WebSocket, message: ServerMessage): void {
 
 function broadcast(): void {
   const message: ServerMessage = { type: "state.snapshot", payload: store.snapshot() };
-  for (const socket of sockets) send(socket, message);
+  broadcastStateSnapshot(sockets, message);
 }
 
 store.subscribe(broadcast);
 
 wss.on("connection", (socket, request) => {
-  const role = new URL(request.url ?? "/socket", "http://localhost").searchParams.get("role");
-  sockets.add(socket);
-  send(socket, { type: "state.snapshot", payload: store.snapshot() });
+  const role = new URL(request.url ?? "/socket", "http://localhost").searchParams.get("role") as SocketRole;
+  sockets.set(socket, role);
+  if (role !== "telemetry") send(socket, { type: "state.snapshot", payload: store.snapshot() });
 
   socket.on("message", async (data) => {
     try {
@@ -205,6 +206,10 @@ wss.on("connection", (socket, request) => {
     }
   });
 
+  socket.on("error", (error) => {
+    sockets.delete(socket);
+    app.log.warn({ err: error, role }, "WebSocket connection error");
+  });
   socket.on("close", () => sockets.delete(socket));
 });
 
@@ -220,7 +225,7 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   app.log.info({ signal }, "Shutting down");
   stopSimulator?.();
-  for (const socket of sockets) socket.close(1012, "Server restarting");
+  for (const socket of sockets.keys()) socket.close(1012, "Server restarting");
   await app.close();
   await auth.close();
 }

@@ -4,7 +4,7 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 
 ## Components
 
-- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and diagnostic-replay sources plus local capture.
+- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and diagnostic-replay sources, local capture, and automatic server reconnection.
 - `apps/server`: authoritative live state, WebSocket ingestion/control, package discovery, and production static hosting.
 - `apps/web`: the operator panel and transparent browser-overlay routes.
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.

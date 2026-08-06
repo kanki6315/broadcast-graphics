@@ -23,6 +23,8 @@ public sealed record TelemetryBridgeStatus(
 public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(10);
     private readonly object gate = new();
     private CancellationTokenSource? cancellation;
     private Task? runTask;
@@ -175,8 +177,14 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
             try
             {
                 socket.Options.SetRequestHeader("Authorization", $"Bearer {options.IngestionKey}");
+                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+                socket.Options.KeepAliveTimeout = TimeSpan.FromSeconds(10);
                 WriteLog($"Connecting to {endpoint.Host}…");
-                await socket.ConnectAsync(endpoint, cancellationToken);
+                await WithTimeoutAsync(
+                    token => socket.ConnectAsync(endpoint, token),
+                    ConnectTimeout,
+                    "Server connection timed out.",
+                    cancellationToken);
                 UpdateStatus(current => current with { ServerConnected = true, LastError = null });
                 diagnostics.TryRecord("events.ndjson", new { type = "server.connected", endpoint = endpoint.Host });
                 WriteLog("Server connected.");
@@ -187,24 +195,52 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                     role = "telemetry",
                     clientId = Environment.MachineName
                 }, JsonOptions);
-                await socket.SendAsync(hello, WebSocketMessageType.Text, true, cancellationToken);
+                await SendAsync(socket, hello, cancellationToken);
 
-                while (await snapshots.WaitToReadAsync(cancellationToken))
+                using var connectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var receiveTask = MonitorServerAsync(socket, connectionCancellation.Token);
+
+                try
                 {
-                    while (snapshots.TryRead(out var snapshot))
+                    while (true)
                     {
-                        diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
-                        var payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "telemetry.update", payload = snapshot }, JsonOptions);
-                        await socket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
-                        UpdateStatus(current => current with
+                        var availableTask = snapshots.WaitToReadAsync(connectionCancellation.Token).AsTask();
+                        var completedTask = await Task.WhenAny(availableTask, receiveTask);
+                        if (completedTask == receiveTask)
                         {
-                            Streaming = true,
-                            LastTelemetryAt = DateTimeOffset.UtcNow,
-                            LastError = null
-                        });
+                            await receiveTask;
+                            throw new WebSocketException("The server connection ended.");
+                        }
+                        if (!await availableTask) return;
+
+                        while (snapshots.TryRead(out var snapshot))
+                        {
+                            diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
+                            var payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "telemetry.update", payload = snapshot }, JsonOptions);
+                            var sendTask = SendAsync(socket, payload, connectionCancellation.Token);
+                            completedTask = await Task.WhenAny(sendTask, receiveTask);
+                            if (completedTask == receiveTask)
+                            {
+                                connectionCancellation.Cancel();
+                                await receiveTask;
+                            }
+                            await sendTask;
+                            UpdateStatus(current => current with
+                            {
+                                Streaming = true,
+                                LastTelemetryAt = DateTimeOffset.UtcNow,
+                                LastError = null
+                            });
+                        }
                     }
                 }
-                return;
+                finally
+                {
+                    await connectionCancellation.CancelAsync();
+                    try { await receiveTask; }
+                    catch (OperationCanceledException) when (connectionCancellation.IsCancellationRequested) { }
+                    catch when (cancellationToken.IsCancellationRequested) { }
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -222,6 +258,52 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                 WriteLog($"Server connection lost: {error.Message}. Retrying in 2 seconds.");
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
             }
+        }
+    }
+
+    private static Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken) =>
+        WithTimeoutAsync(
+            token => socket.SendAsync(payload, WebSocketMessageType.Text, true, token).AsTask(),
+            SendTimeout,
+            "Sending telemetry to the server timed out.",
+            cancellationToken);
+
+    private static async Task MonitorServerAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[8_192];
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await socket.ReceiveAsync(buffer, cancellationToken);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    var description = string.IsNullOrWhiteSpace(result.CloseStatusDescription)
+                        ? "no reason provided"
+                        : result.CloseStatusDescription;
+                    throw new WebSocketException($"Server closed the connection ({result.CloseStatus}: {description}).");
+                }
+            }
+            while (!result.EndOfMessage);
+        }
+    }
+
+    private static async Task WithTimeoutAsync(
+        Func<CancellationToken, Task> operation,
+        TimeSpan timeout,
+        string timeoutMessage,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellation.CancelAfter(timeout);
+        try
+        {
+            await operation(timeoutCancellation.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException(timeoutMessage);
         }
     }
 

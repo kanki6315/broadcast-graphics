@@ -229,7 +229,13 @@ public partial class MainWindow : Window
                 ? "Replay complete"
                 : replayPaused
                     ? "Replay paused"
-                    : status.Streaming ? "Telemetry flowing" : status.SourceConnected ? "Waiting for server" : "Waiting for telemetry";
+                    : status.Streaming
+                        ? "Telemetry flowing"
+                        : !status.ServerConnected
+                            ? "Waiting for server"
+                            : status.SourceConnected && status.LastTelemetryAt is not null
+                                ? "Telemetry transport stalled"
+                                : "Waiting for telemetry";
             ReplayTransportPanel.Visibility = replayActive && status.ServerConnected ? Visibility.Visible : Visibility.Collapsed;
             LastSentText.Text = status.LastTelemetryAt is { } sent
                 ? $"LAST SENT {sent.ToLocalTime():HH:mm:ss}"

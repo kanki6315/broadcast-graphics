@@ -17,6 +17,9 @@ Run this check on the iRacing PC before treating a client build as release-ready
 4. Confirm the written statuses progress to **Connected to graphics server**, an SDK connected state, and **Telemetry flowing**.
 5. Confirm the control panel timing data follows the active iRacing session.
 6. Disconnect the network briefly, restore it, and confirm the client retries without being restarted.
+7. Move through practice, qualifying, and race without restarting the client. Confirm telemetry resumes after each SDK reconnect.
+8. Restart the server while iRacing remains connected. Confirm the client reports the lost connection, retries, and resumes sending without being restarted.
+9. Leave telemetry connected for at least 20 minutes and confirm **Last sent** continues to advance and the server never marks telemetry stale.
 
 ## Diagnostics
 
