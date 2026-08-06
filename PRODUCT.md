@@ -40,7 +40,8 @@ One live race-state model powers both the on-air graphics and the operator contr
 - Camera-group and focused-driver control are explicitly deferred beyond the first graphics-focused milestone.
 - Driver selection is part of the first control-panel information model so it can become the future hook for focused-driver camera control without redesigning the workflow.
 - The telemetry client must tolerate reconnects and avoid disrupting iRacing.
-- Exact deployment target, authentication model, data-retention window, and product name remain open decisions.
+- Authentication uses one administrator account, browser sessions for control, independently revocable ingestion keys for telemetry clients, and revocable view-only keys for browser overlays.
+- Exact deployment target and data-retention window remain open decisions.
 
 ## Evidence on Hand
 

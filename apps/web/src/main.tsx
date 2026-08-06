@@ -6,11 +6,11 @@ import "@fontsource/source-sans-3/600.css";
 import "./styles.css";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ControlPanel } from "./control-panel";
+import { AdminApp } from "./auth-app";
 import { OverlayApp } from "./overlay";
 
 const isOverlay = window.location.pathname.startsWith("/overlay/");
 
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>{isOverlay ? <OverlayApp /> : <ControlPanel />}</React.StrictMode>,
+  <React.StrictMode>{isOverlay ? <OverlayApp /> : <AdminApp />}</React.StrictMode>,
 );

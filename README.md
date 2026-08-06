@@ -35,17 +35,20 @@ dotnet run --project client/TelemetryClient -- --simulate --server ws://localhos
 
 Disable the server simulator with `DISABLE_SIMULATOR=1` when using the client.
 
-On the Windows PC running iRacing, omit `--simulate` to stream live SDK data:
+Create an ingestion key in **Access management** in the control panel. On the Windows PC running iRacing, set that key and omit `--simulate` to stream live SDK data:
 
-```bash
-dotnet run --project client/TelemetryClient -- --server ws://localhost:8787/socket
+```powershell
+$env:BROADCAST_GRAPHICS_INGESTION_KEY="bg_ing_..."
+dotnet run --project client/TelemetryClient -- --server wss://your-server.example/socket
 ```
 
 An iRacing telemetry recording can be replayed at real-time speed on any development machine:
 
 ```bash
-dotnet run --project client/TelemetryClient -- --ibt path/to/session.ibt --server ws://localhost:8787/socket
+dotnet run --project client/TelemetryClient -- --ibt path/to/session.ibt --server ws://localhost:8787/socket --key bg_ing_...
 ```
+
+The server requires `ADMIN_PASSWORD` in production. In development it prints a random one-time admin password at startup. Access keys are stored hashed in `apps/server/data/auth.json`; their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
 
 ## Runtime graphic packages
 

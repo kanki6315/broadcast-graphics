@@ -2,11 +2,23 @@ import { WebSocket } from "ws";
 import type { LiveState, ServerMessage } from "@racecontrol/protocol";
 
 const baseUrl = process.env.E2E_URL ?? "http://127.0.0.1:8787";
+const adminUsername = process.env.E2E_ADMIN_USERNAME ?? "admin";
+const adminPassword = process.env.E2E_ADMIN_PASSWORD;
+if (!adminPassword) throw new Error("E2E_ADMIN_PASSWORD is required.");
 const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json()) as { ok: boolean };
 if (!health.ok) throw new Error("Health endpoint did not report ready.");
 
-const socketUrl = baseUrl.replace(/^http/, "ws") + "/socket";
-const socket = new WebSocket(socketUrl);
+const login = await fetch(`${baseUrl}/api/auth/login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ username: adminUsername, password: adminPassword }),
+});
+if (!login.ok) throw new Error(`Admin login failed with status ${login.status}.`);
+const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
+if (!cookie) throw new Error("Admin login did not return a session cookie.");
+
+const socketUrl = baseUrl.replace(/^http/, "ws") + "/socket?role=control";
+const socket = new WebSocket(socketUrl, { headers: { Cookie: cookie } });
 let latest: LiveState | null = null;
 
 const waitFor = (predicate: (state: LiveState) => boolean, timeoutMs = 4_000) => new Promise<LiveState>((resolve, reject) => {
