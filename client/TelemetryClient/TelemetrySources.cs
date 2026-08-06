@@ -6,27 +6,41 @@ namespace RaceControl.TelemetryClient;
 
 public interface ITelemetrySource : IAsyncDisposable
 {
+    event Action<bool, string>? ConnectionChanged;
+    event Action<string>? Log;
     IAsyncEnumerable<SessionState> ReadAsync(CancellationToken cancellationToken);
 }
 
-public sealed class SimulatedTelemetrySource : ITelemetrySource
+public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource
 {
     private static readonly string[] Names = ["Maya Anderson", "Jon Bell", "Riley Patterson", "Alejandra Garcia", "Bryn Thompson", "Dev Morris"];
+    public event Action<bool, string>? ConnectionChanged;
+    public event Action<string>? Log;
 
     public async IAsyncEnumerable<SessionState> ReadAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        ConnectionChanged?.Invoke(true, "Simulation ready");
+        Log?.Invoke("Simulated telemetry started.");
+        diagnostics.TryRecord("events.ndjson", new { type = "simulation.started" });
         var tick = 0;
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            tick++;
-            var drivers = Names.Select((name, index) => new DriverState(
-                index, index + 1, (23 + index * 7).ToString(), name, $"Team {index + 1}", "GT3",
-                index == 0 ? null : index * 0.72 + Math.Sin(tick / 8d + index) * 0.15,
-                81.4 + index * 0.22 + Math.Sin(tick / 7d + index) * 0.2,
-                81.1 + index * 0.22, 18, false, index % 3)).ToArray();
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                tick++;
+                var drivers = Names.Select((name, index) => new DriverState(
+                    index, index + 1, (23 + index * 7).ToString(), name, $"Team {index + 1}", "GT3",
+                    index == 0 ? null : index * 0.72 + Math.Sin(tick / 8d + index) * 0.15,
+                    81.4 + index * 0.22 + Math.Sin(tick / 7d + index) * 0.2,
+                    81.1 + index * 0.22, 18, false, index % 3)).ToArray();
 
-            yield return new SessionState("client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course", 18, 40, null, "green", DateTimeOffset.UtcNow.ToString("O"), drivers);
-            await Task.Delay(250, cancellationToken);
+                yield return new SessionState("client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course", 18, 40, null, "green", DateTimeOffset.UtcNow.ToString("O"), drivers);
+                await Task.Delay(250, cancellationToken);
+            }
+        }
+        finally
+        {
+            ConnectionChanged?.Invoke(false, "Simulation stopped");
         }
     }
 
@@ -47,11 +61,15 @@ public sealed class SimulatedTelemetrySource : ITelemetrySource
     TelemetryVar.CarIdxBestLapTime,
     TelemetryVar.CarIdxOnPitRoad
 ])]
-public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemetrySource
+public sealed class IracingSdkTelemetrySource(
+    string? ibtPath,
+    DiagnosticCapture diagnostics) : ITelemetrySource
 {
+    public event Action<bool, string>? ConnectionChanged;
+    public event Action<string>? Log;
+
     public async IAsyncEnumerable<SessionState> ReadAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        // This boundary intentionally keeps the vendor SDK out of transport and presentation code.
         var snapshots = Channel.CreateBounded<SessionState>(new BoundedChannelOptions(4)
         {
             SingleReader = true,
@@ -63,6 +81,7 @@ public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemet
         await using var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, ibtOptions);
 
         TelemetrySessionInfo? sessionInfo = null;
+        string? latestRawSessionInfo = null;
         long lastSnapshotTick = 0;
         var handlers = new TelemetryHandlers<TelemetryData>
         {
@@ -71,8 +90,20 @@ public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemet
                 Volatile.Write(ref sessionInfo, update);
                 return Task.CompletedTask;
             },
+            OnRawSessionInfoUpdate = yaml =>
+            {
+                Volatile.Write(ref latestRawSessionInfo, yaml);
+                diagnostics.TryRecord("session-info.ndjson", new { yaml });
+                return Task.CompletedTask;
+            },
             OnTelemetryUpdate = telemetry =>
             {
+                diagnostics.TryRecordSampled("sdk-telemetry", "telemetry.ndjson", telemetry);
+                diagnostics.TryRecordOnce("variable-inventory", "variables.ndjson", new { variables = client.GetTelemetryVariables() });
+                var rawSession = Volatile.Read(ref latestRawSessionInfo);
+                if (rawSession is not null)
+                    diagnostics.TryRecordOnce("initial-session-info", "session-info.ndjson", new { yaml = rawSession, initial = true });
+
                 var now = System.Diagnostics.Stopwatch.GetTimestamp();
                 if (lastSnapshotTick != 0 &&
                     System.Diagnostics.Stopwatch.GetElapsedTime(lastSnapshotTick, now) < TimeSpan.FromMilliseconds(100))
@@ -88,12 +119,16 @@ public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemet
             },
             OnConnectStateChanged = state =>
             {
-                Console.WriteLine($"iRacing SDK: {state}");
+                var connected = string.Equals(state.ToString(), "Connected", StringComparison.OrdinalIgnoreCase);
+                var label = ibtPath is null ? $"iRacing SDK — {state}" : $"IBT playback — {state}";
+                ConnectionChanged?.Invoke(connected, label);
+                Log?.Invoke(label);
                 return Task.CompletedTask;
             },
             OnError = error =>
             {
-                Console.Error.WriteLine($"iRacing SDK error: {error.Message}");
+                Log?.Invoke($"iRacing SDK error: {error.Message}");
+                diagnostics.TryRecord("events.ndjson", new { type = "sdk.error", error = error.Message });
                 return Task.CompletedTask;
             }
         };
@@ -108,6 +143,7 @@ public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemet
         {
             await monitorCancellation.CancelAsync();
             try { await monitorTask; } catch (OperationCanceledException) { }
+            ConnectionChanged?.Invoke(false, ibtPath is null ? "iRacing SDK disconnected" : "IBT playback stopped");
         }
     }
 
@@ -147,8 +183,7 @@ public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemet
 
         var weekend = info.WeekendInfo;
         var trackName = weekend?.TrackDisplayName;
-        if (string.IsNullOrWhiteSpace(trackName))
-            trackName = weekend?.TrackName;
+        if (string.IsNullOrWhiteSpace(trackName)) trackName = weekend?.TrackName;
 
         return new SessionState(
             $"{weekend?.SubSessionID ?? 0}-{sessionNumber}",
@@ -170,7 +205,6 @@ public sealed class IracingSdkTelemetrySource(string? ibtPath = null) : ITelemet
     {
         var index = driver.CarIdx;
         results.TryGetValue(index, out var result);
-
         return new DriverState(
             index,
             ValueAt(telemetry.CarIdxPosition, index),

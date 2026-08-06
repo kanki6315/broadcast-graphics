@@ -4,7 +4,7 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 
 ## Components
 
-- `client/TelemetryClient`: Windows .NET telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with simulated and IBT-playback modes for development.
+- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and IBT-playback sources plus local diagnostic capture.
 - `apps/server`: authoritative live state, WebSocket ingestion/control, package discovery, and production static hosting.
 - `apps/web`: the operator panel and transparent browser-overlay routes.
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
@@ -26,27 +26,40 @@ http://localhost:5173/overlay/driver-focus?package=apex
 http://localhost:5173/overlay/race-status?package=apex
 ```
 
-Build the Windows bridge with the .NET 10 SDK:
+### Windows telemetry client
+
+Build the Windows bridge with the .NET 10 SDK. Running the project opens the desktop client:
 
 ```bash
 dotnet build client/TelemetryClient
-dotnet run --project client/TelemetryClient -- --simulate --server ws://localhost:8787/socket
+dotnet run --project client/TelemetryClient -- --simulate --server ws://localhost:8787
 ```
 
-Disable the server simulator with `DISABLE_SIMULATOR=1` when using the client.
+Paste an ingestion key from **Access management**, choose a telemetry source, and select **Connect**. If **Remember this key** is enabled, the secret is stored in Windows Credential Manager; other preferences are stored under the current user's local application data. Disable the server simulator with `DISABLE_SIMULATOR=1` when using the client.
 
-Create an ingestion key in **Access management** in the control panel. On the Windows PC running iRacing, set that key and omit `--simulate` to stream live SDK data:
+For the hosted service, enter `https://broadcasts.arjunakankipati.com` as the server URL. The client converts HTTP(S) URLs to the corresponding authenticated WebSocket endpoint. Command-line options remain available to prefill non-secret connection settings:
 
 ```powershell
-$env:BROADCAST_GRAPHICS_INGESTION_KEY="bg_ing_..."
-dotnet run --project client/TelemetryClient -- --server wss://your-server.example/socket
+dotnet run --project client/TelemetryClient -- --server https://broadcasts.arjunakankipati.com
 ```
 
-An iRacing telemetry recording can be replayed at real-time speed on any development machine:
+Use **Diagnostics** after connecting to capture the SDK variable inventory, raw session YAML, sampled selected telemetry, normalized server payloads, connection events, and client errors. Choose a sampling rate and a fixed duration, or choose **Manual stop** and finish with **Stop & Save**. Captures remain local and are saved as ZIP files; ingestion keys are never written into them.
 
-```bash
-dotnet run --project client/TelemetryClient -- --ibt path/to/session.ibt --server ws://localhost:8787/socket --key bg_ing_...
+An iRacing telemetry recording can be replayed at real-time speed on a Windows development machine:
+
+```powershell
+dotnet run --project client/TelemetryClient -- --ibt C:\recordings\session.ibt --server http://localhost:8787
 ```
+
+Create a self-contained, single-file `win-x64` release from PowerShell:
+
+```powershell
+.\client\publish-windows.ps1
+```
+
+The distributable is written to `artifacts\windows-client\BroadcastGraphicsClient.exe`. The destination PC does not need a separate .NET installation. Windows may show a SmartScreen warning until releases are code-signed.
+
+Before a release, complete the [Windows telemetry client smoke test](docs/windows-client-smoke-test.md), including the 100% and 150% display-scaling checks.
 
 The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys and admin sessions are stored in PostgreSQL; key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
 
@@ -71,12 +84,7 @@ The repository includes a multi-stage production `Dockerfile` and `railway.toml`
 4. Confirm that Railway reports `/api/health` as healthy, then open `/control` and create one ingestion key and one view key.
 5. Add `broadcasts.arjunakankipati.com` as the Railway service's custom domain. In Cloudflare DNS, create the CNAME Railway supplies. Keep it DNS-only while validating HTTPS and WebSockets; Cloudflare proxying can be enabled after the end-to-end test succeeds.
 
-Use the production telemetry endpoint on the iRacing computer:
-
-```powershell
-$env:BROADCAST_GRAPHICS_INGESTION_KEY="bg_ing_..."
-dotnet run --project client/TelemetryClient -- --server wss://broadcasts.arjunakankipati.com/socket
-```
+Use `https://broadcasts.arjunakankipati.com` as the desktop telemetry client's production server URL.
 
 Railway deploys should be performed outside a live broadcast. The current live race state is held in one server process, so a deployment restarts the session and connected clients will reconnect automatically. PostgreSQL preserves administrator sessions and access keys across that restart.
 

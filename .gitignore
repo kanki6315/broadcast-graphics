@@ -8,3 +8,4 @@ dist/
 apps/server/data/
 client/**/bin/
 client/**/obj/
+artifacts/

@@ -8,6 +8,8 @@ colors:
   inspection-green-gray: "#b8c2bd"
   ledger-muted: "#626b68"
   paper-rule: "rgba(21, 25, 28, 0.19)"
+  native-rule: "#4d15191c"
+  native-interaction-wash: "#26b8c2bd"
   connected-green: "#177344"
   disconnected-ink: "#2b2523"
   disconnected-copy: "#f2c5b8"
@@ -103,6 +105,8 @@ The interface is a live race-production instrument printed on technical stock: t
 
 The global control desk has one durable visual identity, while browser-source overlays inherit their visual identity from the selected graphic package. That boundary is intentional: the control panel always operates semantic graphic slots, and package themes may change palette, type, plate geometry, and depth without restyling the operator workflow.
 
+The native Windows telemetry client is the same Scrutineering Ledger translated into authored WPF controls. It is scan-first rather than dashboard-like: a server/source/stream health strip precedes a connection sheet on the left and diagnostics with activity on the right. Native platform behavior remains intact, but default visual chrome does not replace the shared stock, rules, type, or state language.
+
 **Key Characteristics:**
 
 - Off-white technical stock, near-black ink, muted gray-green inspection fields, and fluorescent orange state stamps.
@@ -110,6 +114,7 @@ The global control desk has one durable visual identity, while browser-source ov
 - Square controls, dense rules, and visible state labels; no ornamental cards or ambient animation.
 - A timing-first desktop composition that collapses into a readable single-column operating sequence.
 - Transparent overlays built from stable layouts and runtime package tokens.
+- A native telemetry boundary with packaged fonts, explicit health text, and square authored controls.
 
 ## Colors
 
@@ -137,6 +142,7 @@ The control palette is mostly paper and ink; color is scarce, semantic, and alwa
 - **Carbon Ink** (`#15191c`): primary copy, section rules, selected rows, dark actions, and inverse table headers.
 - **Ledger Muted** (`#626b68`): descriptions, secondary data, and field labels.
 - **Paper Rule** (`rgba(21, 25, 28, 0.19)`): quiet row dividers and dotted log rules.
+- **Native Rule / Interaction Wash** (`#4d15191c` / `#26b8c2bd`): WPF health-strip divisions and restrained hover feedback, expressed as alpha-bearing ARGB resources rather than new hues.
 - **Disconnected Ink / Copy** (`#2b2523` / `#f2c5b8`): explicit feed-failure plate and supporting diagnostic text.
 
 **The Approval Stamp Rule.** Orange marks a state change or decisive action; it is not a general decoration or large ambient background.
@@ -151,6 +157,8 @@ Authentication follows the same discipline: green is limited to the success icon
 
 **Body Font:** Source Sans 3 (sans-serif fallback)
 **Overlay Package Fonts:** supplied through `--gfx-font-display` and `--gfx-font-data`; current packages use condensed system display faces and Segoe UI data text.
+
+The Windows client packages Barlow Condensed and Source Sans 3 in the application and references them with WPF pack URIs. Do not fall back to a system display face for authored native surfaces when those resources are available.
 
 **Character:** Condensed uppercase type gives headings and controls the force of pit-lane labels, while Source Sans 3 keeps instructions and dense operational copy calm. Race values use tabular numerals so columns do not twitch as telemetry changes.
 
@@ -174,11 +182,15 @@ At `1050px`, masthead cells form two columns, timing and production become verti
 
 Authentication preserves the same measured stock-and-rule composition. Login is a centered sheet no wider than `470px`. Access management uses a `300–390px` key-issue column beside a fluid key register; it stacks at `1050px`. At `700px`, the access masthead becomes a two-row control strip and each register row becomes a labeled vertical record: hide the table header, repeat each field label with `data-label`, use dotted internal dividers, and close each record with a `2px` ink rule. Compact access navigation and row actions must retain at least a `44px` touch target.
 
+The native telemetry client opens centered at `1080 × 760px` with an `880 × 650px` minimum. Its vertical scan is fixed: `82px` identity masthead, `88px` three-cell health strip, flexible work area, then a `34px` privacy/activity footer. The work area uses a `9:11` split with minimum widths of `390px` and `430px`: connection settings scroll independently on the left, while diagnostics sit above a separately ruled activity log on the right. Preserve this source-to-stream reading order; the client is a bridge health instrument, not a telemetry dashboard.
+
 Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, and lower-third use viewport-relative offsets and purpose-built dimensions; do not apply the control-panel responsive grid to them.
 
 ## Elevation & Depth
 
 The control desk is flat. It uses no ambient box shadows: hierarchy comes from tonal fields, border weight, inverse ink plates, and state stamps. The only inset accents are structural state marks, such as the focused-row orange bar or next-cue top rule.
+
+The native client follows the same flat rule. WPF regions are separated by `1–3px` borders, pale alpha washes, inverse footer ink, and state bars; do not add native drop shadows, raised panels, or floating cards.
 
 Overlays are the exception because they must separate from unpredictable video. Package themes may supply a restrained drop shadow (`0 8px 16px rgba(0,0,0,.35)` in Apex Signal; `0 8px 18px rgba(0,0,0,.4)` in Endurance Blue) and opaque or near-opaque plates.
 
@@ -187,6 +199,8 @@ Overlays are the exception because they must separate from unpredictable video. 
 ## Shapes
 
 Control-panel geometry is square (`0px` radius). Inputs, selects, toggles, row buttons, cue plates, actions, and the emergency clear all use hard corners and visible rules. Decisive state can appear as a stamp, inset stripe, inverse plate, or clipped reveal; avoid pill silhouettes.
+
+Native controls are deliberately authored rather than left to default WPF chrome. Text, password, combo-box, popup, and button templates keep square borders; hover uses the inspection wash, keyboard focus thickens the field rule and adds an external orange focus frame, press/default state thickens the button rule, and disabled controls remain structurally present at `0.48` opacity.
 
 Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: Apex Signal clips two corners by `10px`, while Endurance Blue keeps `0px` corners and uses a colored top rule. Package-specific geometry must remain in `graphic-packages/<id>/theme.css`, not in the global control grammar.
 
@@ -222,6 +236,23 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 
 - Inputs and selects are transparent, `34px` high, square, and bounded by a `1px` ink rule. Labels sit above in small uppercase display type.
 - The toggle is a square `42 × 24px` track with a `16px` block thumb. Checked state moves the thumb `18px` and turns it orange.
+
+### Native Health Strip
+
+- Place `SERVER`, `IRACING SOURCE`, and `DATA STREAM` in three equal cells immediately below the native masthead. Each cell combines a `10 × 42px` state bar, condensed uppercase source name, and plain-language status text announced with polite native live-region behavior.
+- The state bar is supportive, not sufficient: disconnected or waiting copy remains visible beside it. Truncate only the potentially long source description; never remove the source label or health meaning.
+
+### Native Connection, Diagnostics, and Activity
+
+- The left connection sheet keeps server URL, masked ingestion key, secure local-memory choice, source selector, conditional recording path, and connect/disconnect actions in one vertical sequence. Validation appears immediately before the actions as a focusable, assertive red-outlined panel with wrapping copy.
+- The right side keeps diagnostic sampling and duration controls above paired start/stop actions, written status, and capture path. The activity log is a separately ruled lower region with an explicit `CLEAR LOG` action; it is not a decorative console card.
+- Close the window with a full-width inverse footer that states the local-key and no-automatic-upload guarantees on the left and last-send state on the right.
+
+### Authored Native Controls
+
+- Native text, password, and combo fields have a `36px` minimum height, `1px` ink border, transparent or stock background, and packaged body type. Hover adds the inspection wash; keyboard focus uses the orange frame plus a `2px` field rule.
+- Native buttons use condensed semibold labels, `40px` minimum height, `14 × 8px` padding, square `1px` rules, and ink overlays for hover/press. Primary orange and dark inverse action pairs increase to `48px`; small tertiary utilities may use the shipped `28px` compact size when adjacent to a full-size field or section title.
+- Combo-box popup rows use stock at rest, inspection gray-green when highlighted, and orange plus stronger weight when selected. Preserve normal WPF keyboard navigation and selection semantics inside the authored visual template.
 
 ### Admin Login
 
@@ -261,6 +292,9 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - **Do** move focus into newly revealed, high-consequence authentication content such as the one-time secret receipt.
 - **Do** write every loading, pending, empty, active, revoked, success, and error state in specific operator language.
 - **Do** preserve `44px` minimum touch targets for compact access navigation and record actions.
+- **Do** keep the Windows client scan order as identity, three-source health, connection/diagnostics work, then privacy and last-send assurance.
+- **Do** package and use the shared Barlow Condensed and Source Sans 3 files in native authored surfaces.
+- **Do** pair native state bars with live-updating text so server, source, and stream health remain understandable without color.
 
 ### Don't:
 
@@ -273,3 +307,5 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - **Don't** use orange or green as generic authentication status fills; reserve orange for action/selection/confirmation and green for a reinforced success cue.
 - **Don't** collapse mobile key records into unlabeled values or require horizontal table scrolling for routine access management.
 - **Don't** leave keyboard focus behind when the issue form is replaced by the one-time secret receipt.
+- **Don't** let default WPF rounding, gradients, shadows, or typography replace the square Scrutineering Ledger control templates.
+- **Don't** turn the native telemetry client into a race-data or program-preview dashboard; it configures the bridge and exposes source-to-stream health, diagnostics, and local activity.
