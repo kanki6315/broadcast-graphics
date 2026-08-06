@@ -7,6 +7,8 @@ import {
   Crosshair,
   Flag,
   Layers3,
+  KeyRound,
+  LogOut,
   PackageOpen,
   Radio,
   TimerReset,
@@ -69,10 +71,23 @@ function FieldControl({ field, value, onChange }: {
   );
 }
 
-export function ControlPanel() {
+export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () => void; onLogout: () => Promise<void> }) {
   const { state, socketConnected, command } = useLiveState("control");
   const [packages, setPackages] = useState<GraphicPackageManifest[]>([]);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+
+  async function logout() {
+    setLoggingOut(true);
+    setLogoutError("");
+    try {
+      await onLogout();
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "Sign out failed. This session remains active.");
+      setLoggingOut(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/packages").then((response) => response.json()).then(setPackages).catch(() => setPackages([]));
@@ -123,12 +138,16 @@ export function ControlPanel() {
           <strong>{isSimulated ? `Simulated · ${state.session?.name}` : state.session?.name ?? "Waiting for session"}</strong>
           <span>{state.session ? `${state.session.trackName} · Lap ${state.session.lap}${state.session.totalLaps ? ` / ${state.session.totalLaps}` : ""}` : "No telemetry received"}</span>
         </div>
-        <label className="package-picker">
-          <span>Client package</span>
-          <select value={state.graphics.packageId} onChange={(event) => command({ type: "graphics.package.set", packageId: event.target.value })}>
-            {packages.map((item) => <option key={item.id} value={item.id}>{item.clientName} / {item.name}</option>)}
-          </select>
-        </label>
+        <div className="package-account-cell">
+          <label className="package-picker">
+            <span>Client package</span>
+            <select value={state.graphics.packageId} onChange={(event) => command({ type: "graphics.package.set", packageId: event.target.value })}>
+              {packages.map((item) => <option key={item.id} value={item.id}>{item.clientName} / {item.name}</option>)}
+            </select>
+          </label>
+          <div className="account-actions"><button onClick={onManageAccess}><KeyRound aria-hidden="true" />Access</button><button onClick={() => void logout()} disabled={loggingOut}><LogOut aria-hidden="true" />{loggingOut ? "Signing out" : "Sign out"}</button></div>
+          {logoutError && <span className="account-error" role="alert">{logoutError}</span>}
+        </div>
       </header>
 
       <main className="production-grid">

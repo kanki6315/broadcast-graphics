@@ -15,6 +15,8 @@ colors:
   caution-ink: "#17150a"
   stop-red: "#c53127"
   fastest-purple: "#7e3bd1"
+  validation-red: "#8d211b"
+  validation-wash: "rgba(197, 49, 39, 0.08)"
 typography:
   display:
     fontFamily: "Barlow Condensed, sans-serif"
@@ -127,6 +129,7 @@ The control palette is mostly paper and ink; color is scarce, semantic, and alwa
 - **Stop Red** (`#c53127`): red-flag state with explicit label text.
 - **Fastest Purple** (`#7e3bd1`): fastest-lap data and its written `FASTEST` tag.
 - **Connected Green** (`#177344`): healthy-feed icon only; the adjacent `CONNECTED` and `DATA FEED CURRENT` copy carries the meaning.
+- **Validation Red** (`#8d211b` on `rgba(197, 49, 39, 0.08)`): authentication, key-creation, key-register, revoke, and sign-out failures, always paired with explicit error copy and alert semantics.
 
 ### Neutral
 
@@ -139,6 +142,8 @@ The control palette is mostly paper and ink; color is scarce, semantic, and alwa
 **The Approval Stamp Rule.** Orange marks a state change or decisive action; it is not a general decoration or large ambient background.
 
 **The Redundancy Rule.** Never communicate live, preview, focused, disconnected, fastest, pit, or flag state through color alone.
+
+Authentication follows the same discipline: green is limited to the success icon on a created-key receipt, red belongs to explicit failures, and orange marks selection, focus, confirmation, or the primary action. Loading, pending, empty, active, and revoked states are written out rather than inferred from hue.
 
 ## Typography
 
@@ -167,6 +172,8 @@ Spacing is compact and multiples cluster around `4`, `8`, `12`, `16`, and `24px`
 
 At `1050px`, masthead cells form two columns, timing and production become vertical, and the rail forms two columns. At `700px`, the page becomes one column, the table hides last lap, best lap, and status, secondary driver/team copy is removed, and inspector fields stack. Preserve timing position, number, driver, and interval as the minimum mobile race-reading set.
 
+Authentication preserves the same measured stock-and-rule composition. Login is a centered sheet no wider than `470px`. Access management uses a `300–390px` key-issue column beside a fluid key register; it stacks at `1050px`. At `700px`, the access masthead becomes a two-row control strip and each register row becomes a labeled vertical record: hide the table header, repeat each field label with `data-label`, use dotted internal dividers, and close each record with a `2px` ink rule. Compact access navigation and row actions must retain at least a `44px` touch target.
+
 Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, and lower-third use viewport-relative offsets and purpose-built dimensions; do not apply the control-panel responsive grid to them.
 
 ## Elevation & Depth
@@ -191,6 +198,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - **Take:** full-width fluorescent orange field, near-black copy, `48px` minimum height, icon plus text, and an `Enter` keyboard hint.
 - **Clear:** full-width carbon ink with stock-colored copy. Emergency clear is taller (`66px` minimum), outlined in orange, and requires a second press within three seconds; confirmation reverses to orange and changes both headline and instruction.
 - **Focus:** every interactive control receives a `3px` orange `:focus-visible` outline with `2px` offset.
+- **Pending / Disabled:** preserve the control's label position, replace its verb with specific progress copy such as `CHECKING CREDENTIALS…`, `CREATING KEY…`, `REVOKING…`, or `SIGNING OUT…`, disable repeat activation, and use the shipped `0.48` opacity treatment.
 
 ### Chips and Status Plates
 
@@ -215,6 +223,25 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - Inputs and selects are transparent, `34px` high, square, and bounded by a `1px` ink rule. Labels sit above in small uppercase display type.
 - The toggle is a square `42 × 24px` track with a `16px` block thumb. Checked state moves the thumb `18px` and turns it orange.
 
+### Admin Login
+
+- Present authentication as an `AUTHORIZED OPERATORS ONLY` ledger sheet with a strong `8px` ink top rule, a `3px` bottom rule, shield mark, plain-language purpose, and a short two-field form.
+- Login fields are square, transparent, `42px` high, and use appropriate browser autocomplete. Place initial focus on the password field; expired sessions return to the same login state instead of leaving protected controls visible.
+- The primary submit is an orange, icon-labeled command with a `46px` minimum height. Put authentication failure copy inside the form near the fields with `role="alert"`; do not use toast-only failure feedback.
+
+### Access Management and Key Register
+
+- Keep key issuance and the register visually distinct but adjacent. Access type is a two-option radio ledger: the selected option receives an inspection fill and `4px` inset orange leading rule, while its title and explanation remain visible.
+- The register preserves label, scope, shortened identifier, issue date, written status, and row action. Active count is a bordered text plate; revoked records use muted ink, strikethrough, the literal `REVOKED` status, and a disabled action.
+- Revocation is a two-step inline action. The first press changes the same button to orange `CONFIRM REVOKE`; the pending request changes it to `REVOKING…`. Put a failed revoke directly beneath its record so the error remains attached to the affected key.
+- Loading uses `READING KEY REGISTER…` and `CHECKING`; load failure replaces the register with explicit error copy plus a `RETRY KEY REGISTER` action; empty state explains that no keys exist and names the useful first action. Key creation and revocation also announce completion through a nonvisual `role="status"` region.
+
+### One-Time Secret Receipt
+
+- Replace the issue form with a bordered receipt immediately after key creation. Move keyboard focus to the receipt, give it the same orange focus ring, and announce it politely so the one-time reveal cannot be missed.
+- Lead with `KEY CREATED` and the irreversible instruction `COPY IT NOW. THE COMPLETE VALUE CANNOT BE SHOWN AGAIN.` Show the read-only secret or example overlay URL in a monospace textarea, then provide explicit copy and done actions.
+- Copy success changes icon and text to `COPIED`; clipboard failure appears beside the receipt as an alert and tells the operator to select and copy manually. Never depend on success green alone, and never reveal a full secret later in the key register.
+
 ### Overlay Plates
 
 - Shared overlay components position and structure content; package themes own `--gfx-ink`, `--gfx-surface`, `--gfx-surface-soft`, `--gfx-accent`, `--gfx-muted`, `--gfx-font-display`, `--gfx-font-data`, and `--gfx-cut`.
@@ -231,6 +258,9 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - **Do** use text, icons, borders, patterns, and shape together so color never carries state by itself.
 - **Do** reduce motion to effectively zero when `prefers-reduced-motion` is active.
 - **Do** keep overlays transparent outside their graphic plates and let package tokens own their client-facing finish.
+- **Do** move focus into newly revealed, high-consequence authentication content such as the one-time secret receipt.
+- **Do** write every loading, pending, empty, active, revoked, success, and error state in specific operator language.
+- **Do** preserve `44px` minimum touch targets for compact access navigation and record actions.
 
 ### Don't:
 
@@ -240,3 +270,6 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.
 - **Don't** allow a package theme to alter control-panel layout, control styling, or operator terminology.
 - **Don't** animate continuously; use only decisive stamp/slide or opacity state changes around `180–260ms`.
+- **Don't** use orange or green as generic authentication status fills; reserve orange for action/selection/confirmation and green for a reinforced success cue.
+- **Don't** collapse mobile key records into unlabeled values or require horizontal table scrolling for routine access management.
+- **Don't** leave keyboard focus behind when the issue form is replaced by the one-time secret receipt.

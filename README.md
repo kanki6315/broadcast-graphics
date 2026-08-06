@@ -35,17 +35,50 @@ dotnet run --project client/TelemetryClient -- --simulate --server ws://localhos
 
 Disable the server simulator with `DISABLE_SIMULATOR=1` when using the client.
 
-On the Windows PC running iRacing, omit `--simulate` to stream live SDK data:
+Create an ingestion key in **Access management** in the control panel. On the Windows PC running iRacing, set that key and omit `--simulate` to stream live SDK data:
 
-```bash
-dotnet run --project client/TelemetryClient -- --server ws://localhost:8787/socket
+```powershell
+$env:BROADCAST_GRAPHICS_INGESTION_KEY="bg_ing_..."
+dotnet run --project client/TelemetryClient -- --server wss://your-server.example/socket
 ```
 
 An iRacing telemetry recording can be replayed at real-time speed on any development machine:
 
 ```bash
-dotnet run --project client/TelemetryClient -- --ibt path/to/session.ibt --server ws://localhost:8787/socket
+dotnet run --project client/TelemetryClient -- --ibt path/to/session.ibt --server ws://localhost:8787/socket --key bg_ing_...
 ```
+
+The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys and admin sessions are stored in PostgreSQL; key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
+
+## Railway deployment
+
+The repository includes a multi-stage production `Dockerfile` and `railway.toml`. The container builds the control panel, overlays, protocol package, and server into one deployment so HTTP, authentication, and WebSocket traffic share the same origin.
+
+1. Create a Railway project from this GitHub repository and deploy the application service.
+2. Add a Railway PostgreSQL service to the same project.
+3. Set these application-service variables:
+
+   ```text
+   NODE_ENV=production
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=<long generated password>
+   DATABASE_URL=${{Postgres.DATABASE_URL}}
+   DISABLE_SIMULATOR=1
+   ```
+
+   If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its `bg_access_keys` and `bg_admin_sessions` tables during startup.
+
+4. Confirm that Railway reports `/api/health` as healthy, then open `/control` and create one ingestion key and one view key.
+5. Add `broadcasts.arjunakankipati.com` as the Railway service's custom domain. In Cloudflare DNS, create the CNAME Railway supplies. Keep it DNS-only while validating HTTPS and WebSockets; Cloudflare proxying can be enabled after the end-to-end test succeeds.
+
+Use the production telemetry endpoint on the iRacing computer:
+
+```powershell
+$env:BROADCAST_GRAPHICS_INGESTION_KEY="bg_ing_..."
+dotnet run --project client/TelemetryClient -- --server wss://broadcasts.arjunakankipati.com/socket
+```
+
+Railway deploys should be performed outside a live broadcast. The current live race state is held in one server process, so a deployment restarts the session and connected clients will reconnect automatically. PostgreSQL preserves administrator sessions and access keys across that restart.
 
 ## Runtime graphic packages
 

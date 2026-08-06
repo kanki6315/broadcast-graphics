@@ -12,7 +12,13 @@ export function useLiveState(role: "control" | "overlay") {
 
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const socket = new WebSocket(`${protocol}//${window.location.host}/socket`);
+      const query = new URLSearchParams({ role });
+      let socketProtocols: string[] | undefined;
+      if (role === "overlay") {
+        const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
+        if (token) socketProtocols = ["bg-view", token];
+      }
+      const socket = new WebSocket(`${protocol}//${window.location.host}/socket?${query}`, socketProtocols);
       socketRef.current = socket;
       socket.addEventListener("open", () => {
         setSocketConnected(true);

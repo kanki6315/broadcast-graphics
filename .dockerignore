@@ -1,0 +1,11 @@
+.git
+.github
+.env
+.impeccable
+node_modules
+**/bin
+**/dist
+**/obj
+apps/server/data
+*.log
+*.tsbuildinfo

@@ -10,6 +10,21 @@ export const graphicSlots = [
 export type GraphicSlot = (typeof graphicSlots)[number];
 export type ConnectionStatus = "connected" | "stale" | "disconnected";
 export type SessionFlag = "green" | "yellow" | "red" | "white" | "checkered";
+export type AccessKeyKind = "ingestion" | "view";
+
+export interface AccessKey {
+  id: string;
+  kind: AccessKeyKind;
+  label: string;
+  prefix: string;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+export interface CreatedAccessKey {
+  key: AccessKey;
+  secret: string;
+}
 
 export interface DriverState {
   carIdx: number;
