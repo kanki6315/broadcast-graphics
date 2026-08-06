@@ -7,7 +7,7 @@ import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ClientMessage, ServerMessage } from "@racecontrol/protocol";
-import { AuthStore } from "./auth-store.js";
+import { createAuthenticationStore } from "./auth-store.js";
 import { PackageRegistry } from "./package-registry.js";
 import { startSimulator } from "./simulator.js";
 import { StateStore } from "./state-store.js";
@@ -16,7 +16,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "../../..");
 const packageRoot = resolve(projectRoot, "graphic-packages");
 const webRoot = resolve(projectRoot, "apps/web/dist");
-const authDataPath = resolve(projectRoot, "apps/server/data/auth.json");
+const authDataPath = process.env.AUTH_DATA_PATH ?? resolve(projectRoot, "apps/server/data/auth.json");
 
 const app = Fastify({ logger: true });
 const adminUsername = process.env.ADMIN_USERNAME ?? "admin";
@@ -26,7 +26,13 @@ if (!adminPassword) {
   adminPassword = randomBytes(18).toString("base64url");
   app.log.warn(`Development admin login — username: ${adminUsername} password: ${adminPassword}`);
 }
-const auth = new AuthStore(authDataPath, adminUsername, adminPassword);
+const auth = createAuthenticationStore({
+  databaseUrl: process.env.DATABASE_URL,
+  dataPath: authDataPath,
+  adminUsername,
+  adminPassword,
+  production: process.env.NODE_ENV === "production",
+});
 await auth.initialize();
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
@@ -59,8 +65,8 @@ function setSessionCookie(reply: { header(name: string, value: string): unknown 
   reply.header("Set-Cookie", `bg_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`);
 }
 
-function requireAdmin(request: { headers: { cookie?: string } }, reply: { code(status: number): { send(body: unknown): unknown } }): { username: string } | null {
-  const admin = auth.validateSession(sessionToken(request.headers.cookie));
+async function requireAdmin(request: { headers: { cookie?: string } }, reply: { code(status: number): { send(body: unknown): unknown } }): Promise<{ username: string } | null> {
+  const admin = await auth.validateSession(sessionToken(request.headers.cookie));
   if (!admin) reply.code(401).send({ error: "Authentication required." });
   return admin;
 }
@@ -95,28 +101,28 @@ app.post<{ Body: { username?: unknown; password?: unknown } }>("/api/auth/login"
   }
 
   loginAttempts.delete(request.ip);
-  setSessionCookie(reply, auth.createSession());
+  setSessionCookie(reply, await auth.createSession());
   return { username };
 });
 
 app.get("/api/auth/me", async (request, reply) => {
-  const admin = requireAdmin(request, reply);
+  const admin = await requireAdmin(request, reply);
   return admin ?? undefined;
 });
 
 app.post("/api/auth/logout", async (request, reply) => {
-  auth.revokeSession(sessionToken(request.headers.cookie));
+  await auth.revokeSession(sessionToken(request.headers.cookie));
   setSessionCookie(reply, "", 0);
   return { ok: true };
 });
 
 app.get("/api/auth/keys", async (request, reply) => {
-  if (!requireAdmin(request, reply)) return;
-  return auth.listKeys();
+  if (!await requireAdmin(request, reply)) return;
+  return await auth.listKeys();
 });
 
 app.post<{ Body: { kind?: unknown; label?: unknown } }>("/api/auth/keys", async (request, reply) => {
-  if (!requireAdmin(request, reply)) return;
+  if (!await requireAdmin(request, reply)) return;
   const kind = request.body?.kind;
   const label = typeof request.body?.label === "string" ? request.body.label.trim().slice(0, 80) : "";
   if ((kind !== "ingestion" && kind !== "view") || !label) {
@@ -126,17 +132,17 @@ app.post<{ Body: { kind?: unknown; label?: unknown } }>("/api/auth/keys", async 
 });
 
 app.delete<{ Params: { id: string } }>("/api/auth/keys/:id", async (request, reply) => {
-  if (!requireAdmin(request, reply)) return;
+  if (!await requireAdmin(request, reply)) return;
   if (!await auth.revokeKey(request.params.id)) return reply.code(404).send({ error: "Active key not found." });
   return { ok: true };
 });
 
 app.get("/api/state", async (request, reply) => {
-  if (!requireAdmin(request, reply)) return;
+  if (!await requireAdmin(request, reply)) return;
   return store.snapshot();
 });
 app.get("/api/packages", async (request, reply) => {
-  if (!requireAdmin(request, reply)) return;
+  if (!await requireAdmin(request, reply)) return;
   return registry.list();
 });
 
@@ -149,17 +155,26 @@ if (existsSync(webRoot)) {
   });
 }
 
+async function authorizeSocket(req: IncomingMessage): Promise<boolean> {
+  const url = new URL(req.url ?? "/socket", "http://localhost");
+  const role = url.searchParams.get("role");
+  if (role === "control") return await auth.validateSession(sessionToken(req.headers.cookie)) !== null;
+  if (role === "telemetry") return auth.validateAccessKey("ingestion", bearerToken(req.headers.authorization));
+  if (role === "overlay") return auth.validateAccessKey("view", viewToken(req.headers["sec-websocket-protocol"]));
+  return false;
+}
+
 const wss = new WebSocketServer({
   server: app.server,
   path: "/socket",
   maxPayload: 1_048_576,
-  verifyClient: ({ req }: { req: IncomingMessage }) => {
-    const url = new URL(req.url ?? "/socket", "http://localhost");
-    const role = url.searchParams.get("role");
-    if (role === "control") return auth.validateSession(sessionToken(req.headers.cookie)) !== null;
-    if (role === "telemetry") return auth.validateAccessKey("ingestion", bearerToken(req.headers.authorization));
-    if (role === "overlay") return auth.validateAccessKey("view", viewToken(req.headers["sec-websocket-protocol"]));
-    return false;
+  verifyClient: ({ req }: { req: IncomingMessage }, done) => {
+    void authorizeSocket(req)
+      .then((authorized) => done(authorized, authorized ? undefined : 401, authorized ? undefined : "Unauthorized"))
+      .catch((error) => {
+        app.log.error(error, "WebSocket authorization failed");
+        done(false, 500, "Authorization unavailable");
+      });
   },
 });
 
@@ -193,8 +208,30 @@ wss.on("connection", (socket, request) => {
   socket.on("close", () => sockets.delete(socket));
 });
 
-if (!process.env.DISABLE_SIMULATOR) startSimulator(store);
+const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store);
 
 const port = Number(process.env.PORT ?? 8787);
 await app.listen({ port, host: "0.0.0.0" });
 app.log.info(`Control panel: http://localhost:${port}/control`);
+
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  app.log.info({ signal }, "Shutting down");
+  stopSimulator?.();
+  for (const socket of sockets) socket.close(1012, "Server restarting");
+  await app.close();
+  await auth.close();
+}
+
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    void shutdown(signal)
+      .then(() => process.exit(0))
+      .catch((error) => {
+        app.log.error(error, "Shutdown failed");
+        process.exit(1);
+      });
+  });
+}
