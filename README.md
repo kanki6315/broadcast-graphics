@@ -61,6 +61,8 @@ Create a self-contained, single-file `win-x64` release from PowerShell:
 
 The distributable is written to `artifacts\windows-client\BroadcastGraphicsClient.exe`. The destination PC does not need a separate .NET installation. Windows may show a SmartScreen warning until releases are code-signed.
 
+Pushes to `main` that change `client/**` or `global.json` automatically publish the same self-contained build and its SHA-256 checksum to the rolling [`windows-client-latest`](https://github.com/kanki6315/broadcast-graphics/releases/tag/windows-client-latest) prerelease. The stable ZIP download is [`BroadcastGraphicsClient-win-x64.zip`](https://github.com/kanki6315/broadcast-graphics/releases/download/windows-client-latest/BroadcastGraphicsClient-win-x64.zip). The workflow can also be run manually from GitHub Actions when a rebuild is needed without a source change.
+
 Before a release, complete the [Windows telemetry client smoke test](docs/windows-client-smoke-test.md), including the 100% and 150% display-scaling checks.
 
 The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys and admin sessions are stored in PostgreSQL; key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
