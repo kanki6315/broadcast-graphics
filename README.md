@@ -4,11 +4,13 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 
 ## Components
 
-- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and IBT-playback sources plus local diagnostic capture.
+- `client/TelemetryClient`: Windows .NET desktop telemetry bridge using `SVappsLAB.iRacingTelemetrySDK`, with live, simulated, and diagnostic-replay sources, local capture, and automatic server reconnection.
 - `apps/server`: authoritative live state, WebSocket ingestion/control, package discovery, and production static hosting.
 - `apps/web`: the operator panel and consolidated transparent browser overlay.
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
+
+The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, and completed-lap metadata before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics and the [race-history model](docs/race-history.md) for durable lap storage.
 
 ## Quick start
 
@@ -43,11 +45,13 @@ dotnet run --project client/TelemetryClient -- --server https://broadcasts.arjun
 
 Use **Diagnostics** after connecting to capture the SDK variable inventory, raw session YAML, sampled selected telemetry, normalized server payloads, connection events, and client errors. Choose a sampling rate and a fixed duration, or choose **Manual stop** and finish with **Stop & Save**. Captures remain local and are saved as ZIP files; ingestion keys are never written into them.
 
-An iRacing telemetry recording can be replayed at real-time speed on a Windows development machine:
+Choose **Diagnostic replay** to stream a previously captured diagnostic ZIP without iRacing running. The client validates the capture, shows its session sequence, track, driver/class counts, duration, sample count, and format, then replays it at `0.5×`, captured `1×` timing, `2×`, or maximum speed. New captures use normalized output directly; compatible older captures containing SDK telemetry and session information are reconstructed with the current mapper. Replay can be paused, resumed, or restarted; it stops at the final sample and never loops.
 
 ```powershell
-dotnet run --project client/TelemetryClient -- --ibt C:\recordings\session.ibt --server http://localhost:8787
+dotnet run --project client/TelemetryClient -- --replay C:\captures\broadcast-diagnostics.zip --server http://localhost:8787
 ```
+
+Starting replay against a non-local server requires an explicit confirmation because replay replaces that server's current telemetry state. Diagnostic capture is disabled while an existing capture is being replayed.
 
 Create a self-contained, single-file `win-x64` release from PowerShell:
 
@@ -57,9 +61,11 @@ Create a self-contained, single-file `win-x64` release from PowerShell:
 
 The distributable is written to `artifacts\windows-client\BroadcastGraphicsClient.exe`. The destination PC does not need a separate .NET installation. Windows may show a SmartScreen warning until releases are code-signed.
 
+Pushes to `main` that change `client/**` or `global.json` automatically publish the same self-contained build and its SHA-256 checksum to the rolling [`windows-client-latest`](https://github.com/kanki6315/broadcast-graphics/releases/tag/windows-client-latest) prerelease. The stable ZIP download is [`BroadcastGraphicsClient-win-x64.zip`](https://github.com/kanki6315/broadcast-graphics/releases/download/windows-client-latest/BroadcastGraphicsClient-win-x64.zip). The workflow can also be run manually from GitHub Actions when a rebuild is needed without a source change.
+
 Before a release, complete the [Windows telemetry client smoke test](docs/windows-client-smoke-test.md), including the 100% and 150% display-scaling checks.
 
-The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys and admin sessions are stored in PostgreSQL; key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
+The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys, admin sessions, broadcast sessions, entries, drivers, and completed laps are stored in PostgreSQL. Raw telemetry frames remain in memory. Key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
 
 ## Railway deployment
 
@@ -77,7 +83,7 @@ The repository includes a multi-stage production `Dockerfile` and `railway.toml`
    DISABLE_SIMULATOR=1
    ```
 
-   If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its `bg_access_keys` and `bg_admin_sessions` tables during startup.
+   If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its authentication and `bg_*` race-history tables during startup.
 
 4. Confirm that Railway reports `/api/health` as healthy, then open `/control` and create one ingestion key and one view key.
 5. Add `broadcasts.arjunakankipati.com` as the Railway service's custom domain. In Cloudflare DNS, create the CNAME Railway supplies. Keep it DNS-only while validating HTTPS and WebSockets; Cloudflare proxying can be enabled after the end-to-end test succeeds.

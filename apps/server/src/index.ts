@@ -9,7 +9,9 @@ import { WebSocket, WebSocketServer } from "ws";
 import type { ClientMessage, ServerMessage } from "@racecontrol/protocol";
 import { createAuthenticationStore } from "./auth-store.js";
 import { PackageRegistry } from "./package-registry.js";
+import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
 import { startSimulator } from "./simulator.js";
+import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
 import { StateStore } from "./state-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -34,10 +36,17 @@ const auth = createAuthenticationStore({
   production: process.env.NODE_ENV === "production",
 });
 await auth.initialize();
+const historyRepository = createRaceHistoryRepository(process.env.DATABASE_URL);
+await historyRepository.initialize();
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
 const store = new StateStore(packages[0]?.id ?? "apex");
-const sockets = new Set<WebSocket>();
+const sockets = new Map<WebSocket, SocketRole>();
+const history = new RaceHistoryService(
+  historyRepository,
+  (lap) => broadcastStateSnapshot(sockets, { type: "lap.completed", payload: lap }),
+  (error) => app.log.error({ err: error }, "Failed to persist completed lap"),
+);
 const loginAttempts = new Map<string, { count: number; resetsAt: number }>();
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -141,6 +150,16 @@ app.get("/api/state", async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;
   return store.snapshot();
 });
+app.get<{ Querystring: { carIdx?: string; limit?: string } }>("/api/history/laps", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  const session = store.snapshot().session;
+  const carIdx = Number(request.query.carIdx);
+  const limit = request.query.limit == null ? 20 : Number(request.query.limit);
+  if (!session || !Number.isInteger(carIdx) || !Number.isInteger(limit)) {
+    return reply.code(400).send({ error: "An active session, integer carIdx, and integer limit are required." });
+  }
+  return history.listLaps(session, carIdx, limit);
+});
 app.get("/api/packages", async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;
   return registry.list();
@@ -184,31 +203,53 @@ function send(socket: WebSocket, message: ServerMessage): void {
 
 function broadcast(): void {
   const message: ServerMessage = { type: "state.snapshot", payload: store.snapshot() };
-  for (const socket of sockets) send(socket, message);
+  broadcastStateSnapshot(sockets, message);
 }
 
 store.subscribe(broadcast);
 
 wss.on("connection", (socket, request) => {
-  const role = new URL(request.url ?? "/socket", "http://localhost").searchParams.get("role");
-  sockets.add(socket);
-  send(socket, { type: "state.snapshot", payload: store.snapshot() });
+  const role = new URL(request.url ?? "/socket", "http://localhost").searchParams.get("role") as SocketRole;
+  sockets.set(socket, role);
+  if (role !== "telemetry") send(socket, { type: "state.snapshot", payload: store.snapshot() });
 
   socket.on("message", async (data) => {
     try {
       const message = JSON.parse(data.toString()) as ClientMessage;
       if (message.type === "hello" && message.role !== role) return socket.close(1008, "Role does not match authenticated connection.");
-      if (message.type === "telemetry.update" && role === "telemetry") store.telemetry(message.payload);
+      if (message.type === "telemetry.update" && role === "telemetry") {
+        store.telemetry(message.payload);
+        history.ingest(message.payload);
+      }
+      if (message.type === "lap.history.request" && role !== "telemetry") {
+        const session = store.snapshot().session;
+        if (!session || !Number.isInteger(message.carIdx)) {
+          send(socket, { type: "lap.history", payload: [] });
+        } else {
+          send(socket, {
+            type: "lap.history",
+            payload: await history.listLaps(
+              session,
+              message.carIdx,
+              Number.isInteger(message.limit) ? message.limit : undefined,
+            ),
+          });
+        }
+      }
       if (message.type === "control.command" && role === "control") store.command(message.command, await registry.list());
     } catch (error) {
       send(socket, { type: "error", message: error instanceof Error ? error.message : "Invalid message" });
     }
   });
 
+  socket.on("error", (error) => {
+    sockets.delete(socket);
+    app.log.warn({ err: error, role }, "WebSocket connection error");
+  });
   socket.on("close", () => sockets.delete(socket));
 });
 
-const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store);
+const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store, (session) => history.ingest(session));
 
 const port = Number(process.env.PORT ?? 8787);
 await app.listen({ port, host: "0.0.0.0" });
@@ -220,8 +261,9 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   app.log.info({ signal }, "Shutting down");
   stopSimulator?.();
-  for (const socket of sockets) socket.close(1012, "Server restarting");
+  for (const socket of sockets.keys()) socket.close(1012, "Server restarting");
   await app.close();
+  await history.close();
   await auth.close();
 }
 

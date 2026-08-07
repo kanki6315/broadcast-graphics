@@ -32,9 +32,19 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
                     index, index + 1, (23 + index * 7).ToString(), name, $"Team {index + 1}", "GT3",
                     index == 0 ? null : index * 0.72 + Math.Sin(tick / 8d + index) * 0.15,
                     81.4 + index * 0.22 + Math.Sin(tick / 7d + index) * 0.2,
-                    81.1 + index * 0.22, 18, false, index % 3)).ToArray();
+                    81.1 + index * 0.22, 18, false, index % 3,
+                    1, "#e54b2a", index + 1,
+                    index == 0 ? 0 : index * 0.72,
+                    index == 0 ? null : 0.72,
+                    index == 0 ? 0 : index * 0.72,
+                    index == 0 ? null : 0.72,
+                    0, 0, 19, 18, 12, 0.42, "running", true)).ToArray();
 
-                yield return new SessionState("client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course", 18, 40, null, "green", DateTimeOffset.UtcNow.ToString("O"), drivers);
+                yield return new SessionState(
+                    "client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course",
+                    19, 40, null, "green", DateTimeOffset.UtcNow.ToString("O"), drivers,
+                    18, 21, tick / 4d, null, "racing", "go", ["green"], [new CarClassState(1, "GT3", "#e54b2a", drivers.Length)],
+                    "simulation", "simulation");
                 await Task.Delay(250, cancellationToken);
             }
         }
@@ -49,21 +59,27 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
 
 [RequiredTelemetryVars([
     TelemetryVar.SessionNum,
+    TelemetryVar.SessionState,
     TelemetryVar.SessionTime,
     TelemetryVar.SessionTimeRemain,
+    TelemetryVar.SessionTimeTotal,
     TelemetryVar.SessionLapsTotal,
+    TelemetryVar.SessionLapsRemain,
     TelemetryVar.SessionFlags,
     TelemetryVar.Lap,
     TelemetryVar.CarIdxPosition,
+    TelemetryVar.CarIdxClassPosition,
     TelemetryVar.CarIdxF2Time,
+    TelemetryVar.CarIdxLap,
     TelemetryVar.CarIdxLapCompleted,
+    TelemetryVar.CarIdxLapDistPct,
     TelemetryVar.CarIdxLastLapTime,
     TelemetryVar.CarIdxBestLapTime,
+    TelemetryVar.CarIdxBestLapNum,
+    TelemetryVar.CarIdxTrackSurface,
     TelemetryVar.CarIdxOnPitRoad
 ])]
-public sealed class IracingSdkTelemetrySource(
-    string? ibtPath,
-    DiagnosticCapture diagnostics) : ITelemetrySource
+public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource
 {
     public event Action<bool, string>? ConnectionChanged;
     public event Action<string>? Log;
@@ -77,8 +93,7 @@ public sealed class IracingSdkTelemetrySource(
             FullMode = BoundedChannelFullMode.DropOldest
         });
         using var monitorCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        IBTOptions? ibtOptions = ibtPath is null ? null : new IBTOptions(ibtPath, playBackSpeedMultiplier: 1);
-        await using var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, ibtOptions);
+        await using var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance);
 
         TelemetrySessionInfo? sessionInfo = null;
         string? latestRawSessionInfo = null;
@@ -99,7 +114,18 @@ public sealed class IracingSdkTelemetrySource(
             OnTelemetryUpdate = telemetry =>
             {
                 diagnostics.TryRecordSampled("sdk-telemetry", "telemetry.ndjson", telemetry);
-                diagnostics.TryRecordOnce("variable-inventory", "variables.ndjson", new { variables = client.GetTelemetryVariables() });
+                diagnostics.TryRecordOnce("variable-inventory", "variables.ndjson", new
+                {
+                    variables = client.GetTelemetryVariables().Select(variable => new
+                    {
+                        type = variable.Type.FullName,
+                        variable.Length,
+                        variable.IsTimeValue,
+                        variable.Name,
+                        variable.Desc,
+                        variable.Units
+                    })
+                });
                 var rawSession = Volatile.Read(ref latestRawSessionInfo);
                 if (rawSession is not null)
                     diagnostics.TryRecordOnce("initial-session-info", "session-info.ndjson", new { yaml = rawSession, initial = true });
@@ -113,14 +139,16 @@ public sealed class IracingSdkTelemetrySource(
                 if (session is not null)
                 {
                     lastSnapshotTick = now;
-                    snapshots.Writer.TryWrite(MapSnapshot(telemetry, session));
+                    var snapshot = TelemetrySnapshotMapper.Map(telemetry, session);
+                    diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
+                    snapshots.Writer.TryWrite(snapshot);
                 }
                 return Task.CompletedTask;
             },
             OnConnectStateChanged = state =>
             {
                 var connected = string.Equals(state.ToString(), "Connected", StringComparison.OrdinalIgnoreCase);
-                var label = ibtPath is null ? $"iRacing SDK — {state}" : $"IBT playback — {state}";
+                var label = $"iRacing SDK — {state}";
                 ConnectionChanged?.Invoke(connected, label);
                 Log?.Invoke(label);
                 return Task.CompletedTask;
@@ -143,7 +171,7 @@ public sealed class IracingSdkTelemetrySource(
         {
             await monitorCancellation.CancelAsync();
             try { await monitorTask; } catch (OperationCanceledException) { }
-            ConnectionChanged?.Invoke(false, ibtPath is null ? "iRacing SDK disconnected" : "IBT playback stopped");
+            ConnectionChanged?.Invoke(false, "iRacing SDK disconnected");
         }
     }
 
@@ -170,54 +198,208 @@ public sealed class IracingSdkTelemetrySource(
         }
     }
 
-    private static SessionState MapSnapshot(TelemetryData telemetry, TelemetrySessionInfo info)
+}
+
+internal static class TelemetrySnapshotMapper
+{
+    public static SessionState Map(TelemetryData telemetry, TelemetrySessionInfo info, DateTimeOffset? capturedAt = null)
     {
         var sessionNumber = telemetry.SessionNum ?? info.SessionInfo?.CurrentSessionNum ?? 0;
         var session = info.SessionInfo?.Sessions?.FirstOrDefault(item => item.SessionNum == sessionNumber);
-        var results = session?.ResultsPositions?.ToDictionary(item => item.CarIdx) ?? [];
+        var results = session?.ResultsPositions?
+            .GroupBy(item => item.CarIdx)
+            .ToDictionary(group => group.Key, group => group.First()) ?? [];
+        var sessionType = NormalizeSessionType(session?.SessionType ?? info.WeekendInfo?.EventType);
         var drivers = (info.DriverInfo?.Drivers ?? [])
             .Where(driver => driver.CarIdx >= 0 && driver.CarIsPaceCar == 0 && driver.IsSpectator == 0)
-            .Select(driver => MapDriver(driver, telemetry, results))
+            .Select(driver => MapDriver(driver, telemetry, results, sessionType))
             .OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position)
             .ToArray();
+        drivers = AddRaceTiming(drivers, sessionType);
 
         var weekend = info.WeekendInfo;
         var trackName = weekend?.TrackDisplayName;
         if (string.IsNullOrWhiteSpace(trackName)) trackName = weekend?.TrackName;
+        var leader = drivers.FirstOrDefault(driver => driver.Position == 1);
+        var hasLiveLeader = telemetry.CarIdxPosition?.Contains(1) == true;
+        var leaderLapsCompleted = Math.Max(leader?.LapsCompleted ?? session?.ResultsLapsComplete ?? 0, 0);
+        var phase = NormalizePhase(telemetry.SessionState);
+        var currentLap = CalculateCurrentLap(sessionType, phase, leader, hasLiveLeader, leaderLapsCompleted, telemetry.SessionLapsTotal);
+        var classes = drivers
+            .GroupBy(driver => new { driver.ClassId, driver.ClassName, driver.ClassColor })
+            .Select(group => new CarClassState(group.Key.ClassId, group.Key.ClassName, group.Key.ClassColor, group.Count()))
+            .OrderByDescending(carClass => carClass.CarCount)
+            .ThenBy(carClass => carClass.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var flags = NormalizeFlags(telemetry.SessionFlags);
 
         return new SessionState(
             $"{weekend?.SubSessionID ?? 0}-{sessionNumber}",
             session?.SessionName ?? weekend?.EventType ?? "iRacing session",
-            NormalizeSessionType(session?.SessionType ?? weekend?.EventType),
+            sessionType,
             trackName ?? "Unknown track",
-            Math.Max(telemetry.Lap ?? 0, 0),
+            currentLap,
             NormalizeTotalLaps(telemetry.SessionLapsTotal),
             NormalizeTime(telemetry.SessionTimeRemain),
             NormalizeFlag(telemetry.SessionFlags),
-            DateTimeOffset.UtcNow.ToString("O"),
-            drivers);
+            (capturedAt ?? DateTimeOffset.UtcNow).ToString("O"),
+            drivers,
+            leaderLapsCompleted,
+            NormalizeRemainingLaps(telemetry.SessionLapsRemain),
+            NormalizeTime(telemetry.SessionTime),
+            NormalizeTime(telemetry.SessionTimeTotal),
+            phase,
+            NormalizeStartState(telemetry.SessionFlags),
+            flags,
+            classes,
+            "iracing",
+            "live",
+            weekend?.SubSessionID,
+            sessionNumber,
+            weekend?.TrackID);
     }
 
     private static DriverState MapDriver(
         Driver driver,
         TelemetryData telemetry,
-        IReadOnlyDictionary<int, Session.ResultPosition> results)
+        IReadOnlyDictionary<int, Session.ResultPosition> results,
+        string sessionType)
     {
         var index = driver.CarIdx;
         results.TryGetValue(index, out var result);
+        var position = ValueAt(telemetry.CarIdxPosition, index);
+        if (position <= 0 && result?.Position > 0) position = result.Position;
+        var classPosition = ValueAt(telemetry.CarIdxClassPosition, index);
+        if (classPosition <= 0 && result is not null) classPosition = result.ClassPosition + 1;
+        var lapsCompleted = ValueAt(telemetry.CarIdxLapCompleted, index);
+        if (lapsCompleted < 0 && result is not null) lapsCompleted = result.LapsComplete;
+        var lastLap = NormalizeTime(ValueAt(telemetry.CarIdxLastLapTime, index)) ?? NormalizeTime(result?.LastTime);
+        var bestLap = NormalizeTime(ValueAt(telemetry.CarIdxBestLapTime, index));
+        var currentLap = ValueAt(telemetry.CarIdxLap, index);
+        if (currentLap <= 0 && lapsCompleted >= 0) currentLap = lapsCompleted + 1;
+        var bestLapNumber = ValueAt(telemetry.CarIdxBestLapNum, index);
+        if (bestLapNumber <= 0 && result?.FastestLap > 0) bestLapNumber = result.FastestLap;
+        var trackLocation = ValueAt(telemetry.CarIdxTrackSurface, index);
+        var onPitRoad = ValueAt(telemetry.CarIdxOnPitRoad, index);
+        var trackStatus = NormalizeTrackStatus(trackLocation, onPitRoad, result?.ReasonOutStr, position);
+        int? lastLapNumber = lastLap is not null && lapsCompleted > 0 ? lapsCompleted : null;
+        var hasMatchingResult = lastLapNumber is not null && result?.LapsComplete == lastLapNumber;
         return new DriverState(
             index,
-            ValueAt(telemetry.CarIdxPosition, index),
+            position,
             driver.CarNumber ?? string.Empty,
             driver.UserName ?? driver.AbbrevName ?? $"Car {driver.CarNumber}",
             driver.TeamName ?? string.Empty,
             driver.CarClassShortName ?? driver.CarScreenNameShort ?? string.Empty,
             NormalizeTime(ValueAt(telemetry.CarIdxF2Time, index)),
-            NormalizeTime(ValueAt(telemetry.CarIdxLastLapTime, index)),
-            NormalizeTime(ValueAt(telemetry.CarIdxBestLapTime, index)),
-            Math.Max(ValueAt(telemetry.CarIdxLapCompleted, index), 0),
-            ValueAt(telemetry.CarIdxOnPitRoad, index),
-            result?.Incidents ?? Math.Max(driver.TeamIncidentCount, driver.CurDriverIncidentCount));
+            lastLap,
+            bestLap,
+            Math.Max(lapsCompleted, 0),
+            onPitRoad,
+            result?.Incidents ?? Math.Max(driver.TeamIncidentCount, driver.CurDriverIncidentCount),
+            driver.CarClassID,
+            NormalizeColor(driver.CarClassColor),
+            classPosition,
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            Math.Max(currentLap, 0),
+            lastLapNumber,
+            bestLapNumber > 0 ? bestLapNumber : null,
+            NormalizeLapDistance(ValueAt(telemetry.CarIdxLapDistPct, index)),
+            trackStatus,
+            !string.Equals(trackStatus, "not-in-world", StringComparison.Ordinal),
+            driver.UserID,
+            driver.TeamID,
+            driver.CarID,
+            hasMatchingResult && result!.Position > 0 ? result.Position : null,
+            hasMatchingResult && result!.ClassPosition >= 0 ? result.ClassPosition + 1 : null,
+            hasMatchingResult && string.Equals(sessionType, "race", StringComparison.Ordinal) ? NormalizeGap(result!.Time) : null);
+    }
+
+    private static DriverState[] AddRaceTiming(DriverState[] drivers, string sessionType)
+    {
+        if (!string.Equals(sessionType, "race", StringComparison.Ordinal))
+            return drivers.Select(driver => driver with { Interval = null }).ToArray();
+
+        var ordered = drivers.Where(driver => driver.Position > 0).OrderBy(driver => driver.Position).ToArray();
+        var leader = ordered.FirstOrDefault();
+        if (leader is null) return drivers;
+        var byPosition = ordered
+            .GroupBy(driver => driver.Position)
+            .ToDictionary(group => group.Key, group => group.First());
+        var classLeaders = ordered
+            .Where(driver => driver.ClassPosition > 0)
+            .GroupBy(driver => driver.ClassId)
+            .ToDictionary(group => group.Key, group => group.OrderBy(driver => driver.ClassPosition).First());
+        var byClassPosition = ordered
+            .Where(driver => driver.ClassPosition > 0)
+            .GroupBy(driver => (driver.ClassId, driver.ClassPosition))
+            .ToDictionary(group => group.Key, group => group.First());
+
+        return drivers.Select(driver =>
+        {
+            var lapsBehind = Math.Max(leader.LapsCompleted - driver.LapsCompleted, 0);
+            var gap = driver.Position == leader.Position
+                ? 0d
+                : lapsBehind == 0 ? NormalizeGap(driver.Interval) : null;
+            double? intervalToAhead = null;
+            if (byPosition.TryGetValue(driver.Position - 1, out var ahead) && ahead.LapsCompleted == driver.LapsCompleted)
+                intervalToAhead = Difference(gap, ahead.Position == leader.Position ? 0d : NormalizeGap(ahead.Interval));
+
+            classLeaders.TryGetValue(driver.ClassId, out var classLeader);
+            var classLapsBehind = classLeader is null ? 0 : Math.Max(classLeader.LapsCompleted - driver.LapsCompleted, 0);
+            var classGap = classLeader is null || driver.CarIdx == classLeader.CarIdx
+                ? 0d
+                : classLapsBehind == 0 ? Difference(NormalizeGap(driver.Interval), NormalizeGap(classLeader.Interval) ?? 0d) : null;
+            double? classInterval = null;
+            if (byClassPosition.TryGetValue((driver.ClassId, driver.ClassPosition - 1), out var classAhead) &&
+                classAhead.LapsCompleted == driver.LapsCompleted)
+            {
+                var aheadClassGap = classAhead.CarIdx == classLeader?.CarIdx
+                    ? 0d
+                    : Difference(NormalizeGap(classAhead.Interval), NormalizeGap(classLeader?.Interval) ?? 0d);
+                classInterval = Difference(classGap, aheadClassGap);
+            }
+
+            int? lastLapLapsBehind = null;
+            double? lastLapGap = null;
+            int? lastLapClassLapsBehind = null;
+            double? lastLapClassGap = null;
+            if (driver.LastLapNumber is { } completedLap && driver.LastLapPosition is not null)
+            {
+                lastLapLapsBehind = Math.Max(leader.LapsCompleted - completedLap, 0);
+                lastLapGap = lastLapLapsBehind == 0 ? driver.LastLapGapToLeader : null;
+                if (classLeader?.LastLapNumber is { } classLeaderLap && classLeader.LastLapPosition is not null)
+                {
+                    lastLapClassLapsBehind = Math.Max(classLeaderLap - completedLap, 0);
+                    if (lastLapClassLapsBehind == 0)
+                    {
+                        lastLapClassGap = driver.CarIdx == classLeader.CarIdx
+                            ? 0d
+                            : Difference(driver.LastLapGapToLeader, classLeader.LastLapGapToLeader);
+                    }
+                }
+            }
+
+            return driver with
+            {
+                Interval = gap,
+                GapToLeader = gap,
+                IntervalToAhead = intervalToAhead,
+                ClassGapToLeader = classGap,
+                ClassIntervalToAhead = classInterval,
+                LapsBehindLeader = lapsBehind,
+                LapsBehindClassLeader = classLapsBehind,
+                LastLapGapToLeader = lastLapGap,
+                LastLapGapToClassLeader = lastLapClassGap,
+                LastLapLapsBehindLeader = lastLapLapsBehind,
+                LastLapLapsBehindClassLeader = lastLapClassLapsBehind
+            };
+        }).OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position).ToArray();
     }
 
     private static int ValueAt(int[]? values, int index) =>
@@ -229,10 +411,30 @@ public sealed class IracingSdkTelemetrySource(
     private static bool ValueAt(bool[]? values, int index) =>
         values is not null && index >= 0 && index < values.Length && values[index];
 
+    private static TrackLocation? ValueAt(TrackLocation[]? values, int index) =>
+        values is not null && index >= 0 && index < values.Length ? values[index] : null;
+
     private static double? NormalizeTime(double? value) =>
         value is >= 0 && double.IsFinite(value.Value) ? value : null;
 
     private static int? NormalizeTotalLaps(int? laps) => laps is > 0 and < 32767 ? laps : null;
+
+    private static int? NormalizeRemainingLaps(int? laps) => laps is >= 0 and < 32767 ? laps : null;
+
+    private static double? NormalizeGap(double? value) =>
+        value is >= 0 && double.IsFinite(value.Value) ? value : null;
+
+    private static double? Difference(double? value, double? baseline)
+    {
+        if (value is null || baseline is null) return null;
+        var difference = value.Value - baseline.Value;
+        return difference >= -0.001 ? Math.Max(difference, 0) : null;
+    }
+
+    private static double? NormalizeLapDistance(double? value) =>
+        value is >= 0 and < 1.5 && double.IsFinite(value.Value) ? value : null;
+
+    private static string NormalizeColor(int color) => $"#{(color & 0x00ffffff):x6}";
 
     private static string NormalizeSessionType(string? type)
     {
@@ -240,6 +442,89 @@ public sealed class IracingSdkTelemetrySource(
         if (normalized.Contains("race")) return "race";
         if (normalized.Contains("qual")) return "qualifying";
         return "practice";
+    }
+
+    private static int CalculateCurrentLap(
+        string sessionType,
+        string phase,
+        DriverState? leader,
+        bool hasLiveLeader,
+        int leaderLapsCompleted,
+        int? totalLaps)
+    {
+        if (!string.Equals(sessionType, "race", StringComparison.Ordinal))
+            return leader is null ? 0 : Math.Max(leader.CurrentLap, leaderLapsCompleted);
+        if (leader is null || !hasLiveLeader || string.Equals(phase, "get-in-car", StringComparison.Ordinal) ||
+            string.Equals(phase, "warmup", StringComparison.Ordinal) ||
+            string.Equals(phase, "parade-laps", StringComparison.Ordinal)) return 0;
+
+        var lap = leaderLapsCompleted + 1;
+        var normalizedTotal = NormalizeTotalLaps(totalLaps);
+        return normalizedTotal is { } total ? Math.Min(lap, total) : lap;
+    }
+
+    private static string NormalizePhase(SVappsLAB.iRacingTelemetrySDK.SessionState? state) => state switch
+    {
+        SVappsLAB.iRacingTelemetrySDK.SessionState.GetInCar => "get-in-car",
+        SVappsLAB.iRacingTelemetrySDK.SessionState.Warmup => "warmup",
+        SVappsLAB.iRacingTelemetrySDK.SessionState.ParadeLaps => "parade-laps",
+        SVappsLAB.iRacingTelemetrySDK.SessionState.Racing => "racing",
+        SVappsLAB.iRacingTelemetrySDK.SessionState.Checkered => "checkered",
+        SVappsLAB.iRacingTelemetrySDK.SessionState.CoolDown => "cool-down",
+        _ => "invalid"
+    };
+
+    private static string NormalizeStartState(SessionFlags? flags)
+    {
+        if (flags?.HasFlag(SessionFlags.StartGo) == true) return "go";
+        if (flags?.HasFlag(SessionFlags.StartSet) == true) return "set";
+        if (flags?.HasFlag(SessionFlags.StartReady) == true) return "ready";
+        return "hidden";
+    }
+
+    private static IReadOnlyList<string> NormalizeFlags(SessionFlags? flags)
+    {
+        if (flags is null) return [];
+        var normalized = new List<string>();
+        Add(SessionFlags.Checkered, "checkered");
+        Add(SessionFlags.White, "white");
+        Add(SessionFlags.Green, "green");
+        Add(SessionFlags.Yellow, "yellow");
+        Add(SessionFlags.Red, "red");
+        Add(SessionFlags.Blue, "blue");
+        Add(SessionFlags.Debris, "debris");
+        Add(SessionFlags.Crossed, "crossed");
+        Add(SessionFlags.YellowWaving, "yellow-waving");
+        Add(SessionFlags.OneLapToGreen, "one-lap-to-green");
+        Add(SessionFlags.GreenHeld, "green-held");
+        Add(SessionFlags.TenToGo, "ten-to-go");
+        Add(SessionFlags.FiveToGo, "five-to-go");
+        Add(SessionFlags.Caution, "caution");
+        Add(SessionFlags.CautionWaving, "caution-waving");
+        Add(SessionFlags.Black, "black");
+        Add(SessionFlags.Disqualify, "disqualify");
+        Add(SessionFlags.Repair, "repair");
+        return normalized;
+
+        void Add(SessionFlags value, string label)
+        {
+            if (flags.Value.HasFlag(value)) normalized.Add(label);
+        }
+    }
+
+    private static string NormalizeTrackStatus(
+        TrackLocation? location,
+        bool onPitRoad,
+        string? resultReason,
+        int position)
+    {
+        if (!string.IsNullOrWhiteSpace(resultReason) &&
+            !string.Equals(resultReason, "Running", StringComparison.OrdinalIgnoreCase)) return "retired";
+        if (onPitRoad || location is TrackLocation.InPitStall or TrackLocation.AproachingPits) return "pit";
+        if (location == TrackLocation.OffTrack) return "off-track";
+        if (location == TrackLocation.NotInWorld) return "not-in-world";
+        if (location == TrackLocation.OnTrack || position > 0) return "running";
+        return "unknown";
     }
 
     private static string NormalizeFlag(SessionFlags? flags)

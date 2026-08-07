@@ -8,7 +8,8 @@ public sealed record TelemetryBridgeOptions(
     string ServerUrl,
     string IngestionKey,
     TelemetrySourceMode SourceMode,
-    string? IbtPath);
+    string? ReplayPath,
+    double ReplaySpeed);
 
 public sealed record TelemetryBridgeStatus(
     bool Running,
@@ -22,13 +23,17 @@ public sealed record TelemetryBridgeStatus(
 public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(10);
     private readonly object gate = new();
     private CancellationTokenSource? cancellation;
     private Task? runTask;
+    private IReplayControl? replayControl;
     private TelemetryBridgeStatus status = new(false, false, false, false, "Not connected", null, null);
 
     public event Action<TelemetryBridgeStatus>? StatusChanged;
     public event Action<string>? Log;
+    public event Action<ReplayProgress>? ReplayProgressChanged;
     public TelemetryBridgeStatus Status { get { lock (gate) return status; } }
 
     public Task StartAsync(TelemetryBridgeOptions options)
@@ -69,23 +74,46 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         }
     }
 
+    public void SetReplayPaused(bool paused)
+    {
+        IReplayControl? control;
+        lock (gate) control = replayControl;
+        if (paused) control?.Pause();
+        else control?.Resume();
+    }
+
+    public void RestartReplay()
+    {
+        IReplayControl? control;
+        lock (gate) control = replayControl;
+        control?.Restart();
+    }
+
     private async Task RunAsync(TelemetryBridgeOptions options, CancellationToken cancellationToken)
     {
-        var snapshots = Channel.CreateBounded<SessionState>(new BoundedChannelOptions(4)
+        var snapshots = Channel.CreateBounded<SessionState>(new BoundedChannelOptions(1)
         {
             SingleReader = true,
             SingleWriter = true,
-            FullMode = BoundedChannelFullMode.DropOldest
+            FullMode = BoundedChannelFullMode.Wait
         });
 
         await using ITelemetrySource source = options.SourceMode switch
         {
             TelemetrySourceMode.Simulation => new SimulatedTelemetrySource(diagnostics),
-            TelemetrySourceMode.IbtPlayback => new IracingSdkTelemetrySource(options.IbtPath, diagnostics),
-            _ => new IracingSdkTelemetrySource(null, diagnostics)
+            TelemetrySourceMode.DiagnosticReplay => new DiagnosticReplayTelemetrySource(
+                options.ReplayPath ?? throw new InvalidOperationException("Choose a diagnostic replay ZIP."),
+                options.ReplaySpeed,
+                diagnostics),
+            _ => new IracingSdkTelemetrySource(diagnostics)
         };
         source.ConnectionChanged += OnSourceConnectionChanged;
         source.Log += WriteLog;
+        if (source is IReplayControl control)
+        {
+            control.ProgressChanged += OnReplayProgressChanged;
+            lock (gate) replayControl = control;
+        }
 
         var sourceTask = PumpSourceAsync(source, snapshots.Writer, cancellationToken);
         var socketTask = SendToServerAsync(options, snapshots.Reader, cancellationToken);
@@ -103,6 +131,14 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         {
             source.ConnectionChanged -= OnSourceConnectionChanged;
             source.Log -= WriteLog;
+            if (source is IReplayControl finishedReplayControl)
+            {
+                finishedReplayControl.ProgressChanged -= OnReplayProgressChanged;
+                lock (gate)
+                {
+                    if (ReferenceEquals(replayControl, finishedReplayControl)) replayControl = null;
+                }
+            }
             UpdateStatus(current => current with
             {
                 Running = false,
@@ -141,8 +177,14 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
             try
             {
                 socket.Options.SetRequestHeader("Authorization", $"Bearer {options.IngestionKey}");
+                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+                socket.Options.KeepAliveTimeout = TimeSpan.FromSeconds(10);
                 WriteLog($"Connecting to {endpoint.Host}…");
-                await socket.ConnectAsync(endpoint, cancellationToken);
+                await WithTimeoutAsync(
+                    token => socket.ConnectAsync(endpoint, token),
+                    ConnectTimeout,
+                    "Server connection timed out.",
+                    cancellationToken);
                 UpdateStatus(current => current with { ServerConnected = true, LastError = null });
                 diagnostics.TryRecord("events.ndjson", new { type = "server.connected", endpoint = endpoint.Host });
                 WriteLog("Server connected.");
@@ -153,24 +195,52 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                     role = "telemetry",
                     clientId = Environment.MachineName
                 }, JsonOptions);
-                await socket.SendAsync(hello, WebSocketMessageType.Text, true, cancellationToken);
+                await SendAsync(socket, hello, cancellationToken);
 
-                while (await snapshots.WaitToReadAsync(cancellationToken))
+                using var connectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                var receiveTask = MonitorServerAsync(socket, connectionCancellation.Token);
+
+                try
                 {
-                    while (snapshots.TryRead(out var snapshot))
+                    while (true)
                     {
-                        diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
-                        var payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "telemetry.update", payload = snapshot }, JsonOptions);
-                        await socket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
-                        UpdateStatus(current => current with
+                        var availableTask = snapshots.WaitToReadAsync(connectionCancellation.Token).AsTask();
+                        var completedTask = await Task.WhenAny(availableTask, receiveTask);
+                        if (completedTask == receiveTask)
                         {
-                            Streaming = true,
-                            LastTelemetryAt = DateTimeOffset.UtcNow,
-                            LastError = null
-                        });
+                            await receiveTask;
+                            throw new WebSocketException("The server connection ended.");
+                        }
+                        if (!await availableTask) return;
+
+                        while (snapshots.TryRead(out var snapshot))
+                        {
+                            diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
+                            var payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "telemetry.update", payload = snapshot }, JsonOptions);
+                            var sendTask = SendAsync(socket, payload, connectionCancellation.Token);
+                            completedTask = await Task.WhenAny(sendTask, receiveTask);
+                            if (completedTask == receiveTask)
+                            {
+                                connectionCancellation.Cancel();
+                                await receiveTask;
+                            }
+                            await sendTask;
+                            UpdateStatus(current => current with
+                            {
+                                Streaming = true,
+                                LastTelemetryAt = DateTimeOffset.UtcNow,
+                                LastError = null
+                            });
+                        }
                     }
                 }
-                return;
+                finally
+                {
+                    await connectionCancellation.CancelAsync();
+                    try { await receiveTask; }
+                    catch (OperationCanceledException) when (connectionCancellation.IsCancellationRequested) { }
+                    catch when (cancellationToken.IsCancellationRequested) { }
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -188,6 +258,52 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                 WriteLog($"Server connection lost: {error.Message}. Retrying in 2 seconds.");
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
             }
+        }
+    }
+
+    private static Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken) =>
+        WithTimeoutAsync(
+            token => socket.SendAsync(payload, WebSocketMessageType.Text, true, token).AsTask(),
+            SendTimeout,
+            "Sending telemetry to the server timed out.",
+            cancellationToken);
+
+    private static async Task MonitorServerAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[8_192];
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await socket.ReceiveAsync(buffer, cancellationToken);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    var description = string.IsNullOrWhiteSpace(result.CloseStatusDescription)
+                        ? "no reason provided"
+                        : result.CloseStatusDescription;
+                    throw new WebSocketException($"Server closed the connection ({result.CloseStatus}: {description}).");
+                }
+            }
+            while (!result.EndOfMessage);
+        }
+    }
+
+    private static async Task WithTimeoutAsync(
+        Func<CancellationToken, Task> operation,
+        TimeSpan timeout,
+        string timeoutMessage,
+        CancellationToken cancellationToken)
+    {
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellation.CancelAfter(timeout);
+        try
+        {
+            await operation(timeoutCancellation.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeoutCancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException(timeoutMessage);
         }
     }
 
@@ -227,6 +343,13 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         Log?.Invoke(message);
     }
 
+    private void OnReplayProgressChanged(ReplayProgress progress)
+    {
+        if (progress.IsComplete)
+            UpdateStatus(current => current with { Streaming = false, SourceLabel = "Diagnostic replay complete" });
+        ReplayProgressChanged?.Invoke(progress);
+    }
+
     private void UpdateStatus(Func<TelemetryBridgeStatus, TelemetryBridgeStatus> update)
     {
         TelemetryBridgeStatus next;
@@ -241,7 +364,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     private static string SourceLabel(TelemetryBridgeOptions options) => options.SourceMode switch
     {
         TelemetrySourceMode.Simulation => "Simulated telemetry",
-        TelemetrySourceMode.IbtPlayback => $"IBT playback — {Path.GetFileName(options.IbtPath)}",
+        TelemetrySourceMode.DiagnosticReplay => $"Diagnostic replay — {Path.GetFileName(options.ReplayPath)}",
         _ => "Live iRacing SDK"
     };
 

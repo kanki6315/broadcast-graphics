@@ -16,6 +16,10 @@ public partial class MainWindow : Window
     private readonly DiagnosticCapture diagnostics = new();
     private readonly TelemetryBridge bridge;
     private readonly ObservableCollection<string> logEntries = [];
+    private DiagnosticReplayArchive? validatedReplay;
+    private CancellationTokenSource? replayValidationCancellation;
+    private ReplayProgress? replayProgress;
+    private string? pendingReplayServerUrl;
     private bool shutdownComplete;
 
     public MainWindow()
@@ -25,6 +29,7 @@ public partial class MainWindow : Window
         ActivityLog.ItemsSource = logEntries;
         bridge.StatusChanged += Bridge_StatusChanged;
         bridge.Log += AddLog;
+        bridge.ReplayProgressChanged += Bridge_ReplayProgressChanged;
         diagnostics.Completed += Diagnostics_Completed;
         Loaded += MainWindow_Loaded;
         VersionText.Text = $"VERSION {Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.1.0"}";
@@ -35,8 +40,9 @@ public partial class MainWindow : Window
         var settings = await settingsStore.LoadAsync();
         ServerUrlBox.Text = settings.ServerUrl;
         RememberKeyCheck.IsChecked = settings.RememberKey;
-        IbtPathBox.Text = settings.IbtPath ?? string.Empty;
+        ReplayPathBox.Text = settings.ReplayPath ?? string.Empty;
         SelectSourceMode(settings.SourceMode);
+        SelectComboTag(ReplaySpeedBox, settings.ReplaySpeed.ToString(System.Globalization.CultureInfo.InvariantCulture));
         SelectComboTag(DiagnosticRateBox, settings.DiagnosticSampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture));
         SelectComboTag(DiagnosticDurationBox, (settings.DiagnosticDurationMinutes ?? 0).ToString());
 
@@ -52,20 +58,41 @@ public partial class MainWindow : Window
         }
 
         ApplyCommandLine();
+        UpdateSourceModeUi();
+        if (SelectedSourceMode() == TelemetrySourceMode.DiagnosticReplay && !string.IsNullOrWhiteSpace(ReplayPathBox.Text))
+            await ValidateReplayAsync(ReplayPathBox.Text);
         AddLog("Client ready. Configure the connection, then select Connect.");
     }
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
+        => await TryConnectAsync(false);
+
+    private async Task TryConnectAsync(bool remoteReplayConfirmed)
     {
         ClearError();
+        ReplayWarningPanel.Visibility = Visibility.Collapsed;
         try
         {
             var sourceMode = SelectedSourceMode();
             var key = IngestionKeyBox.Password.Trim();
             if (key.Length == 0) throw new InvalidOperationException("Paste an ingestion key created in the web control panel.");
-            _ = TelemetryBridge.BuildTelemetryUri(ServerUrlBox.Text);
-            if (sourceMode == TelemetrySourceMode.IbtPlayback && !File.Exists(IbtPathBox.Text))
-                throw new InvalidOperationException("Choose an existing IBT recording before connecting.");
+            var endpoint = TelemetryBridge.BuildTelemetryUri(ServerUrlBox.Text);
+            if (sourceMode == TelemetrySourceMode.DiagnosticReplay)
+            {
+                if (validatedReplay is null)
+                    await ValidateReplayAsync(ReplayPathBox.Text);
+                if (validatedReplay is null)
+                    throw new InvalidOperationException("Choose a compatible diagnostic capture before starting replay.");
+                if (IsRemoteEndpoint(endpoint) && !remoteReplayConfirmed)
+                {
+                    pendingReplayServerUrl = ServerUrlBox.Text.Trim();
+                    ReplayWarningText.Text = $"This replay will replace the current telemetry state on {endpoint.Host}. Confirm that no live broadcast is using this server.";
+                    ReplayWarningPanel.Visibility = Visibility.Visible;
+                    ReplayWarningPanel.Focus();
+                    Announce(ReplayWarningPanel);
+                    return;
+                }
+            }
 
             var settings = ReadSettings();
             await settingsStore.SaveAsync(settings);
@@ -76,7 +103,10 @@ public partial class MainWindow : Window
                 settings.ServerUrl,
                 key,
                 sourceMode,
-                settings.IbtPath));
+                settings.ReplayPath,
+                settings.ReplaySpeed));
+            pendingReplayServerUrl = null;
+            replayProgress = null;
             SetConnectionControls(true);
         }
         catch (Exception error)
@@ -84,6 +114,23 @@ public partial class MainWindow : Window
             ShowError(error.Message);
             AddLog($"Connection could not start: {error.Message}");
         }
+    }
+
+    private async void ConfirmReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.Equals(pendingReplayServerUrl, ServerUrlBox.Text.Trim(), StringComparison.Ordinal))
+        {
+            await TryConnectAsync(false);
+            return;
+        }
+        await TryConnectAsync(true);
+    }
+
+    private void CancelReplayWarning_Click(object sender, RoutedEventArgs e)
+    {
+        pendingReplayServerUrl = null;
+        ReplayWarningPanel.Visibility = Visibility.Collapsed;
+        ConnectButton.Focus();
     }
 
     private async void Disconnect_Click(object sender, RoutedEventArgs e)
@@ -144,7 +191,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() =>
         {
             var running = bridge.Status.Running;
-            StartCaptureButton.IsEnabled = running;
+            StartCaptureButton.IsEnabled = running && SelectedSourceMode() != TelemetrySourceMode.DiagnosticReplay;
             StopCaptureButton.IsEnabled = false;
             DiagnosticRateBox.IsEnabled = true;
             DiagnosticDurationBox.IsEnabled = true;
@@ -174,8 +221,22 @@ public partial class MainWindow : Window
             ServerStatusText.Text = status.ServerConnected ? "Connected to graphics server" : status.Running ? "Connecting / retrying" : "Not connected";
             SetIndicator(SourceIndicator, status.SourceConnected);
             SourceStatusText.Text = status.SourceLabel;
-            SetIndicator(StreamIndicator, status.Streaming);
-            StreamStatusText.Text = status.Streaming ? "Telemetry flowing" : status.SourceConnected ? "Waiting for server" : "Waiting for telemetry";
+            var replayActive = status.Running && SelectedSourceMode() == TelemetrySourceMode.DiagnosticReplay;
+            var replayPaused = replayActive && replayProgress?.IsPaused == true;
+            var replayComplete = replayActive && replayProgress?.IsComplete == true;
+            SetIndicator(StreamIndicator, status.Streaming && !replayPaused && !replayComplete);
+            StreamStatusText.Text = replayComplete
+                ? "Replay complete"
+                : replayPaused
+                    ? "Replay paused"
+                    : status.Streaming
+                        ? "Telemetry flowing"
+                        : !status.ServerConnected
+                            ? "Waiting for server"
+                            : status.SourceConnected && status.LastTelemetryAt is not null
+                                ? "Telemetry transport stalled"
+                                : "Waiting for telemetry";
+            ReplayTransportPanel.Visibility = replayActive && status.ServerConnected ? Visibility.Visible : Visibility.Collapsed;
             LastSentText.Text = status.LastTelemetryAt is { } sent
                 ? $"LAST SENT {sent.ToLocalTime():HH:mm:ss}"
                 : "NO TELEMETRY SENT";
@@ -191,7 +252,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                StartCaptureButton.IsEnabled = !diagnostics.IsCapturing;
+                StartCaptureButton.IsEnabled = SelectedSourceMode() != TelemetrySourceMode.DiagnosticReplay && !diagnostics.IsCapturing;
             }
         });
     }
@@ -205,29 +266,79 @@ public partial class MainWindow : Window
         RememberKeyCheck.IsEnabled = !running;
         ForgetKeyButton.IsEnabled = !running;
         SourceModeBox.IsEnabled = !running;
-        IbtPathBox.IsEnabled = !running && SelectedSourceMode() == TelemetrySourceMode.IbtPlayback;
-        StartCaptureButton.IsEnabled = running && !diagnostics.IsCapturing;
+        var replay = SelectedSourceMode() == TelemetrySourceMode.DiagnosticReplay;
+        ReplayPathBox.IsEnabled = !running && replay;
+        BrowseReplayButton.IsEnabled = !running && replay;
+        ReplaySpeedBox.IsEnabled = !running && replay;
+        ReplayTransportPanel.Visibility = running && replay && bridge.Status.ServerConnected ? Visibility.Visible : Visibility.Collapsed;
+        StartCaptureButton.IsEnabled = running && !replay && !diagnostics.IsCapturing;
+        DiagnosticRateBox.IsEnabled = !replay && !diagnostics.IsCapturing;
+        DiagnosticDurationBox.IsEnabled = !replay && !diagnostics.IsCapturing;
         if (!running && !diagnostics.IsCapturing)
             DiagnosticStatusText.Text = "Connect the bridge to enable diagnostics.";
+        if (replay)
+            DiagnosticStatusText.Text = "Diagnostic capture is unavailable while replaying an existing capture.";
     }
 
     private void SourceMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!IsLoaded) return;
-        var ibt = SelectedSourceMode() == TelemetrySourceMode.IbtPlayback;
-        IbtFilePanel.Visibility = ibt ? Visibility.Visible : Visibility.Collapsed;
-        IbtPathBox.IsEnabled = ibt && !bridge.Status.Running;
+        validatedReplay = null;
+        ReplayWarningPanel.Visibility = Visibility.Collapsed;
+        UpdateSourceModeUi();
+        if (SelectedSourceMode() == TelemetrySourceMode.DiagnosticReplay && !string.IsNullOrWhiteSpace(ReplayPathBox.Text))
+            _ = ValidateReplayAsync(ReplayPathBox.Text);
     }
 
-    private void BrowseIbt_Click(object sender, RoutedEventArgs e)
+    private async void BrowseReplay_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Select an iRacing telemetry recording",
-            Filter = "iRacing telemetry (*.ibt)|*.ibt|All files (*.*)|*.*",
+            Title = "Select a Broadcast Graphics diagnostic capture",
+            Filter = "Diagnostic capture (*.zip)|*.zip|All files (*.*)|*.*",
             CheckFileExists = true
         };
-        if (dialog.ShowDialog(this) == true) IbtPathBox.Text = dialog.FileName;
+        if (dialog.ShowDialog(this) != true) return;
+        ReplayPathBox.Text = dialog.FileName;
+        await ValidateReplayAsync(dialog.FileName);
+    }
+
+    private void ReplayPause_Click(object sender, RoutedEventArgs e)
+    {
+        var pause = replayProgress?.IsPaused != true;
+        bridge.SetReplayPaused(pause);
+    }
+
+    private void ReplayRestart_Click(object sender, RoutedEventArgs e) => bridge.RestartReplay();
+
+    private void Bridge_ReplayProgressChanged(ReplayProgress progress)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            var previousProgress = replayProgress;
+            replayProgress = progress;
+            ReplayProgressBar.Maximum = Math.Max(progress.SampleCount, 1);
+            ReplayProgressBar.Value = Math.Min(progress.SampleNumber, ReplayProgressBar.Maximum);
+            ReplayProgressText.Text = $"{FormatDuration(progress.Position)} / {FormatDuration(progress.Duration)} · {progress.SampleNumber:N0}/{progress.SampleCount:N0}";
+            ReplayPauseButton.Content = progress.IsPaused ? "RESUME" : "PAUSE";
+            ReplayPauseButton.IsEnabled = !progress.IsComplete;
+            ReplayRestartButton.IsEnabled = true;
+            if (progress.IsComplete)
+            {
+                StreamStatusText.Text = "Replay complete";
+                SetIndicator(StreamIndicator, false);
+            }
+            else if (progress.IsPaused)
+            {
+                StreamStatusText.Text = "Replay paused";
+                SetIndicator(StreamIndicator, false);
+            }
+            if (previousProgress is null ||
+                previousProgress.IsPaused != progress.IsPaused ||
+                previousProgress.IsComplete != progress.IsComplete ||
+                progress.SampleNumber == 0)
+                Announce(ReplayProgressText);
+        });
     }
 
     private void ForgetKey_Click(object sender, RoutedEventArgs e)
@@ -264,7 +375,8 @@ public partial class MainWindow : Window
             ServerUrlBox.Text.Trim(),
             RememberKeyCheck.IsChecked == true,
             SelectedSourceMode(),
-            string.IsNullOrWhiteSpace(IbtPathBox.Text) ? null : IbtPathBox.Text.Trim(),
+            string.IsNullOrWhiteSpace(ReplayPathBox.Text) ? null : ReplayPathBox.Text.Trim(),
+            double.Parse(SelectedTag(ReplaySpeedBox), System.Globalization.CultureInfo.InvariantCulture),
             double.Parse(SelectedTag(DiagnosticRateBox), System.Globalization.CultureInfo.InvariantCulture),
             duration == 0 ? null : duration);
     }
@@ -275,8 +387,7 @@ public partial class MainWindow : Window
     private void SelectSourceMode(TelemetrySourceMode mode)
     {
         SelectComboTag(SourceModeBox, mode.ToString());
-        var ibt = mode == TelemetrySourceMode.IbtPlayback;
-        IbtFilePanel.Visibility = ibt ? Visibility.Visible : Visibility.Collapsed;
+        ReplayFilePanel.Visibility = mode == TelemetrySourceMode.DiagnosticReplay ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static string SelectedTag(ComboBox comboBox) =>
@@ -318,13 +429,75 @@ public partial class MainWindow : Window
         if (args.Contains("--simulate", StringComparer.OrdinalIgnoreCase)) SelectSourceMode(TelemetrySourceMode.Simulation);
         var serverIndex = Array.IndexOf(args, "--server");
         if (serverIndex >= 0 && serverIndex + 1 < args.Length) ServerUrlBox.Text = args[serverIndex + 1];
-        var ibtIndex = Array.IndexOf(args, "--ibt");
-        if (ibtIndex >= 0 && ibtIndex + 1 < args.Length)
+        var replayIndex = Array.IndexOf(args, "--replay");
+        if (replayIndex >= 0 && replayIndex + 1 < args.Length)
         {
-            SelectSourceMode(TelemetrySourceMode.IbtPlayback);
-            IbtPathBox.Text = args[ibtIndex + 1];
+            SelectSourceMode(TelemetrySourceMode.DiagnosticReplay);
+            ReplayPathBox.Text = args[replayIndex + 1];
         }
     }
+
+    private void UpdateSourceModeUi()
+    {
+        var replay = SelectedSourceMode() == TelemetrySourceMode.DiagnosticReplay;
+        ReplayFilePanel.Visibility = replay ? Visibility.Visible : Visibility.Collapsed;
+        ReplayPathBox.IsEnabled = replay && !bridge.Status.Running;
+        BrowseReplayButton.IsEnabled = replay && !bridge.Status.Running;
+        ReplaySpeedBox.IsEnabled = replay && !bridge.Status.Running;
+        ConnectButton.Content = replay ? "CONNECT & START REPLAY" : "CONNECT";
+        DiagnosticRateBox.IsEnabled = !replay && !diagnostics.IsCapturing;
+        DiagnosticDurationBox.IsEnabled = !replay && !diagnostics.IsCapturing;
+        StartCaptureButton.IsEnabled = bridge.Status.Running && !replay && !diagnostics.IsCapturing;
+        ConnectButton.IsEnabled = !bridge.Status.Running && (!replay || validatedReplay is not null);
+        if (replay)
+            DiagnosticStatusText.Text = "Diagnostic capture is unavailable while replaying an existing capture.";
+        else if (!bridge.Status.Running)
+            DiagnosticStatusText.Text = "Connect the bridge to enable diagnostics.";
+    }
+
+    private async Task ValidateReplayAsync(string path)
+    {
+        replayValidationCancellation?.Cancel();
+        replayValidationCancellation?.Dispose();
+        replayValidationCancellation = new CancellationTokenSource();
+        var cancellationToken = replayValidationCancellation.Token;
+        validatedReplay = null;
+        ReplaySummaryPanel.Visibility = Visibility.Collapsed;
+        ReplayValidationText.Foreground = (Brush)Application.Current.Resources["MutedBrush"];
+        ReplayValidationText.Text = "READING DIAGNOSTIC CAPTURE…";
+        ConnectButton.IsEnabled = false;
+        try
+        {
+            var archive = await Task.Run(() => DiagnosticReplayArchive.LoadAsync(path, cancellationToken), cancellationToken);
+            if (cancellationToken.IsCancellationRequested || !string.Equals(path, ReplayPathBox.Text, StringComparison.Ordinal)) return;
+            validatedReplay = archive;
+            ReplaySessionText.Text = string.Join(" → ", archive.Info.SessionNames);
+            ReplayTrackText.Text = $"{archive.Info.TrackName} · {archive.Info.DriverCount:N0} drivers · {archive.Info.ClassCount:N0} classes";
+            ReplayDetailsText.Text = $"Captured {archive.Info.CapturedAt.ToLocalTime():MMM d, yyyy h:mm tt} · {FormatDuration(archive.Info.Duration)} · {archive.Info.SampleCount:N0} samples · format {archive.Info.FormatVersion}";
+            ReplayValidationText.Text = $"Compatible replay found · {archive.Info.StreamKind}.";
+            ReplaySummaryPanel.Visibility = Visibility.Visible;
+            ConnectButton.IsEnabled = !bridge.Status.Running;
+            Announce(ReplayValidationText);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            if (cancellationToken.IsCancellationRequested) return;
+            ReplayValidationText.Foreground = (Brush)Application.Current.Resources["ErrorBrush"];
+            ReplayValidationText.Text = error.Message;
+            ConnectButton.IsEnabled = false;
+            Announce(ReplayValidationText);
+        }
+    }
+
+    private static bool IsRemoteEndpoint(Uri endpoint)
+    {
+        if (string.Equals(endpoint.Host, "localhost", StringComparison.OrdinalIgnoreCase)) return false;
+        return !System.Net.IPAddress.TryParse(endpoint.Host, out var address) || !System.Net.IPAddress.IsLoopback(address);
+    }
+
+    private static string FormatDuration(TimeSpan duration) =>
+        duration.TotalHours >= 1 ? duration.ToString(@"h\:mm\:ss") : duration.ToString(@"mm\:ss");
 
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
@@ -332,6 +505,8 @@ public partial class MainWindow : Window
         e.Cancel = true;
         IsEnabled = false;
         await bridge.DisposeAsync();
+        replayValidationCancellation?.Cancel();
+        replayValidationCancellation?.Dispose();
         await diagnostics.DisposeAsync();
         try { await settingsStore.SaveAsync(ReadSettings()); } catch { }
         shutdownComplete = true;
