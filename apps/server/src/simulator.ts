@@ -90,6 +90,18 @@ export function startSimulator(store: StateStore, onTelemetry: (session: Session
       externalSubSessionId: null,
       externalSessionNumber: null,
       trackId: null,
+      cameraGroups: [
+        { number: 1, name: "TV 1", isScenic: false, cameras: [{ number: 0, name: "TV 1" }] },
+        { number: 2, name: "TV 2", isScenic: false, cameras: [{ number: 0, name: "TV 2" }] },
+        { number: 3, name: "TV 3", isScenic: false, cameras: [{ number: 0, name: "TV 3" }] },
+        { number: 4, name: "Pit Lane", isScenic: false, cameras: [{ number: 0, name: "Pit Lane" }] },
+        { number: 5, name: "Nose", isScenic: false, cameras: [{ number: 0, name: "Nose" }] },
+        { number: 6, name: "Gearbox", isScenic: false, cameras: [{ number: 0, name: "Gearbox" }] },
+        { number: 7, name: "Roll Bar", isScenic: false, cameras: [{ number: 0, name: "Roll Bar" }] },
+      ],
+      activeCameraCarIdx: 0,
+      activeCameraGroup: 1,
+      activeCamera: 0,
     };
     store.telemetry(session);
     onTelemetry(session);

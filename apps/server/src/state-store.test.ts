@@ -32,6 +32,11 @@ const session: SessionState = {
     name: "TV 1",
     isScenic: false,
     cameras: [{ number: 0, name: "TV 1" }],
+  }, {
+    number: 5,
+    name: "TV 2",
+    isScenic: false,
+    cameras: [{ number: 0, name: "TV 2" }],
   }],
   activeCameraCarIdx: 7,
   activeCameraGroup: 3,
@@ -86,6 +91,10 @@ test("focused-driver and manual camera takes dispatch to the live iRacing contro
 
   const takeCommand = store.command({ type: "camera.take" }, packages);
   assert.equal(takeCommand?.cameraGroup, 3);
+
+  const groupTakeCommand = store.command({ type: "camera.group.take", cameraGroup: 5 }, packages);
+  assert.equal(groupTakeCommand?.cameraGroup, 5);
+  assert.equal(store.snapshot().camera.selectedGroup, 5);
 });
 
 test("camera takes remain unavailable without a live camera-capable telemetry source", () => {
