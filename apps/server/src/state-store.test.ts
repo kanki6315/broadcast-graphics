@@ -104,3 +104,34 @@ test("camera takes remain unavailable without a live camera-capable telemetry so
   assert.equal(cameraCommand, null);
   assert.equal(store.snapshot().camera.lastResult, "rejected");
 });
+
+test("a driver camera take selects the requested driver and camera group atomically", () => {
+  const store = new StateStore();
+  const secondDriver = { ...session.drivers[0], carIdx: 8, carNumber: "24", name: "Second Driver" };
+  store.setCameraController(true, true);
+  store.telemetry({ ...session, drivers: [...session.drivers, secondDriver] });
+
+  const cameraCommand = store.command({ type: "camera.driver.take", carIdx: 8, cameraGroup: 5 }, packages);
+
+  assert.deepEqual(cameraCommand && {
+    carIdx: cameraCommand.carIdx,
+    carNumber: cameraCommand.carNumber,
+    cameraGroup: cameraCommand.cameraGroup,
+  }, { carIdx: 8, carNumber: "24", cameraGroup: 5 });
+  assert.equal(store.snapshot().graphics.selectedDriverCarIdx, 8);
+  assert.equal(store.snapshot().camera.selectedGroup, 5);
+});
+
+test("a rejected driver camera take preserves the existing focus and group", () => {
+  const store = new StateStore();
+  const secondDriver = { ...session.drivers[0], carIdx: 8, carNumber: "24", name: "Second Driver" };
+  store.telemetry({ ...session, drivers: [...session.drivers, secondDriver] });
+
+  const cameraCommand = store.command({ type: "camera.driver.take", carIdx: 8, cameraGroup: 5 }, packages);
+
+  assert.equal(cameraCommand, null);
+  assert.equal(store.snapshot().graphics.selectedDriverCarIdx, 7);
+  assert.equal(store.snapshot().camera.selectedGroup, 3);
+  assert.equal(store.snapshot().camera.lastResult, "rejected");
+  assert.equal(store.snapshot().events.some((event) => event.message.includes("Camera selected")), false);
+});

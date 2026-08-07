@@ -23,13 +23,14 @@ Run this check on the iRacing PC before treating a client build as release-ready
 10. While spectating, confirm the control panel gives every non-scenic camera group its own button. Select a timing row and verify iRacing switches to that car using the selected group.
 11. Press another camera-group button. Confirm the current driver stays focused, the shot changes to that group, and the control panel reports `CAMERA SENT`.
 12. Disconnect the Windows client and confirm the camera controls disable with explicit disconnected copy while graphic focus remains usable.
-13. Observe a start and caution if available. Confirm ready/set/go and caution/one-lap-to-green details agree with iRacing.
-14. Disconnect the network briefly, restore it, and confirm the client retries without being restarted.
-15. Move through practice, qualifying, and race without restarting the client. Confirm telemetry resumes after each SDK reconnect.
-16. Restart the server while iRacing remains connected. Confirm the client reports the lost connection, retries, and resumes sending without being restarted.
-17. Leave telemetry connected for at least 20 minutes and confirm **Last acknowledged** continues to advance and the server never marks telemetry stale.
-18. Against a test server that accepts telemetry but suppresses acknowledgements, confirm the client shows **Telemetry acknowledgement stalled**, reconnects after approximately three seconds, and resumes without restarting the SDK source when acknowledgements return.
-19. With a test SDK source that remains nominally connected but suppresses raw telemetry callbacks, confirm the client shows **Restarting iRacing SDK source**, recreates the source after the watchdog deadline, and resumes without reconnecting a healthy server socket.
+13. Right-click a different timing row and choose a camera group. Confirm that driver becomes the shared focus and iRacing switches directly to the requested group. Repeat from the keyboard with both `Shift+F10` and the Context Menu key; use arrow keys and `Enter`, then confirm focus returns to the originating driver control. Reopen the menu and verify both `Escape` and `Tab` dismiss it and restore focus.
+14. Observe a start and caution if available. Confirm ready/set/go and caution/one-lap-to-green details agree with iRacing.
+15. Disconnect the network briefly, restore it, and confirm the client retries without being restarted.
+16. Move through practice, qualifying, and race without restarting the client. Confirm telemetry resumes after each SDK reconnect.
+17. Restart the server while iRacing remains connected. Confirm the client reports the lost connection, retries, and resumes sending without being restarted.
+18. Leave telemetry connected for at least 20 minutes and confirm **Last acknowledged** continues to advance and the server never marks telemetry stale.
+19. Against a test server that accepts telemetry but suppresses acknowledgements, confirm the client shows **Telemetry acknowledgement stalled**, reconnects after approximately three seconds, and resumes without restarting the SDK source when acknowledgements return.
+20. With a test SDK source that remains nominally connected but suppresses raw telemetry callbacks, confirm the client shows **Restarting iRacing SDK source**, recreates the source after the watchdog deadline, and resumes without reconnecting a healthy server socket.
 
 ## Diagnostics
 

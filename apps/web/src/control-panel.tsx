@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -32,6 +32,13 @@ const slotIcons: Record<GraphicSlot, typeof Radio> = {
   battle: Radio,
   flag: Flag,
   "lower-third": PackageOpen,
+};
+
+type CameraMenuState = {
+  driverCarIdx: number;
+  x: number;
+  y: number;
+  returnFocus: HTMLElement | null;
 };
 
 function FieldControl({ field, value, onChange }: {
@@ -78,6 +85,8 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
   const [confirmClear, setConfirmClear] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [cameraMenu, setCameraMenu] = useState<CameraMenuState | null>(null);
+  const cameraMenuRef = useRef<HTMLDivElement>(null);
 
   async function logout() {
     setLoggingOut(true);
@@ -99,6 +108,82 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
     const timer = window.setTimeout(() => setConfirmClear(false), 3_000);
     return () => window.clearTimeout(timer);
   }, [confirmClear]);
+
+  useEffect(() => {
+    if (!cameraMenu) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (!cameraMenuRef.current?.contains(event.target as Node)) setCameraMenu(null);
+    };
+    const dismissAndRestoreFocus = () => {
+      const shouldRestoreFocus = cameraMenuRef.current?.contains(document.activeElement);
+      const returnFocus = cameraMenu.returnFocus;
+      setCameraMenu(null);
+      if (shouldRestoreFocus) window.requestAnimationFrame(() => returnFocus?.focus());
+    };
+    const dismissForResize = () => dismissAndRestoreFocus();
+    const dismissForScroll = (event: Event) => {
+      if (!cameraMenuRef.current?.contains(event.target as Node)) dismissAndRestoreFocus();
+    };
+    window.addEventListener("pointerdown", dismissOutside);
+    window.addEventListener("resize", dismissForResize);
+    window.addEventListener("scroll", dismissForScroll, true);
+    return () => {
+      window.removeEventListener("pointerdown", dismissOutside);
+      window.removeEventListener("resize", dismissForResize);
+      window.removeEventListener("scroll", dismissForScroll, true);
+    };
+  }, [cameraMenu]);
+
+  useLayoutEffect(() => {
+    const menu = cameraMenuRef.current;
+    if (!cameraMenu || !menu) return;
+    const bounds = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(cameraMenu.x, window.innerWidth - bounds.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(cameraMenu.y, window.innerHeight - bounds.height - 8))}px`;
+    const firstAction = menu.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)');
+    (firstAction ?? menu).focus();
+  }, [cameraMenu]);
+
+  function openCameraMenu(driverCarIdx: number, x: number, y: number, returnFocus: HTMLElement | null) {
+    setCameraMenu({ driverCarIdx, x, y, returnFocus });
+  }
+
+  function handleDriverContextMenu(driverCarIdx: number, event: ReactMouseEvent<HTMLTableRowElement>) {
+    event.preventDefault();
+    const activeElement = document.activeElement instanceof HTMLElement && event.currentTarget.contains(document.activeElement)
+      ? document.activeElement
+      : event.currentTarget.querySelector<HTMLElement>(".driver-name");
+    openCameraMenu(driverCarIdx, event.clientX, event.clientY, activeElement);
+  }
+
+  function handleDriverMenuKey(driverCarIdx: number, event: ReactKeyboardEvent<HTMLTableRowElement>) {
+    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+    event.preventDefault();
+    const target = event.target instanceof HTMLElement ? event.target : event.currentTarget;
+    const bounds = target.getBoundingClientRect();
+    openCameraMenu(driverCarIdx, bounds.left + 24, bounds.bottom + 4, target);
+  }
+
+  function handleCameraMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!cameraMenu) return;
+    if (event.key === "Escape" || event.key === "Tab") {
+      event.preventDefault();
+      const returnFocus = cameraMenu.returnFocus;
+      setCameraMenu(null);
+      window.requestAnimationFrame(() => returnFocus?.focus());
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const actions = Array.from(cameraMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? []);
+    if (actions.length === 0) return;
+    event.preventDefault();
+    const currentIndex = actions.indexOf(document.activeElement as HTMLButtonElement);
+    const nextIndex = event.key === "Home" ? 0
+      : event.key === "End" ? actions.length - 1
+        : event.key === "ArrowDown" ? (currentIndex + 1) % actions.length
+          : (currentIndex - 1 + actions.length) % actions.length;
+    actions[nextIndex].focus();
+  }
 
   const activePackage = packages.find((candidate) => candidate.id === state?.graphics.packageId) ?? packages[0];
   const armedSlot = state?.graphics.armedSlot ?? "timing-tower";
@@ -161,7 +246,7 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
       <main className="production-grid">
         <section className="timing-director" aria-labelledby="timing-title">
           <div className="section-heading">
-            <div><h1 id="timing-title">Timing director</h1><p>Select the driver worth following. Focus is shared by driver graphics and the live iRacing camera.</p></div>
+            <div><h1 id="timing-title">Timing director</h1><p>Select a driver to share focus with graphics and the live camera. Right-click a driver to choose a specific camera group.</p></div>
             <div className={`flag-plate flag-${state.session?.flag ?? "green"}`}><Flag aria-hidden="true" /><strong>{state.session?.flag ?? "No flag"}</strong></div>
           </div>
           <div className="timing-table-wrap">
@@ -172,7 +257,12 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
                   const focused = driver.carIdx === state.graphics.selectedDriverCarIdx;
                   const fastest = driver.carIdx === fastestCarIdx;
                   return (
-                    <tr key={driver.carIdx} className={focused ? "is-focused" : ""}>
+                    <tr
+                      key={driver.carIdx}
+                      className={`${focused ? "is-focused" : ""}${cameraMenu?.driverCarIdx === driver.carIdx ? " has-camera-menu" : ""}`}
+                      onContextMenu={(event) => handleDriverContextMenu(driver.carIdx, event)}
+                      onKeyDown={(event) => handleDriverMenuKey(driver.carIdx, event)}
+                    >
                       <td><button className="driver-select" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })} aria-label={`${cameraReady ? "Focus graphics and take camera for" : "Focus graphics on"} ${driver.name}`} aria-pressed={focused}>{driver.position}</button></td>
                       <td><span className="car-number">{driver.carNumber}</span></td>
                       <td><button className="driver-name" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })} aria-label={`${cameraReady ? "Focus graphics and take camera for" : "Focus graphics on"} ${driver.name}`}><strong>{driver.name}</strong><span>{driver.team}</span></button></td>
@@ -284,6 +374,50 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
           </button>
         </aside>
       </main>
+      {cameraMenu && (() => {
+        const driver = state.session?.drivers.find((candidate) => candidate.carIdx === cameraMenu.driverCarIdx);
+        if (!driver) return null;
+        return (
+          <div
+            ref={cameraMenuRef}
+            className="driver-camera-menu"
+            role="menu"
+            aria-label={`Camera group for ${driver.name}`}
+            aria-busy={Boolean(state.camera.pendingCommandId)}
+            tabIndex={-1}
+            style={{ left: cameraMenu.x, top: cameraMenu.y }}
+            onKeyDown={handleCameraMenuKeyDown}
+          >
+            <div className="driver-camera-menu-heading">
+              <span>Take camera for</span>
+              <strong>#{driver.carNumber} {driver.name}</strong>
+            </div>
+            <div className="driver-camera-menu-actions">
+              {cameraGroups.length > 0 ? cameraGroups.map((group) => (
+                <button
+                  key={group.number}
+                  type="button"
+                  role="menuitem"
+                  tabIndex={-1}
+                  className={group.number === state.camera.activeGroup && driver.carIdx === state.camera.activeCarIdx ? "is-active" : ""}
+                  disabled={!cameraReady || Boolean(state.camera.pendingCommandId)}
+                  onClick={() => {
+                    const returnFocus = cameraMenu.returnFocus;
+                    command({ type: "camera.driver.take", carIdx: driver.carIdx, cameraGroup: group.number });
+                    setCameraMenu(null);
+                    window.requestAnimationFrame(() => returnFocus?.focus());
+                  }}
+                >
+                  <Camera aria-hidden="true" />
+                  <strong>{group.name}</strong>
+                  <span>{group.number === state.camera.activeGroup && driver.carIdx === state.camera.activeCarIdx ? "Active" : "Take"}</span>
+                </button>
+              )) : <p>No camera groups available</p>}
+            </div>
+            <span className={`driver-camera-menu-status is-${state.camera.lastResult ?? state.camera.controller}`} role="status">{cameraStatus}</span>
+          </div>
+        );
+      })()}
     </div>
   );
 }

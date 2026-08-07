@@ -231,6 +231,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 ### Focused-Driver Camera Control
 
 - Keep camera control inside a two-region focused-driver ledger: compact driver identity on the left and a dominant camera-group button bank on the right. Remove duplicate position, gap, and best-lap metrics from this ledger. Each camera-group button directly takes the focused driver's camera; selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
+- Right-clicking any timing row opens a compact, viewport-bound camera-group menu for that driver. `Shift+F10` and the Context Menu key expose the same action from a focused driver control; arrow keys move through available groups, while `Escape` or `Tab` closes the menu and restores focus. Choosing a group atomically updates shared driver focus and takes that driver on the requested group, then returns focus to the originating driver control.
 - Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. Mark selected and observed-active camera groups with written states as well as color. `SENT` confirms SDK delivery, not verified shot execution. Camera buttons are at least `44px` high, wrap into a capped two-row bank on desktop, become an uncapped two-column bank at `700px` and below, and collapse to one column below `340px`.
 
 ### Cue Workflow
