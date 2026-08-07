@@ -266,7 +266,7 @@ html.overlay-document #root {
 .timing-overlay { position: absolute; top: 6vh; left: 3vw; width: min(360px, 30vw); }
 .timing-overlay > header { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; background: var(--gfx-accent); color: #111; }
 .timing-overlay ol { list-style: none; margin: 0; padding: 0; }
-.timing-overlay li { height: 45px; display: grid; grid-template-columns: 42px 42px 1fr auto; align-items: center; gap: 9px; padding-right: 12px; border-bottom: 1px solid; }
+.timing-overlay li { position: relative; height: 45px; display: grid; grid-template-columns: 42px 42px 1fr auto; align-items: center; gap: 9px; padding-right: 12px; border-bottom: 1px solid; }
 .position-chip { align-self: stretch; display: grid; place-items: center; font-weight: 800; }
 .overlay-number { font-weight: 800; }
 .timing-overlay li > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -296,6 +296,10 @@ html.overlay-document #root {
 .lower-overlay > div:not([class]) { display: flex; flex-direction: column; justify-content: center; padding: 15px 24px; min-width: 520px; }
 .lower-overlay > div:not([class]) strong { font-size: 30px; }
 .lower-overlay > div:not([class]) span { color: var(--gfx-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay-canvas { transition: none; }
+}
 
 @media (max-width: 1050px) {
   .masthead { grid-template-columns: 1fr 1fr; }

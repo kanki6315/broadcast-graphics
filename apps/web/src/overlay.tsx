@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { formatLapTime, type DriverState, type GraphicSlot, type SessionState } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
@@ -40,6 +40,35 @@ function broadcastSurname(name: string): string {
 }
 
 function TimingTower({ session, rows }: { session: SessionState; rows: number }) {
+  const visibleDrivers = session.drivers.slice(0, rows);
+  const visibleDriverOrder = visibleDrivers.map((driver) => driver.carIdx).join(":");
+  const rowElements = useRef(new Map<number, HTMLLIElement>());
+  const previousTops = useRef(new Map<number, number>());
+
+  useLayoutEffect(() => {
+    const currentTops = new Map<number, number>();
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    for (const driver of visibleDrivers) {
+      const element = rowElements.current.get(driver.carIdx);
+      if (!element) continue;
+      const top = element.offsetTop;
+      currentTops.set(driver.carIdx, top);
+      const previousTop = previousTops.current.get(driver.carIdx);
+      const distance = previousTop == null ? 0 : previousTop - top;
+      if (!reduceMotion && Math.abs(distance) > 1) {
+        for (const animation of element.getAnimations()) animation.cancel();
+        element.animate(
+          [
+            { transform: `translateY(${distance}px)`, zIndex: 2 },
+            { transform: "translateY(0)", zIndex: 2 },
+          ],
+          { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+        );
+      }
+    }
+    previousTops.current = currentTops;
+  }, [visibleDriverOrder]);
+
   return (
     <div className="overlay-surface timing-overlay">
       <div className="tower-brand overlay-title">
@@ -52,8 +81,15 @@ function TimingTower({ session, rows }: { session: SessionState; rows: number })
       </header>
       <div className="tower-columns overlay-title"><span>Pos</span><span>Car</span><span>Driver</span><strong>Interval</strong></div>
       <ol className="overlay-plate">
-        {session.drivers.slice(0, rows).map((driver) => (
-          <li key={driver.carIdx} className="overlay-rule">
+        {visibleDrivers.map((driver) => (
+          <li
+            key={driver.carIdx}
+            ref={(element) => {
+              if (element) rowElements.current.set(driver.carIdx, element);
+              else rowElements.current.delete(driver.carIdx);
+            }}
+            className="overlay-rule"
+          >
             <span className="position-chip">{driver.position}</span>
             <span className="overlay-accent overlay-number">{driver.carNumber}</span>
             <strong>{driver.name}</strong>
