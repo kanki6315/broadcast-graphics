@@ -63,6 +63,19 @@ test("telemetry establishes a default driver focus", () => {
   assert.equal(store.snapshot().connection, "connected");
 });
 
+test("telemetry retains the latest results snapshot for each session type", () => {
+  const store = new StateStore();
+  const practice = { ...session, id: "practice", name: "Practice", type: "practice" as const };
+  const qualifying = { ...session, id: "qualifying", name: "Qualifying", type: "qualifying" as const };
+
+  store.telemetry(practice);
+  store.telemetry(qualifying);
+
+  assert.equal(store.snapshot().session?.id, "qualifying");
+  assert.equal(store.snapshot().sessionResults.practice?.id, "practice");
+  assert.equal(store.snapshot().sessionResults.qualifying?.id, "qualifying");
+});
+
 test("taking and clearing a semantic slot updates on-air state", () => {
   const store = new StateStore();
   store.telemetry(session);

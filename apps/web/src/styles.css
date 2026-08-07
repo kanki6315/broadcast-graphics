@@ -499,6 +499,17 @@ html.overlay-document #root {
 .overlay-number { font-weight: 800; }
 .timing-overlay li > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timing-overlay li > span:last-child { font-size: 13px; }
+.results-overlay { position: absolute; top: 12vh; left: 15vw; width: min(70vw, 1120px); }
+.results-overlay .results-heading { min-height: 88px; display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; background: var(--gfx-accent); }
+.results-overlay .results-heading strong { font-size: 34px; }
+.results-overlay .results-heading span { font-weight: 700; }
+.results-overlay .results-list { margin: 0; padding: 0; list-style: none; }
+.results-overlay .results-list li { min-height: 51px; display: grid; grid-template-columns: 58px 72px minmax(0, 1fr) 150px; align-items: center; border-bottom: 1px solid; }
+.results-overlay .results-position { text-align: right; }
+.results-overlay .results-number { align-self: stretch; display: grid; place-items: center; margin-left: 12px; }
+.results-overlay .results-name { overflow: hidden; padding-left: 18px; font-weight: 700; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.results-overlay .results-value { padding-right: 24px; text-align: right; }
+.results-overlay .results-unavailable { margin: 40px 24px; text-align: center; text-transform: uppercase; }
 .lower-overlay { position: absolute; left: 7vw; bottom: 8vh; min-width: 560px; min-height: 104px; display: flex; align-items: stretch; }
 .driver-focus-overlay { gap: 10px; background: transparent !important; }
 .driver-info-card { min-width: 560px; min-height: 104px; display: flex; align-items: stretch; }

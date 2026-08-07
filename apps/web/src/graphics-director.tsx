@@ -7,7 +7,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { formatLapTime, type GraphicPackageManifest, type GraphicSlot } from "@racecontrol/protocol";
+import { formatLapTime, type GraphicPackageManifest, type GraphicSlot, type SessionType } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
 type DirectorProps = {
@@ -138,10 +138,16 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
   };
 
   const towerConfig = config("timing-tower");
+  const isPriPackage = activePackage?.id === "pri-hoosier-500";
   const towerRows = Math.max(1, Number(towerConfig.rows ?? 12));
-  const towerPage = Math.max(1, Number(towerConfig.page ?? 1));
-  const towerPages = Math.max(1, Math.ceil((session?.drivers.length ?? 0) / towerRows));
-  const nextTowerPage = () => setConfig("timing-tower", "page", towerPage >= towerPages ? 1 : towerPage + 1);
+  const totalTowerCars = Math.max(1, Number(towerConfig.totalCars ?? 20));
+  const visibleTowerRows = Math.max(1, Number(towerConfig.visibleRows ?? towerRows));
+  const fixedTowerPositions = Math.max(0, Number(towerConfig.fixedPositions ?? 5));
+  const resultsConfig = config("results");
+  const resultsSessionType = String(resultsConfig.sessionType ?? "practice");
+  const resultsMetric = String(resultsConfig.metric ?? "speed");
+  const resultsSnapshot = state.sessionResults?.[resultsSessionType as SessionType]
+    ?? (session?.type === resultsSessionType ? session : null);
 
   const compareGap = (() => {
     if (!primaryDriver || !compareDriver) return "—";
@@ -191,7 +197,15 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
 
         <Widget title="Timing tower" active={active("timing-tower")} className="widget-timing-tower">
           <ShowHide active={active("timing-tower")} onShow={() => show("timing-tower")} onHide={() => hide("timing-tower")} />
-          <div className="widget-fields is-two-column"><label><span>Rows</span><input type="number" min={5} max={20} value={towerRows} onChange={(event) => setConfig("timing-tower", "rows", Number(event.target.value))} /></label><label><span>Mode</span><input readOnly value="Interval" /></label><label><span>Page</span><input readOnly value={`${Math.min(towerPage, towerPages)} / ${towerPages}`} /></label><button className="widget-secondary" onClick={nextTowerPage}>Next page</button><label className="widget-check"><input type="checkbox" checked readOnly />Auto update</label></div>
+          <div className="widget-fields is-two-column">
+            {isPriPackage ? <>
+              <label><span>Cars included</span><input type="number" min={5} max={63} value={totalTowerCars} onChange={(event) => setConfig("timing-tower", "totalCars", Number(event.target.value))} /></label>
+              <label><span>Visible slots</span><input type="number" min={5} max={20} value={visibleTowerRows} onChange={(event) => setConfig("timing-tower", "visibleRows", Number(event.target.value))} /></label>
+              <label><span>Fixed positions</span><input type="number" min={0} max={19} value={fixedTowerPositions} onChange={(event) => setConfig("timing-tower", "fixedPositions", Number(event.target.value))} /></label>
+            </> : <label><span>Rows</span><input type="number" min={5} max={20} value={towerRows} onChange={(event) => setConfig("timing-tower", "rows", Number(event.target.value))} /></label>}
+            <label><span>Mode</span><input readOnly value="Interval" /></label>
+            <label className="widget-check"><input type="checkbox" checked readOnly />Auto update</label>
+          </div>
         </Widget>
 
         <Widget title="Driver info" active={active("driver-focus")} className="widget-driver-info">
@@ -221,7 +235,14 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
         </Widget>
 
         <PlaceholderWidget title="Grid" className="widget-grid"><button className="widget-secondary" disabled>Next page</button><output>Page 1 / —</output></PlaceholderWidget>
-        <PlaceholderWidget title="Results" className="widget-results"><button className="widget-secondary" disabled>Next page</button><output>Page 1 / —</output></PlaceholderWidget>
+        <Widget title="Results" active={active("results")} className="widget-results">
+          <ShowHide active={active("results")} onShow={() => show("results")} onHide={() => hide("results")} />
+          <div className="widget-fields is-two-column">
+            <label><span>Session</span><select value={resultsSessionType} onChange={(event) => setConfig("results", "sessionType", event.target.value)}><option value="practice">Practice</option><option value="qualifying">Qualifying</option><option value="race">Race</option></select></label>
+            <label><span>Driver data</span><select value={resultsMetric} onChange={(event) => setConfig("results", "metric", event.target.value)}><option value="speed">Speed</option><option value="gap">Gap to leader</option></select></label>
+            <output>{resultsSnapshot ? `${Math.min(10, resultsSnapshot.drivers.length)} drivers ready` : "Results unavailable"}</output>
+          </div>
+        </Widget>
 
         <PlaceholderWidget title="Fastest lap" className="widget-fastest"><label className="widget-check"><input type="checkbox" />Auto show</label><label><span>Duration</span><input value="8s" readOnly /></label></PlaceholderWidget>
 

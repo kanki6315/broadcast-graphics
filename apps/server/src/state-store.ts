@@ -20,6 +20,7 @@ export class StateStore {
       revision: 0,
       connection: "disconnected",
       session: null,
+      sessionResults: {},
       graphics: {
         packageId: defaultPackageId,
         activeSlots: [],
@@ -54,6 +55,7 @@ export class StateStore {
   telemetry(session: SessionState): void {
     const wasDisconnected = this.state.connection !== "connected";
     this.state.session = session;
+    this.state.sessionResults[session.type] = session;
     this.state.connection = "connected";
     this.state.camera.groups = session.cameraGroups ?? [];
     this.state.camera.activeCarIdx = session.activeCameraCarIdx ?? null;

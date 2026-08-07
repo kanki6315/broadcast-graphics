@@ -9,8 +9,18 @@
       "label": "Timing tower",
       "description": "Running order and live intervals",
       "fields": [
-        { "key": "rows", "label": "Visible drivers", "type": "number", "default": 12, "min": 5, "max": 20 },
+        { "key": "totalCars", "label": "Cars included", "type": "number", "default": 20, "min": 5, "max": 63 },
+        { "key": "visibleRows", "label": "Visible slots", "type": "number", "default": 12, "min": 5, "max": 20 },
+        { "key": "fixedPositions", "label": "Fixed positions", "type": "number", "default": 5, "min": 0, "max": 19 },
         { "key": "showLastLap", "label": "Show last lap", "type": "boolean", "default": false }
+      ]
+    },
+    "results": {
+      "label": "Results page",
+      "description": "Top-ten results from a retained session",
+      "fields": [
+        { "key": "sessionType", "label": "Session results", "type": "select", "default": "practice", "options": [{ "label": "Practice", "value": "practice" }, { "label": "Qualifying", "value": "qualifying" }, { "label": "Race", "value": "race" }] },
+        { "key": "metric", "label": "Driver data", "type": "select", "default": "speed", "options": [{ "label": "Speed", "value": "speed" }, { "label": "Gap to leader", "value": "gap" }] }
       ]
     },
     "race-status": {

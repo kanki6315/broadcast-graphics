@@ -1,3 +1,59 @@
+@font-face {
+  font-family: "PRI Eurostile";
+  src: url("./Eurostile-RegularOblique.otf") format("opentype");
+  font-style: oblique;
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PRI Eurostile";
+  src: url("./Eurostile-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PRI Eurostile";
+  src: url("./Eurostile-Medium.otf") format("opentype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PRI Eurostile Extended";
+  src: url("./Eurostile-ExtendedRegular.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PRI Eurostile Extended";
+  src: url("./Eurostile-ExtendedBlack.otf") format("opentype");
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PRI Eurostile Extended";
+  src: url("./Eurostile-ExtendedMedium.otf") format("opentype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PRI Apotek Wide";
+  src: url("./ApotekWide-Black.otf") format("opentype");
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+}
+
 :root {
   --gfx-ink: #f7f7f5;
   --gfx-surface: rgba(4, 5, 6, 0.97);
@@ -31,77 +87,89 @@
   letter-spacing: 0.035em;
 }
 
-/* Timing tower: compact, high-contrast timing ledger inspired by the supplied broadcast reference. */
+/* Timing tower: faithfully follows the supplied 1080p Leaderboard Pylon artwork. */
 .timing-overlay {
-  top: 6vh;
-  left: 3.4vw;
-  width: clamp(344px, 19vw, 382px);
-  overflow: hidden;
-  border: 4px solid var(--gfx-accent);
-  border-radius: 34px 34px 30px 30px;
-  background: #050506;
+  top: 5.83vh;
+  left: 3.49vw;
+  width: 361px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .timing-overlay .tower-brand {
   height: 76px;
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 16px 19px 12px;
-  background: linear-gradient(180deg, #161719 0%, #050506 68%);
+  background: url("./leaderboard-header.png") 0 0 / 361px 76px no-repeat;
 }
 
-.tower-brand strong {
-  font-size: 39px;
-  font-style: italic;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.035em;
+.timing-overlay .tower-body {
+  padding: 0 0 8px 7px;
+  background: linear-gradient(90deg, #d71d24 0%, #ef1f27 7%, #a71319 28%, #49070a 62%, #030000 100%);
+  border-radius: 0 0 42px 42px;
 }
 
-.tower-brand span {
-  padding-left: 8px;
-  border-left: 2px solid var(--gfx-accent);
-  color: #d5d6d7;
-  font-size: 20px;
-  font-style: italic;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.025em;
+.timing-overlay .tower-body-inner {
+  overflow: hidden;
+  border-radius: 0 0 35px 35px;
+  background: #030303;
 }
 
 .timing-overlay .tower-session {
-  height: 42px;
+  height: 39px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 18px;
-  border-top: 1px solid #25272a;
-  border-bottom: 2px solid var(--gfx-accent);
-  background: linear-gradient(90deg, #070708, #292b2e 52%, #080809);
+  padding: 0 22px 0 20px;
+  border-top: 2px solid #ed1720;
+  border-bottom: 2px solid #e5161e;
+  background: linear-gradient(180deg, #080808 0%, #252525 52%, #080808 100%);
   color: #f7f7f5;
 }
 
-.tower-session strong { font-size: 25px; font-weight: 700; }
-.tower-session span { color: #d8d9da; font-size: 22px; font-weight: 400; letter-spacing: 0.04em; }
-
-.timing-overlay .tower-columns {
-  height: 30px;
-  display: grid;
-  grid-template-columns: 39px 49px 1fr auto;
-  align-items: center;
-  gap: 0;
-  padding-right: 14px;
-  border-bottom: 1px solid #77797c;
-  background: #050506;
-  color: #aeb0b3;
-  font-size: 13px;
-  font-style: italic;
+.tower-session strong {
+  font-family: "PRI Eurostile Extended", sans-serif;
+  font-size: 22.92px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.tower-session span {
+  color: #f5f5f5;
+  font-family: "PRI Eurostile Extended", sans-serif;
+  font-size: 22.92px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
-.tower-columns span:nth-child(1),
-.tower-columns span:nth-child(2) { text-align: center; }
-.tower-columns strong { color: #d5d6d8; font-weight: 500; }
+.timing-overlay .tower-columns {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 19px 0 20px;
+  border-bottom: 1px solid #363636;
+  background: #030303;
+  color: #f0f0f0;
+  font-family: "PRI Eurostile", sans-serif;
+  font-size: 16.67px;
+  font-style: oblique;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.tower-columns strong { color: #f0f0f0; font-weight: 400; }
+
+.timing-overlay .tower-session > *,
+.timing-overlay .tower-columns > *,
+.timing-overlay .position-chip,
+.timing-overlay li > strong,
+.timing-overlay li > span:last-child {
+  position: relative;
+  top: 2px;
+}
 
 .timing-overlay .overlay-plate {
   border: 0;
@@ -110,34 +178,237 @@
 }
 
 .timing-overlay li {
-  height: 40px;
-  grid-template-columns: 39px 49px minmax(0, 1fr) auto;
+  height: 37.6px;
+  grid-template-columns: 39px 47px minmax(0, 1fr) auto;
   gap: 0;
-  padding-right: 14px;
-  border-bottom: 1px solid #26282a;
-  background: linear-gradient(90deg, #050506, #101113 56%, #050506);
+  padding-right: 18px;
+  border-bottom: 1px solid #222;
+  background: linear-gradient(180deg, #0c0c0c 0%, #020202 50%, #111 100%);
 }
 
-.timing-overlay li:nth-child(even) { background: linear-gradient(90deg, #090a0b, #161719 56%, #090a0b); }
-.timing-overlay .position-chip { color: #96989b; font-size: 17px; font-weight: 600; text-align: center; }
+.timing-overlay li:nth-child(even) { background: linear-gradient(180deg, #171717 0%, #060606 52%, #171717 100%); }
+.timing-overlay .position-chip {
+  color: #b7b7b7;
+  font-family: "PRI Eurostile", sans-serif;
+  font-size: 16.67px;
+  font-weight: 700;
+  text-align: center;
+}
 .timing-overlay .overlay-number {
   align-self: stretch;
   display: grid;
   place-items: center;
   min-width: 0;
-  font: 700 18px/1 var(--gfx-font-display);
+  border-inline: 0;
+  background:
+    linear-gradient(90deg, rgba(215, 29, 36, 0.1) 0%, transparent 24%, transparent 78%, rgba(0, 0, 0, 0.18) 100%),
+    linear-gradient(180deg, #000 0%, #020000 16%, #0d0001 34%, #240102 56%, #500609 78%, #7c1015 100%);
+  font: 900 20.83px/1 "PRI Apotek Wide", sans-serif;
 }
 .timing-overlay li > strong {
-  padding-left: 11px;
-  font: 650 17px/1 var(--gfx-font-display);
+  padding-left: 10px;
+  font: 700 18.75px/1 "PRI Eurostile", sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.005em;
+  letter-spacing: 0;
 }
 .timing-overlay li > span:last-child {
-  color: #bfc1c4;
-  font-size: 15px;
-  font-style: italic;
+  color: #f1f1f1;
+  font-family: "PRI Eurostile", sans-serif;
+  font-size: 18.75px;
+  font-style: oblique;
   font-weight: 400;
+  letter-spacing: 0;
+}
+
+.timing-overlay li.is-rotating {
+  animation: pylon-row-rotate 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pylon-row-rotate {
+  from { opacity: 0; transform: translateY(9px); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+/* Results page: direct 1080p reconstruction of the supplied Practice Results smart object. */
+.pri-results-overlay {
+  top: 177px;
+  left: 289px;
+  width: 1344px;
+  height: 783px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  filter: none;
+  color: #f7f7f7;
+  font-synthesis: none;
+}
+
+.pri-results-overlay .results-panel-background {
+  position: absolute;
+  z-index: 0;
+  top: 6px;
+  left: 6px;
+  width: 1332px;
+  height: 771px;
+}
+
+.pri-results-overlay .results-heading {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  min-height: 0;
+  display: block;
+  padding: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.pri-results-overlay .results-heading h1 {
+  position: absolute;
+  top: 39px;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  font: 900 58.33px/1 "PRI Eurostile Extended", sans-serif;
+  letter-spacing: 0;
+}
+
+.pri-results-overlay .results-heading p {
+  position: absolute;
+  top: 102px;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  font: 400 37.5px/1 "PRI Eurostile Extended", sans-serif;
+  letter-spacing: 0;
+}
+
+.pri-results-overlay .results-event-logo {
+  position: absolute;
+  z-index: 1;
+  top: 270px;
+  left: 75px;
+  width: 284px;
+  height: 305px;
+  object-fit: contain;
+}
+
+.pri-results-overlay .results-separator {
+  position: absolute;
+  z-index: 1;
+  top: 193px;
+  left: 418px;
+  width: 5px;
+  height: 539px;
+}
+
+.pri-results-overlay .results-metric-label {
+  position: absolute;
+  z-index: 1;
+  top: 194px;
+  right: 89px;
+  color: #8d8d8d;
+  font: 500 20.83px/1 "PRI Eurostile Extended", sans-serif;
+  letter-spacing: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pri-results-overlay .results-list {
+  position: absolute;
+  z-index: 1;
+  top: 220px;
+  left: 469px;
+  width: 803px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pri-results-overlay .results-list li {
+  min-height: 0;
+  height: 41.5px;
+  display: grid;
+  grid-template-columns: 45px 92px minmax(0, 1fr) 128px;
+  align-items: center;
+  border: 0;
+  font-size: 33.33px;
+  line-height: 1;
+}
+
+.pri-results-overlay .results-position {
+  color: #8d8d8d;
+  font: 700 33.33px/1 "PRI Eurostile", sans-serif;
+  text-align: right;
+}
+
+.pri-results-overlay .results-number {
+  position: relative;
+  top: -5px;
+  left: 0.5px;
+  align-self: center;
+  display: block;
+  margin: 0;
+  color: #d71d24;
+  background: transparent;
+  font: 900 33.33px/1 "PRI Apotek Wide", sans-serif;
+  text-align: center;
+}
+
+.pri-results-overlay .results-name {
+  overflow: hidden;
+  padding: 0;
+  color: #f7f7f7;
+  font: 700 33.33px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pri-results-overlay .results-value {
+  padding: 0;
+  color: #f7f7f7;
+  font: 500 33.33px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  text-align: right;
+}
+
+.pri-results-overlay .results-unavailable {
+  position: absolute;
+  z-index: 1;
+  top: 391px;
+  left: 469px;
+  width: 803px;
+  margin: 0;
+  color: #8d8d8d;
+  font: 500 25px/1 "PRI Eurostile Extended", sans-serif;
+  text-align: center;
+}
+
+.pri-results-overlay .results-presenter {
+  position: absolute;
+  z-index: 1;
+  top: 709px;
+  left: 371px;
+  height: 43px;
+  display: flex;
+  align-items: center;
+}
+
+.pri-results-overlay .results-presenter span {
+  position: relative;
+  top: 1px;
+  font: 400 25px/1 "PRI Eurostile Extended", sans-serif;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.pri-results-overlay .results-presenter img {
+  width: 178px;
+  height: 42px;
+  margin-left: 31px;
+  object-fit: contain;
 }
 
 /* Driver focus: a right-anchored identity plate with the same red number tab and black sponsor field. */
