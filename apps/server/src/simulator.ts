@@ -18,17 +18,19 @@ const names = [
 
 function drivers(tick: number): DriverState[] {
   const completedLaps = 18 + Math.floor(tick / 90);
-  return names.map(([carNumber, name, team], index) => {
+  const battleSwapped = Math.floor(tick / 8) % 2 === 1;
+  return names.map<DriverState>(([carNumber, name, team], index) => {
+    const position = battleSwapped && index === 1 ? 3 : battleSwapped && index === 2 ? 2 : index + 1;
     const base = 81.42 + index * 0.23;
-    const gap = index === 0 ? 0 : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3));
+    const gap = position === 1 ? 0 : Number(((position - 1) * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3));
     return {
       carIdx: index,
-      position: index + 1,
+      position,
       carNumber,
       name,
       team,
       className: "GT3",
-      interval: index === 0 ? null : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3)),
+      interval: position === 1 ? null : gap,
       lastLap: base + Math.sin(tick / 7 + index) * 0.31,
       bestLap: base - 0.42 - (index % 3) * 0.04,
       lapsCompleted: completedLaps,
@@ -36,11 +38,11 @@ function drivers(tick: number): DriverState[] {
       incidents: index % 4,
       classId: 1,
       classColor: "#ff4b2b",
-      classPosition: index + 1,
+      classPosition: position,
       gapToLeader: gap,
-      intervalToAhead: index === 0 ? null : 0.73,
-      classGapToLeader: index === 0 ? 0 : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3)),
-      classIntervalToAhead: index === 0 ? null : 0.73,
+      intervalToAhead: position === 1 ? null : 0.73,
+      classGapToLeader: gap,
+      classIntervalToAhead: position === 1 ? null : 0.73,
       lapsBehindLeader: 0,
       lapsBehindClassLeader: 0,
       currentLap: completedLaps + 1,
@@ -52,14 +54,14 @@ function drivers(tick: number): DriverState[] {
       userId: 10_000 + index,
       teamId: 20_000 + index,
       carId: 1,
-      lastLapPosition: index + 1,
-      lastLapClassPosition: index + 1,
+      lastLapPosition: position,
+      lastLapClassPosition: position,
       lastLapGapToLeader: gap,
       lastLapGapToClassLeader: gap,
       lastLapLapsBehindLeader: 0,
       lastLapLapsBehindClassLeader: 0,
     };
-  });
+  }).sort((left, right) => left.position - right.position);
 }
 
 export function startSimulator(store: StateStore, onTelemetry: (session: SessionState) => void = () => {}): () => void {

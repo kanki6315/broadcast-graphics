@@ -210,6 +210,7 @@ public sealed class DiagnosticReplayArchive
         using var reader = new StreamReader(stream);
         var sessionIndex = 0;
         var lineNumber = 0;
+        var liveTiming = new LiveTimingTracker();
         while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -228,7 +229,7 @@ public sealed class DiagnosticReplayArchive
                 while (sessionIndex + 1 < sessionUpdates.Count && sessionUpdates[sessionIndex + 1].CapturedAt <= capturedAt)
                     sessionIndex++;
                 var telemetry = root.GetProperty("payload").Deserialize<TelemetryData>(JsonOptions);
-                var state = TelemetrySnapshotMapper.Map(telemetry, sessionUpdates[sessionIndex].Session, capturedAt);
+                var state = TelemetrySnapshotMapper.Map(telemetry, sessionUpdates[sessionIndex].Session, capturedAt, liveTiming);
                 frames.Add(new Frame(capturedAt, state));
             }
             catch (Exception error) when (error is JsonException or InvalidDataException or KeyNotFoundException)

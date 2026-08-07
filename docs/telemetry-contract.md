@@ -47,14 +47,14 @@ The mapper behavior is also covered by `client/TelemetryClient.Tests` so SDK cha
 | Field | Meaning |
 | --- | --- |
 | `position` / `classPosition` | One-based overall and class running positions. Session-result class positions are converted from iRacing's zero-based values. |
-| `gapToLeader` | Race-only time gap in seconds to the overall leader when the cars are on the same completed lap. |
-| `intervalToAhead` | Race-only time gap in seconds to the preceding overall-position car, derived from leader gaps. |
+| `gapToLeader` | Race-only moving time gap in seconds to the overall leader when the cars are on the same completed lap. It is interpolated from shared track-position crossings, with `CarIdxF2Time` as the scoring fallback. |
+| `intervalToAhead` | Race-only moving time gap in seconds to the preceding overall-position car, measured at a shared track position. |
 | `classGapToLeader` | Race-only time gap to the driver's class leader. |
 | `classIntervalToAhead` | Race-only time gap to the preceding class-position car. |
-| `lapsBehindLeader` / `lapsBehindClassLeader` | Completed-lap deficit. When nonzero, the corresponding seconds gap is `null` instead of showing a misleading time. |
+| `lapsBehindLeader` / `lapsBehindClassLeader` | Whole-lap race-distance deficit. This avoids briefly marking the field one lap down when a leader crosses start/finish first. When nonzero, the corresponding seconds gap is `null` instead of showing a misleading time. |
 | `interval` | Compatibility alias for `gapToLeader`. New graphics should not use it. |
 
-`CarIdxF2Time` is interpreted as an overall-leader gap only during a race. In practice and qualifying it represents a lap-time value, so the normalized gap fields are deliberately `null`.
+During a race, the live bridge uses `SessionTime`, `CarIdxLap`, and `CarIdxLapDistPct` to record when each car reaches sampled positions around the circuit. Once the reference car's history brackets another car's current position, the bridge interpolates their separation at that shared position. `CarIdxF2Time` supplies the authoritative scoring fallback while that short history warms up. In practice and qualifying it represents a lap-time value, so the normalized gap fields are deliberately `null`.
 
 ## Lap-time graphics
 

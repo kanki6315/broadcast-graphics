@@ -126,6 +126,57 @@ public sealed class TelemetrySnapshotMapperTests
         Assert.Equal("running", driver.TrackStatus);
     }
 
+    [Fact]
+    public void LiveTimingInterpolatesWhenCarsReachTheSameTrackPosition()
+    {
+        var timing = new LiveTimingTracker();
+        var info = SessionInfo("Race", [Driver(0), Driver(1)]);
+
+        TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [4, 4],
+            f2Times: [0, 5],
+            lapDistances: [0.20f, 0.10f],
+            sessionTime: 100), info, liveTiming: timing);
+
+        var secondFrame = TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [4, 4],
+            f2Times: [0, 5],
+            lapDistances: [0.30f, 0.20f],
+            sessionTime: 101), info, liveTiming: timing);
+        var second = secondFrame.Drivers.Single(driver => driver.Position == 2);
+        AssertClose(1, second.GapToLeader);
+        AssertClose(1, second.IntervalToAhead);
+
+        var thirdFrame = TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [4, 4],
+            f2Times: [0, 5],
+            lapDistances: [0.40f, 0.29f],
+            sessionTime: 102), info, liveTiming: timing);
+        var updatedSecond = thirdFrame.Drivers.Single(driver => driver.Position == 2);
+        AssertClose(1.1, updatedSecond.GapToLeader);
+    }
+
+    [Fact]
+    public void LeaderCrossingTheLineDoesNotTemporarilyMarkTheFieldOneLapDown()
+    {
+        var state = TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [5, 4],
+            f2Times: [0, 2.5f],
+            lapDistances: [0.02f, 0.98f]), SessionInfo("Race", [Driver(0), Driver(1)]));
+
+        var second = state.Drivers.Single(driver => driver.Position == 2);
+        Assert.Equal(0, second.LapsBehindLeader);
+        AssertClose(2.5, second.GapToLeader);
+    }
+
     private static TelemetryData Telemetry(
         int[] positions,
         int[] classPositions,
@@ -135,11 +186,12 @@ public sealed class TelemetrySnapshotMapperTests
         float[]? lastLapTimes = null,
         float[]? bestLapTimes = null,
         int[]? bestLapNumbers = null,
-        float[]? lapDistances = null) => new()
+        float[]? lapDistances = null,
+        double sessionTime = 1_000) => new()
     {
         SessionNum = 0,
         SessionState = SVappsLAB.iRacingTelemetrySDK.SessionState.Racing,
-        SessionTime = 1_000,
+        SessionTime = sessionTime,
         SessionTimeRemain = 2_000,
         SessionTimeTotal = 3_000,
         SessionLapsTotal = 100,
