@@ -18,6 +18,10 @@ The primary user is a solo streamer running an iRacing broadcast. They need to o
 
 The product turns live iRacing session data into broadcast-ready browser graphics. A small client runs on the gaming PC, sends telemetry to a server, and the server distributes current race state to transparent browser overlays and a control panel. Success means a solo operator can add trustworthy timing and race context to a stream with little manual coordination.
 
+## Brand
+
+The product is named **Gantry**. Its mark is a circular `G` interrupted by a horizontal timing beam that terminates at an orange sensor, connecting motorsport timing with live broadcast signaling. The primary identity uses carbon ink, approval orange, technical stock, and the existing Barlow Condensed display face.
+
 ## Positioning
 
 One live race-state model powers both the on-air graphics and the operator controls, keeping what the operator sees and what viewers see synchronized.
@@ -47,7 +51,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 
 ## Evidence on Hand
 
-No brand assets, customer claims, or benchmarks are currently present. User-provided captures from a Long Beach multi-class event and a Phoenix IndyCar race cover practice, qualifying, race starts, green-flag running, cautions, one-lap-to-green, and restarts. They are available for local replay compatibility testing but are not stored in the repository. Demonstration data must be labeled as simulated.
+Approved Gantry vector and raster brand assets are stored in `brand/`. No customer claims or benchmarks are currently present. User-provided captures from a Long Beach multi-class event and a Phoenix IndyCar race cover practice, qualifying, race starts, green-flag running, cautions, one-lap-to-green, and restarts. They are available for local replay compatibility testing but are not stored in the repository. Demonstration data must be labeled as simulated.
 
 ## Product Principles
 

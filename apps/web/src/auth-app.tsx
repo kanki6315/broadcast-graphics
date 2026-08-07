@@ -46,7 +46,7 @@ function LoginScreen({ onLogin }: { onLogin: (identity: AdminIdentity) => void }
     <main className="auth-shell">
       <section className="login-sheet" aria-labelledby="login-title">
         <div className="auth-registration"><span className="registration-mark" aria-hidden="true" /><span>Authorized operators only</span></div>
-        <div className="login-heading"><ShieldCheck aria-hidden="true" /><div><h1 id="login-title">Open the control desk</h1><p>Sign in to operate graphics and manage broadcast access.</p></div></div>
+        <div className="login-heading"><img className="login-brand-mark" src="/brand/gantry-mark.svg" alt="" /><div><h1 id="login-title">Open Gantry control</h1><p>Sign in to operate graphics and manage broadcast access.</p></div></div>
         <form onSubmit={submit}>
           <label className="auth-field"><span>Username</span><input autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
           <label className="auth-field"><span>Password</span><input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required autoFocus /></label>
@@ -182,7 +182,7 @@ function AccessManager({ identity, onLogout }: { identity: AdminIdentity; onLogo
     <div className="access-shell">
       <header className="access-masthead">
         <a href="/control"><ArrowLeft aria-hidden="true" />Control desk</a>
-        <div><strong>Access management</strong><span>Signed in as {identity.username}</span></div>
+        <div className="access-identity"><img src="/brand/gantry-mark.svg" alt="" /><div><strong>Gantry access</strong><span>Signed in as {identity.username}</span></div></div>
         <button onClick={() => void logout()} disabled={loggingOut}><LogOut aria-hidden="true" />{loggingOut ? "Signing out…" : "Sign out"}</button>
       </header>
       <main className="access-grid">

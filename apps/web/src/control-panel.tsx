@@ -114,7 +114,7 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
   if (!state) {
     return (
       <main className="loading-screen">
-        <Radio aria-hidden="true" />
+        <img className="loading-brand-mark" src="/brand/gantry-mark.svg" alt="" />
         <h1>Connecting to race control</h1>
         <p>Start the server at port 8787, then this desk will recover automatically.</p>
       </main>
@@ -136,8 +136,8 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
     <div className="control-shell">
       <header className="masthead">
         <div className="brand-block">
-          <span className="registration-mark" aria-hidden="true" />
-          <div><strong>Broadcast Graphics</strong><span>Live control</span></div>
+          <img className="brand-mark" src="/brand/gantry-mark.svg" alt="" />
+          <div><strong>Gantry</strong><span>Live control</span></div>
         </div>
         <div className={`connection-plate ${telemetryHealthy ? "is-good" : "is-bad"}`}>
           {telemetryHealthy ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}

@@ -1,6 +1,8 @@
-# Broadcast Graphics
+# Gantry
 
-A working MVP for turning iRacing race data into browser-source graphics and a timing-led solo-operator control panel.
+A general motorsports broadcast-graphics platform that turns live race data into browser-source graphics and a timing-led solo-operator control panel.
+
+The Gantry identity combines a circular `G`, a timing beam, and an orange terminal sensor. Production logo files and usage guidance live in [`brand/`](brand/README.md).
 
 ## Components
 

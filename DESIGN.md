@@ -1,5 +1,5 @@
 ---
-name: Broadcast Graphics
+name: Gantry
 description: A timing-led production desk and package-driven broadcast graphic system for solo race operators.
 colors:
   technical-stock: "#f4f1e8"
@@ -95,7 +95,7 @@ components:
     width: "100%"
 ---
 
-# Design System: Broadcast Graphics
+# Design System: Gantry
 
 ## Overview
 
@@ -106,6 +106,12 @@ The interface is a live race-production instrument printed on technical stock: t
 The global control desk has one durable visual identity, while browser-source overlays inherit their visual identity from the selected graphic package. That boundary is intentional: the control panel always operates semantic graphic slots, and package themes may change palette, type, plate geometry, and depth without restyling the operator workflow.
 
 The native Windows telemetry client is the same Scrutineering Ledger translated into authored WPF controls. It is scan-first rather than dashboard-like: a server/source/stream health strip precedes a connection sheet on the left and diagnostics with activity on the right. Native platform behavior remains intact, but default visual chrome does not replace the shared stock, rules, type, or state language.
+
+## Brand Identity
+
+The Gantry mark is a circular carbon-ink `G` interrupted by a centered horizontal timing beam and a separated approval-orange square sensor. The orange square is the brand's cue endpoint, not a decorative accent. Preserve the supplied geometry, proportions, and gap between the beam and sensor; do not redraw the mark with a different aperture, terminal shape, or line weight.
+
+Use the stacked lockup for brand-led surfaces and the horizontal lockup where width is available. The symbol alone is appropriate for favicons, application icons, compact mastheads, and native-client identity blocks. Wordmarks use Barlow Condensed Bold in uppercase. Canonical masters and export guidance live in `brand/`.
 
 **Key Characteristics:**
 
