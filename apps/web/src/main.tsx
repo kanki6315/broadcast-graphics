@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { AdminApp } from "./auth-app";
 import { OverlayApp } from "./overlay";
 
-const isOverlay = window.location.pathname.startsWith("/overlay/");
+const isOverlay = window.location.pathname === "/overlay" || window.location.pathname === "/overlay/";
 document.documentElement.classList.toggle("overlay-document", isOverlay);
 
 createRoot(document.getElementById("root")!).render(

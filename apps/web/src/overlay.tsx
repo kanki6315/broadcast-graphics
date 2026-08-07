@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { formatLapTime, isGraphicSlot, type DriverState, type GraphicPackageManifest, type GraphicSlot } from "@racecontrol/protocol";
+import { useEffect, useMemo, type ReactNode } from "react";
+import { formatLapTime, type DriverState, type GraphicSlot } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
 function usePackageTheme(packageId: string | undefined) {
@@ -63,10 +63,12 @@ function LowerThird({ headline, detail }: { headline: string; detail: string }) 
   return <div className="overlay-surface lower-overlay overlay-plate"><span className="overlay-accent lower-mark" /><div><strong className="overlay-title">{headline}</strong><span>{detail}</span></div></div>;
 }
 
+function OverlayLayer({ active, children }: { active: boolean; children: ReactNode }) {
+  return <section className={`overlay-canvas ${active ? "is-active" : ""}`} aria-hidden={!active}>{children}</section>;
+}
+
 export function OverlayApp() {
   const { state } = useLiveState("overlay");
-  const pathSlot = window.location.pathname.split("/").filter(Boolean).at(-1) ?? "timing-tower";
-  const slot: GraphicSlot = isGraphicSlot(pathSlot) ? pathSlot : "timing-tower";
   const queryPackage = new URLSearchParams(window.location.search).get("package");
   const packageId = queryPackage ?? state?.graphics.packageId;
   usePackageTheme(packageId);
@@ -79,17 +81,17 @@ export function OverlayApp() {
   }, [selected, state?.session]);
 
   if (!state?.session) return null;
-  const isActive = state.graphics.activeSlots.includes(slot);
-  const config = state.graphics.slotConfig[slot] ?? {};
+  const activeSlots = new Set(state.graphics.activeSlots);
+  const configFor = (slot: GraphicSlot) => state.graphics.slotConfig[slot] ?? {};
 
   return (
-    <main className={`overlay-canvas ${isActive ? "is-active" : ""}`} aria-hidden={!isActive}>
-      {slot === "timing-tower" && <TimingTower drivers={state.session.drivers} rows={Number(config.rows ?? 10)} />}
-      {slot === "driver-focus" && <DriverFocus driver={selected} config={config} />}
-      {slot === "race-status" && <RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} />}
-      {slot === "battle" && <Battle selected={selected} rival={rival} label={String(config.label ?? "Battle for position")} />}
-      {slot === "flag" && <FlagOverlay flag={state.session.flag} message={String(config.message ?? "")} />}
-      {slot === "lower-third" && <LowerThird headline={String(config.headline ?? "Race control")} detail={String(config.detail ?? "")} />}
+    <main>
+      <OverlayLayer active={activeSlots.has("timing-tower")}><TimingTower drivers={state.session.drivers} rows={Number(configFor("timing-tower").rows ?? 10)} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("driver-focus")}><DriverFocus driver={selected} config={configFor("driver-focus")} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("race-status")}><RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("battle")}><Battle selected={selected} rival={rival} label={String(configFor("battle").label ?? "Battle for position")} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("flag")}><FlagOverlay flag={state.session.flag} message={String(configFor("flag").message ?? "")} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("lower-third")}><LowerThird headline={String(configFor("lower-third").headline ?? "Race control")} detail={String(configFor("lower-third").detail ?? "")} /></OverlayLayer>
     </main>
   );
 }
