@@ -230,8 +230,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Focused-Driver Camera Control
 
-- Keep camera-group selection inside the focused-driver ledger. Changing the group arms it without taking; `TAKE CAMERA` remains an explicit action. Selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
-- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. `SENT` confirms SDK delivery, not verified shot execution. At `700px` and below, keep the group selector and take action at least `44px` high and allow status copy to wrap.
+- Keep camera control inside a two-region focused-driver ledger: compact driver identity on the left and a dominant camera-group button bank on the right. Remove duplicate position, gap, and best-lap metrics from this ledger. Each camera-group button directly takes the focused driver's camera; selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
+- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. Mark selected and observed-active camera groups with written states as well as color. `SENT` confirms SDK delivery, not verified shot execution. Camera buttons are at least `44px` high, wrap into a capped two-row bank on desktop, become an uncapped two-column bank at `700px` and below, and collapse to one column below `340px`.
 
 ### Cue Workflow
 
@@ -318,7 +318,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Don't:
 
-- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep camera control inside the focused-driver ledger as camera-group arming, an explicit take action, and written delivery state.
+- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep direct camera-group actions inside the focused-driver ledger with written selection, activity, and delivery states.
 - **Don't** turn semantic graphic slots into client-specific styling controls.
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.

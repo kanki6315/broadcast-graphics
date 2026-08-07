@@ -104,6 +104,6 @@ The server discovers manifests at runtime. The control panel renders semantic co
 
 ## Camera control
 
-When the Windows client is connected to a live iRacing source, the focus ledger lists the non-scenic camera groups reported by the current session. Selecting a timing row focuses driver-dependent graphics and sends that car to the armed camera group. Changing the group arms it without disturbing the current shot; **Take camera** applies the armed group to the focused driver.
+When the Windows client is connected to a live iRacing source, the focus ledger gives every non-scenic camera group reported by the current session its own button. Selecting a timing row focuses driver-dependent graphics and sends that car to the selected camera group. Pressing a camera-group button switches the focused driver directly to that group.
 
 Camera commands travel from the authenticated control socket to the authenticated telemetry client and then through the SDK's simulator-control interface. The control desk shows disconnected, unavailable, sending, sent, and rejected states. A sent state confirms delivery to the SDK, not that iRacing visibly changed shots; iRacing camera commands are fire-and-forget and only work while spectating or watching a replay (out of the car). Simulation and diagnostic-replay telemetry remain read-only.
