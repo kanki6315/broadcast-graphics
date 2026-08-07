@@ -48,6 +48,41 @@ typography:
     fontWeight: 600
     lineHeight: 1.2
     letterSpacing: "0.08em"
+  pri-tower-driver:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "18.75px"
+    fontWeight: 700
+    lineHeight: 1
+  pri-tower-position:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "16.67px"
+    fontWeight: 700
+    lineHeight: 1
+  pri-tower-timing:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "18.75px"
+    fontWeight: 400
+    lineHeight: 1
+  pri-tower-descriptor:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "16.67px"
+    fontWeight: 400
+    lineHeight: 1
+  pri-tower-car-number:
+    fontFamily: "PRI Apotek Wide, sans-serif"
+    fontSize: "20.83px"
+    fontWeight: 900
+    lineHeight: 1
+  pri-tower-session-title:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "22.92px"
+    fontWeight: 900
+    lineHeight: 1
+  pri-tower-clock:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "22.92px"
+    fontWeight: 400
+    lineHeight: 1
 rounded:
   square: "0px"
 spacing:
@@ -162,7 +197,7 @@ Authentication follows the same discipline: green is limited to the success icon
 **Display Font:** Barlow Condensed (sans-serif fallback)
 
 **Body Font:** Source Sans 3 (sans-serif fallback)
-**Overlay Package Fonts:** supplied through `--gfx-font-display` and `--gfx-font-data`; PRI Hoosier 500 uses the shipped Barlow Condensed and Source Sans 3 faces, while Endurance Blue retains condensed system display faces and Segoe UI data text.
+**Overlay Package Fonts:** supplied by each graphic package. Endurance Blue retains condensed system display faces and Segoe UI data text. The PRI Hoosier 500 timing tower bypasses the generic overlay stacks and loads the five supplied OTF masters under three package-local families: `PRI Eurostile`, `PRI Eurostile Extended`, and `PRI Apotek Wide`.
 
 The Windows client packages Barlow Condensed and Source Sans 3 in the application and references them with WPF pack URIs. Do not fall back to a system display face for authored native surfaces when those resources are available.
 
@@ -175,6 +210,18 @@ The Windows client packages Barlow Condensed and Source Sans 3 in the applicatio
 - **Body** (400, `14px`, approximately `1.4`): instructions and descriptions, typically constrained to `65ch`.
 - **Data** (400, `15px`, tabular numerals): intervals and lap times; emphasis changes weight before it changes size.
 - **Label** (600, `10–12px`, `0.05–0.08em`, uppercase): metadata, table headers, status tags, field labels, and keyboard hints.
+
+### PRI Hoosier 500 Timing Tower
+
+- **Drivers:** Eurostile Bold through `PRI Eurostile` (700, `18.75px`, `1`), uppercase.
+- **Positions:** Eurostile Bold through `PRI Eurostile` (700, `16.67px`, `1`).
+- **Timing values:** Eurostile Regular Oblique through `PRI Eurostile` (400 oblique, `18.75px`, `1`).
+- **Descriptor and unit labels:** Eurostile Regular Oblique through `PRI Eurostile` (400 oblique, `16.67px`, `1`).
+- **Car numbers:** Apotek Wide Black through `PRI Apotek Wide` (900, `20.83px`, `1`).
+- **Session title:** Eurostile Extended Black through `PRI Eurostile Extended` (900, `22.92px`, `1`).
+- **Clock:** Eurostile Extended Regular through `PRI Eurostile Extended` (400, `22.92px`, `1`).
+
+These roles reproduce the supplied PSD typography; do not substitute the global Barlow Condensed or Source Sans 3 faces inside this tower.
 
 **The Condensed Command Rule.** Use Barlow Condensed for headings, labels, statuses, driver identities, and commands; keep explanatory sentences in Source Sans 3.
 
@@ -192,7 +239,7 @@ The native telemetry client opens centered at `1080 × 760px` with an `880 × 65
 
 Diagnostic replay expands inside the left connection sheet only when that source is selected. File selection, verification summary, playback speed, high-consequence confirmation, and connect actions stay in the pre-connection flow. Replay transport occupies the same sheet but remains hidden until the bridge is running in replay mode and the server connection is established; it must not imply usable transport before a destination exists.
 
-Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, and lower-third use viewport-relative offsets and purpose-built dimensions; do not apply the control-panel responsive grid to them.
+Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, and lower-third use viewport-relative offsets and purpose-built dimensions; do not apply the control-panel responsive grid to them. The PRI Hoosier 500 tower is authored for a fixed `1920 × 1080px` canvas: its shipped proof places the shell at approximately `x = 67px`, `y = 63px`, with an exact `361px` width (measured `67.0078`, `62.9609`, and `361px`). Its default field includes twenty cars, exposes twelve vertical slots, and holds the top five positions fixed.
 
 ## Elevation & Depth
 
@@ -210,7 +257,7 @@ Control-panel geometry is square (`0px` radius). Inputs, selects, toggles, row b
 
 Native controls are deliberately authored rather than left to default WPF chrome. Text, password, combo-box, popup, and button templates keep square borders; hover uses the inspection wash, keyboard focus thickens the field rule and adds an external orange focus frame, press/default state thickens the button rule, and disabled controls remain structurally present at `0.48` opacity.
 
-Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, but each package may override it with a deliberate broadcast silhouette. PRI Hoosier 500 uses lacquer-black plates, a `3–4px` racing-red perimeter, and large `18–34px` corner radii; Endurance Blue keeps `0px` corners and uses a colored top rule. Package-specific geometry must remain in `graphic-packages/<id>/theme.css`, not in the global control grammar.
+Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, but each package may override it with a deliberate broadcast silhouette. PRI Hoosier 500 uses the supplied raster header over a racing-red outer shell, with a `42px` lower shell radius around a lacquer-black inner body whose lower corners use `35px`; its session and descriptor bands remain square. The red shell runs down the left edge and wraps beneath the bottom, fading toward black as it reaches the lower-right corner; the black body sits flush to the straight right edge, so no red rail continues down that side. Other PRI plates use their established `18–24px` radii and `3–4px` red perimeters. Endurance Blue keeps `0px` corners and uses a colored top rule. Package-specific geometry must remain in `graphic-packages/<id>/theme.css`, not in the global control grammar.
 
 ## Components
 
@@ -298,10 +345,15 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 ### Overlay Plates
 
 - Shared overlay components position and structure content; package themes own `--gfx-ink`, `--gfx-surface`, `--gfx-surface-soft`, `--gfx-accent`, `--gfx-muted`, `--gfx-font-display`, `--gfx-font-data`, and `--gfx-cut`.
-- PRI Hoosier 500 is a black, white, silver, and racing-red broadcast package. Its tower carries a branded masthead, session strip, labeled columns, twelve `40px` data rows by default, red car-number cells, silver rules, and a red rounded perimeter. Driver focus uses the same red number tab above a deep sponsor-style identity field; race status, battle, and flag plates reuse the lacquer-black material and red outline. Semantic green, yellow, red, and checkered flag colors stay scoped to the flag plate or chip so the surrounding browser-source viewport remains transparent.
-- PRI Hoosier 500's primary overlay steps are `39px` for the tower wordmark, `30px` for driver identity, `25px` for session titles, `18–24px` for number and data emphasis, and `10–15px` for labels and compact telemetry. Its neutral ramp runs from `#030304` through `#313336`, with silver copy from `#8f9194` through `#f7f7f5`, and uses `#e10613` as the package accent.
+- PRI Hoosier 500 is its own black/red broadcast world: supplied PRI / Hoosier event artwork, exact Eurostile and Apotek typography, lacquer-black and charcoal bands, racing-red perimeter and number cells, silver-white copy, restrained video-separation shadow, and a dense `37.6px` row rhythm. The tower is an exact reproduction of the supplied PSD Leaderboard Pylon, not a reinterpretation or a Gantry-branded variation.
+- The tower reads in one fixed vertical story: event header → session title and clock → descriptor and unit → running order. The branded `361 × 76px` raster masthead owns the event-header typography. Below it, the `39px` session band and `28px` descriptor band lead into twelve visible rows by default. Each row preserves the position, car-number cell, uppercase broadcast surname, and timing value. Number cells use the PSD's near-black-at-top to deep-red-at-bottom gradient with no bright inset side rules. Because the exact Eurostile faces sit optically high inside CSS line boxes, session text, descriptors, positions, driver names, and timing values receive a shared `2px` downward baseline correction; the raster masthead and Apotek car numbers do not. Surname particles such as `de`, `van`, and `von` remain attached to the final surname instead of being discarded.
+- Practice shows `BEST LAP TIME` / `TIME`; best laps below one minute omit the leading `0:` and render as seconds plus milliseconds. Race shows `RUNNING ORDER` / `INTERVAL`; the first-place value remains `Leader`, while the remaining values use the established gap or laps-behind formatting.
+- `totalCars` chooses how many classified drivers are included (default `20`). `visibleRows` chooses the number of vertical slots (default `12`). `fixedPositions` anchors the top positions (default `5`). When the included field exceeds the visible slots, only the lower slots advance to the next page every `15s`; the fixed positions do not move. When the full included field fits, all included rows remain fixed.
+- The exact tower typography is defined in the Typography section and frontmatter roles. Driver focus remains a separate `30px` Barlow Condensed treatment; do not apply its generic package typography to the PSD-derived timing tower. The PRI neutral ramp runs from `#030304` through `#313336`, silver copy from `#8f9194` through `#f7f7f5`, and the package accent is `#e10613`.
 - Other slots use similarly direct, labeled facts rather than decorative content. Lower-third and results treatments are not part of the current PRI Hoosier 500 refresh.
 - Overlay visibility is a single `180ms ease-out` opacity transition. Package themes may style plates but must preserve legibility at compressed broadcast sizes and transparent canvas behavior.
+
+**The PSD Authority Rule.** For the PRI Hoosier 500 timing tower, source artwork, measured 1080p placement, type roles, band heights, row rhythm, and shell silhouette are authoritative. Preserve them exactly; package extensions must not reinterpret this component.
 
 ## Do's and Don'ts
 
@@ -313,6 +365,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Do** use text, icons, borders, patterns, and shape together so color never carries state by itself.
 - **Do** reduce motion to effectively zero when `prefers-reduced-motion` is active.
 - **Do** keep overlays transparent outside their graphic plates and let package tokens own their client-facing finish.
+- **Do** preserve the PRI Hoosier 500 tower at `361px` wide and approximately `67px` from the left and `63px` from the top on a `1920 × 1080px` canvas.
+- **Do** keep PRI tower field inclusion, visible slots, and fixed positions as separate controls; rotate only the non-fixed slots at the shipped `15s` cadence.
 - **Do** move focus into newly revealed, high-consequence authentication content such as the one-time secret receipt.
 - **Do** write every loading, pending, empty, active, revoked, success, and error state in specific operator language.
 - **Do** preserve `44px` minimum touch targets for compact access navigation and record actions.
@@ -331,6 +385,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.
 - **Don't** allow a package theme to alter control-panel layout, control styling, or operator terminology.
+- **Don't** substitute Gantry's global fonts, redraw the supplied PRI masthead, or reinterpret the PSD-derived tower proportions.
 - **Don't** animate continuously; use only decisive stamp/slide or opacity state changes around `180–260ms`.
 - **Don't** use orange or green as generic authentication status fills; reserve orange for action/selection/confirmation and green for a reinforced success cue.
 - **Don't** collapse mobile key records into unlabeled values or require horizontal table scrolling for routine access management.

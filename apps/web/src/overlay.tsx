@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatLapTime, type DriverState, type GraphicSlot, type SessionState } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
@@ -36,14 +36,63 @@ function formatSessionClock(seconds: number | null): string {
 }
 
 function broadcastSurname(name: string): string {
-  return name.trim().split(/\s+/).at(-1) ?? name;
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 1) return name;
+  const particles = new Set(["da", "de", "del", "della", "der", "di", "dos", "du", "la", "le", "van", "von"]);
+  let start = parts.length - 1;
+  while (start > 0 && particles.has(parts[start - 1].toLowerCase())) start -= 1;
+  return parts.slice(start).join(" ");
 }
 
-function TimingTower({ session, rows }: { session: SessionState; rows: number }) {
-  const visibleDrivers = session.drivers.slice(0, rows);
+function formatPylonLapTime(seconds: number | null): string {
+  if (seconds == null || !Number.isFinite(seconds)) return "—";
+  return seconds < 60 ? seconds.toFixed(3) : formatLapTime(seconds);
+}
+
+function TimingTower({
+  session,
+  totalCars,
+  visibleRows,
+  fixedPositions,
+  packageId,
+}: {
+  session: SessionState;
+  totalCars: number;
+  visibleRows: number;
+  fixedPositions: number;
+  packageId?: string;
+}) {
+  const includedCount = Math.max(1, Math.min(Math.floor(totalCars), session.drivers.length));
+  const visibleCount = Math.max(1, Math.min(Math.floor(visibleRows), includedCount));
+  const includedDrivers = session.drivers.slice(0, includedCount);
+  const needsRotation = includedCount > visibleCount;
+  const fixedCount = needsRotation
+    ? Math.max(0, Math.min(Math.floor(fixedPositions), visibleCount - 1))
+    : visibleCount;
+  const rotatingSlots = visibleCount - fixedCount;
+  const rotatingPool = includedDrivers.slice(fixedCount);
+  const rotationPages = needsRotation ? Math.ceil(rotatingPool.length / rotatingSlots) : 1;
+  const includedDriverOrder = includedDrivers.map((driver) => driver.carIdx).join(":");
+  const [rotationPage, setRotationPage] = useState(0);
+  const isRace = session.type === "race";
+  const visibleDrivers = !needsRotation
+    ? includedDrivers
+    : [
+        ...includedDrivers.slice(0, fixedCount),
+        ...Array.from({ length: rotatingSlots }, (_, index) => rotatingPool[(rotationPage * rotatingSlots + index) % rotatingPool.length]),
+      ];
   const visibleDriverOrder = visibleDrivers.map((driver) => driver.carIdx).join(":");
   const rowElements = useRef(new Map<number, HTMLLIElement>());
   const previousTops = useRef(new Map<number, number>());
+
+  useEffect(() => {
+    setRotationPage(0);
+    if (rotationPages <= 1) return;
+    const timer = window.setInterval(() => {
+      setRotationPage((page) => (page + 1) % rotationPages);
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [fixedCount, includedDriverOrder, rotatingSlots, rotationPages]);
 
   useLayoutEffect(() => {
     const currentTops = new Map<number, number>();
@@ -69,34 +118,71 @@ function TimingTower({ session, rows }: { session: SessionState; rows: number })
     previousTops.current = currentTops;
   }, [visibleDriverOrder]);
 
+  if (packageId !== "pri-hoosier-500") {
+    return (
+      <div className="overlay-surface timing-overlay">
+        <div className="tower-brand overlay-title">
+          <strong>PRI</strong>
+          <span>HOOSIER 500</span>
+        </div>
+        <header className="tower-session overlay-title">
+          <strong>{session.type}</strong>
+          <span>{session.totalLaps ? `LAP ${session.lap} / ${session.totalLaps}` : formatSessionClock(session.timeRemaining)}</span>
+        </header>
+        <div className="tower-columns overlay-title"><span>Pos</span><span>Car</span><span>Driver</span><strong>Interval</strong></div>
+        <ol className="overlay-plate">
+          {visibleDrivers.map((driver) => (
+            <li
+              key={driver.carIdx}
+              ref={(element) => {
+                if (element) rowElements.current.set(driver.carIdx, element);
+                else rowElements.current.delete(driver.carIdx);
+              }}
+              className="overlay-rule"
+            >
+              <span className="position-chip">{driver.position}</span>
+              <span className="overlay-accent overlay-number">{driver.carNumber}</span>
+              <strong>{driver.name}</strong>
+              <span>{formatGap(driver)}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
   return (
     <div className="overlay-surface timing-overlay">
-      <div className="tower-brand overlay-title">
-        <strong>PRI</strong>
-        <span>HOOSIER 500</span>
+      <div className="tower-brand" role="img" aria-label="PRI Hoosier 500" />
+      <div className="tower-body">
+        <div className="tower-body-inner">
+          <header className="tower-session overlay-title">
+            <strong>{session.type}</strong>
+            <span>{session.timeRemaining != null ? formatSessionClock(session.timeRemaining) : session.totalLaps ? `${session.lap} / ${session.totalLaps}` : "LIVE"}</span>
+          </header>
+          <div className="tower-columns overlay-title">
+            <span>{isRace ? "Running order" : "Best lap time"}</span>
+            <strong>{isRace ? "Interval" : "Time"}</strong>
+          </div>
+          <ol className="overlay-plate">
+            {visibleDrivers.map((driver, index) => (
+              <li
+                key={driver.carIdx}
+                ref={(element) => {
+                  if (element) rowElements.current.set(driver.carIdx, element);
+                  else rowElements.current.delete(driver.carIdx);
+                }}
+                className={`overlay-rule ${needsRotation && index >= fixedCount ? "is-rotating" : ""}`}
+              >
+                <span className="position-chip">{driver.position}</span>
+                <span className="overlay-accent overlay-number">{driver.carNumber}</span>
+                <strong>{broadcastSurname(driver.name)}</strong>
+                <span>{isRace ? formatGap(driver) : formatPylonLapTime(driver.bestLap)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
-      <header className="tower-session overlay-title">
-        <strong>{session.type}</strong>
-        <span>{session.totalLaps ? `LAP ${session.lap} / ${session.totalLaps}` : formatSessionClock(session.timeRemaining)}</span>
-      </header>
-      <div className="tower-columns overlay-title"><span>Pos</span><span>Car</span><span>Driver</span><strong>Interval</strong></div>
-      <ol className="overlay-plate">
-        {visibleDrivers.map((driver) => (
-          <li
-            key={driver.carIdx}
-            ref={(element) => {
-              if (element) rowElements.current.set(driver.carIdx, element);
-              else rowElements.current.delete(driver.carIdx);
-            }}
-            className="overlay-rule"
-          >
-            <span className="position-chip">{driver.position}</span>
-            <span className="overlay-accent overlay-number">{driver.carNumber}</span>
-            <strong>{driver.name}</strong>
-            <span>{formatGap(driver)}</span>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
@@ -154,10 +240,24 @@ export function OverlayApp() {
   if (!state?.session) return null;
   const activeSlots = new Set(state.graphics.activeSlots);
   const configFor = (slot: GraphicSlot) => state.graphics.slotConfig[slot] ?? {};
+  const towerConfig = configFor("timing-tower");
+  const defaultTowerRows = 12;
+  const legacyRows = Number(towerConfig.rows ?? defaultTowerRows);
+  const totalTowerCars = Number(towerConfig.totalCars ?? (packageId === "pri-hoosier-500" ? 20 : legacyRows));
+  const visibleTowerRows = Number(towerConfig.visibleRows ?? legacyRows);
+  const fixedTowerPositions = Number(towerConfig.fixedPositions ?? (packageId === "pri-hoosier-500" ? 5 : visibleTowerRows));
 
   return (
     <main>
-      <OverlayLayer active={activeSlots.has("timing-tower")}><TimingTower session={state.session} rows={Number(configFor("timing-tower").rows ?? 12)} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("timing-tower")}>
+        <TimingTower
+          session={state.session}
+          totalCars={totalTowerCars}
+          visibleRows={visibleTowerRows}
+          fixedPositions={fixedTowerPositions}
+          packageId={packageId}
+        />
+      </OverlayLayer>
       <OverlayLayer active={activeSlots.has("driver-focus")}><DriverFocus driver={selected} config={configFor("driver-focus")} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("race-status")}><RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("battle")}><Battle selected={selected} rival={rival} label={String(configFor("battle").label ?? "Battle for position")} /></OverlayLayer>

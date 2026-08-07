@@ -9,7 +9,9 @@
       "label": "Timing tower",
       "description": "Running order and live intervals",
       "fields": [
-        { "key": "rows", "label": "Visible drivers", "type": "number", "default": 12, "min": 5, "max": 20 },
+        { "key": "totalCars", "label": "Cars included", "type": "number", "default": 20, "min": 5, "max": 63 },
+        { "key": "visibleRows", "label": "Visible slots", "type": "number", "default": 12, "min": 5, "max": 20 },
+        { "key": "fixedPositions", "label": "Fixed positions", "type": "number", "default": 5, "min": 0, "max": 19 },
         { "key": "showLastLap", "label": "Show last lap", "type": "boolean", "default": false }
       ]
     },
