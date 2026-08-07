@@ -19,7 +19,7 @@ public sealed record ClientSettings(
     int? DiagnosticDurationMinutes)
 {
     public static ClientSettings Default { get; } = new(
-        "https://broadcasts.arjunakankipati.com",
+        "https://gantry.arjunakankipati.com",
         true,
         TelemetrySourceMode.Live,
         null,

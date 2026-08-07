@@ -11,7 +11,7 @@ Run this check on the iRacing PC before treating a client build as release-ready
 
 ## Connection and telemetry
 
-1. Confirm the default server is `https://broadcasts.arjunakankipati.com`.
+1. Confirm the default server is `https://gantry.arjunakankipati.com`.
 2. Paste the ingestion key, leave **Live iRacing SDK** selected, and select **Connect**.
 3. Start or join an iRacing session.
 4. Confirm the written statuses progress to **Connected to graphics server**, an SDK connected state, and **Telemetry flowing** only after the first server acknowledgement.
