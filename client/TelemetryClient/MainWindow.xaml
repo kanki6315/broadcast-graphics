@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="Broadcast Graphics Telemetry Client"
+        Title="Gantry Telemetry Client"
         Width="1080" Height="760" MinWidth="880" MinHeight="650"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing">
@@ -22,10 +22,17 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Text="BROADCAST GRAPHICS" />
-                    <TextBlock Foreground="{StaticResource OrangeBrush}" FontFamily="{StaticResource DisplayFont}" FontWeight="Bold" FontSize="12" Text="TELEMETRY BRIDGE" />
-                </StackPanel>
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="52" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Image Width="44" Height="44" HorizontalAlignment="Left" Source="Resources/Brand/gantry-mark.png" Stretch="Uniform" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock FontFamily="{StaticResource DisplayFont}" FontSize="30" FontWeight="Bold" Text="GANTRY" />
+                        <TextBlock Foreground="{StaticResource OrangeBrush}" FontFamily="{StaticResource DisplayFont}" FontWeight="Bold" FontSize="12" Text="TELEMETRY BRIDGE" />
+                    </StackPanel>
+                </Grid>
                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock HorizontalAlignment="Right" FontFamily="{StaticResource DisplayFont}" FontWeight="SemiBold" Text="WINDOWS CLIENT" />
                     <TextBlock x:Name="VersionText" HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" FontSize="12" />

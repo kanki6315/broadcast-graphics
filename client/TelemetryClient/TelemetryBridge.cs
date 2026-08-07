@@ -525,7 +525,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     public static Uri BuildTelemetryUri(string serverUrl)
     {
         if (!Uri.TryCreate(serverUrl.Trim(), UriKind.Absolute, out var parsed))
-            throw new ArgumentException("Enter a complete server URL, such as https://broadcasts.example.com.");
+            throw new ArgumentException("Enter a complete server URL, such as https://gantry.example.com.");
         var builder = new UriBuilder(parsed);
         builder.Scheme = builder.Scheme.ToLowerInvariant() switch
         {

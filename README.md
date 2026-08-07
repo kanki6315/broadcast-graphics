@@ -1,6 +1,8 @@
-# Broadcast Graphics
+# Gantry
 
-A working MVP for turning iRacing race data into browser-source graphics and a timing-led solo-operator control panel.
+A general motorsports broadcast-graphics platform that turns live race data into browser-source graphics and a timing-led solo-operator control panel.
+
+The Gantry identity combines a circular `G`, a timing beam, and an orange terminal sensor. Production logo files and usage guidance live in [`brand/`](brand/README.md).
 
 ## Components
 
@@ -37,10 +39,10 @@ dotnet run --project client/TelemetryClient -- --simulate --server ws://localhos
 
 Paste an ingestion key from **Access management**, choose a telemetry source, and select **Connect**. If **Remember this key** is enabled, the secret is stored in Windows Credential Manager; other preferences are stored under the current user's local application data. Disable the server simulator with `DISABLE_SIMULATOR=1` when using the client.
 
-For the hosted service, enter `https://broadcasts.arjunakankipati.com` as the server URL. The client converts HTTP(S) URLs to the corresponding authenticated WebSocket endpoint. Command-line options remain available to prefill non-secret connection settings:
+For the hosted service, enter `https://gantry.arjunakankipati.com` as the server URL. The client converts HTTP(S) URLs to the corresponding authenticated WebSocket endpoint. Command-line options remain available to prefill non-secret connection settings:
 
 ```powershell
-dotnet run --project client/TelemetryClient -- --server https://broadcasts.arjunakankipati.com
+dotnet run --project client/TelemetryClient -- --server https://gantry.arjunakankipati.com
 ```
 
 Use **Diagnostics** after connecting to capture the SDK variable inventory, raw session YAML, sampled selected telemetry, normalized server payloads, connection events, and client errors. Choose a sampling rate and a fixed duration, or choose **Manual stop** and finish with **Stop & Save**. Captures remain local and are saved as ZIP files; ingestion keys are never written into them.
@@ -61,7 +63,7 @@ Create a self-contained, single-file `win-x64` release from PowerShell:
 
 The distributable is written to `artifacts\windows-client\BroadcastGraphicsClient.exe`. The destination PC does not need a separate .NET installation. Windows may show a SmartScreen warning until releases are code-signed.
 
-The production API publishes the current self-contained executable at [`/api/client/download`](https://broadcasts.arjunakankipati.com/api/client/download). Its public update manifest is available at [`/api/client/latest`](https://broadcasts.arjunakankipati.com/api/client/latest) and includes the client version, byte size, and SHA-256 checksum. The Docker build runs the telemetry correctness tests, publishes the `win-x64` executable, generates the manifest and checksum, and includes all three in the API image.
+The production API publishes the current self-contained executable at [`/api/client/download`](https://gantry.arjunakankipati.com/api/client/download). Its public update manifest is available at [`/api/client/latest`](https://gantry.arjunakankipati.com/api/client/latest) and includes the client version, byte size, and SHA-256 checksum. The Docker build runs the telemetry correctness tests, publishes the `win-x64` executable, generates the manifest and checksum, and includes all three in the API image.
 
 Published clients check the configured server when they start. When a newer version is available, the client downloads it beside the running executable, verifies its size and SHA-256 checksum, starts the verified executable in updater mode, exits, and is atomically replaced and restarted. The previous executable is retained as `BroadcastGraphicsClient.exe.previous` for manual recovery. Automatic replacement requires write access to the directory containing the executable; failures are non-fatal and are recorded in the activity log.
 
@@ -90,9 +92,9 @@ The repository includes a multi-stage production `Dockerfile` and `railway.toml`
    If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its authentication and `bg_*` race-history tables during startup.
 
 4. Confirm that Railway reports `/api/health` as healthy, then open `/control` and create one ingestion key and one view key.
-5. Add `broadcasts.arjunakankipati.com` as the Railway service's custom domain. In Cloudflare DNS, create the CNAME Railway supplies. Keep it DNS-only while validating HTTPS and WebSockets; Cloudflare proxying can be enabled after the end-to-end test succeeds.
+5. Add `gantry.arjunakankipati.com` as the Railway service's custom domain. In Cloudflare DNS, create the CNAME Railway supplies. Keep it DNS-only while validating HTTPS and WebSockets; Cloudflare proxying can be enabled after the end-to-end test succeeds.
 
-Use `https://broadcasts.arjunakankipati.com` as the desktop telemetry client's production server URL.
+Use `https://gantry.arjunakankipati.com` as the desktop telemetry client's production server URL.
 
 Railway deploys should be performed outside a live broadcast. The current live race state is held in one server process, so a deployment restarts the session and connected clients will reconnect automatically. PostgreSQL preserves administrator sessions and access keys across that restart.
 

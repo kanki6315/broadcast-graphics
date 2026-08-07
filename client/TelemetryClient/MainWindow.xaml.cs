@@ -322,7 +322,7 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Select a Broadcast Graphics diagnostic capture",
+            Title = "Select a Gantry diagnostic capture",
             Filter = "Diagnostic capture (*.zip)|*.zip|All files (*.*)|*.*",
             CheckFileExists = true
         };

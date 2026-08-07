@@ -8,14 +8,17 @@
     <Nullable>enable</Nullable>
     <RootNamespace>RaceControl.TelemetryClient</RootNamespace>
     <AssemblyName>BroadcastGraphicsClient</AssemblyName>
-    <Product>Broadcast Graphics Telemetry Client</Product>
-    <Version>0.6.0</Version>
+    <Product>Gantry Telemetry Client</Product>
+    <ApplicationIcon>Resources\Brand\gantry.ico</ApplicationIcon>
+    <Version>0.6.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.2.0" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Resources\Fonts\*.ttf" />
+    <Resource Include="Resources\Brand\*.png" />
+    <Resource Include="Resources\Brand\*.ico" />
     <None Include="Resources\Fonts\OFL-*.txt" CopyToOutputDirectory="Never" />
   </ItemGroup>
 </Project>

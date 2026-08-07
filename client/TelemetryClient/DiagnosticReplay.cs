@@ -57,7 +57,7 @@ public sealed class DiagnosticReplayArchive
     public static async Task<DiagnosticReplayArchive> LoadAsync(string path, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            throw new InvalidDataException("Choose an existing Broadcast Graphics diagnostic ZIP.");
+            throw new InvalidDataException("Choose an existing Gantry diagnostic ZIP.");
 
         try
         {
