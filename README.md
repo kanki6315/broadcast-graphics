@@ -61,7 +61,11 @@ Create a self-contained, single-file `win-x64` release from PowerShell:
 
 The distributable is written to `artifacts\windows-client\BroadcastGraphicsClient.exe`. The destination PC does not need a separate .NET installation. Windows may show a SmartScreen warning until releases are code-signed.
 
-Pushes to `main` that change `client/**` or `global.json` automatically publish the same self-contained build and its SHA-256 checksum to the rolling [`windows-client-latest`](https://github.com/kanki6315/broadcast-graphics/releases/tag/windows-client-latest) prerelease. The stable ZIP download is [`BroadcastGraphicsClient-win-x64.zip`](https://github.com/kanki6315/broadcast-graphics/releases/download/windows-client-latest/BroadcastGraphicsClient-win-x64.zip). The workflow can also be run manually from GitHub Actions when a rebuild is needed without a source change.
+The production API publishes the current self-contained executable at [`/api/client/download`](https://broadcasts.arjunakankipati.com/api/client/download). Its public update manifest is available at [`/api/client/latest`](https://broadcasts.arjunakankipati.com/api/client/latest) and includes the client version, byte size, and SHA-256 checksum. The Docker build runs the telemetry correctness tests, publishes the `win-x64` executable, generates the manifest and checksum, and includes all three in the API image.
+
+Published clients check the configured server when they start. When a newer version is available, the client downloads it beside the running executable, verifies its size and SHA-256 checksum, starts the verified executable in updater mode, exits, and is atomically replaced and restarted. The previous executable is retained as `BroadcastGraphicsClient.exe.previous` for manual recovery. Automatic replacement requires write access to the directory containing the executable; failures are non-fatal and are recorded in the activity log.
+
+Increment the `<Version>` in `client/TelemetryClient/TelemetryClient.csproj` whenever a client change should roll out. Clients older than `0.6.0` predate the updater and require one final manual replacement from `/api/client/download`; subsequent version increments install automatically.
 
 Before a release, complete the [Windows telemetry client smoke test](docs/windows-client-smoke-test.md), including the 100% and 150% display-scaling checks.
 
@@ -69,7 +73,7 @@ The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In develo
 
 ## Railway deployment
 
-The repository includes a multi-stage production `Dockerfile` and `railway.toml`. The container builds the control panel, overlays, protocol package, and server into one deployment so HTTP, authentication, and WebSocket traffic share the same origin.
+The repository includes a multi-stage production `Dockerfile` and `railway.toml`. The container tests and publishes the Windows telemetry client, then builds the control panel, overlays, protocol package, and server into one deployment so downloads, HTTP, authentication, and WebSocket traffic share the same origin.
 
 1. Create a Railway project from this GitHub repository and deploy the application service.
 2. Add a Railway PostgreSQL service to the same project.
