@@ -124,7 +124,6 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
   const telemetryHealthy = socketConnected && state.connection === "connected";
   const isSimulated = state.session?.id.toLowerCase().includes("sim") ?? false;
   const cameraGroups = state.camera.groups.filter((group) => !group.isScenic && group.cameras.length > 0);
-  const selectedCameraGroup = cameraGroups.find((group) => group.number === state.camera.selectedGroup);
   const activeCameraGroup = state.camera.groups.find((group) => group.number === state.camera.activeGroup);
   const cameraReady = state.camera.controller === "ready" && cameraGroups.length > 0;
   const cameraStatus = state.camera.pendingCommandId
@@ -189,28 +188,35 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
           </div>
           <div className="focus-ledger">
             <div><span>Focused driver</span><strong>{selectedDriver ? `#${selectedDriver.carNumber} ${selectedDriver.name}` : "None"}</strong></div>
-            <div><span>Position</span><strong>{selectedDriver ? `P${selectedDriver.position}` : "—"}</strong></div>
-            <div><span>Gap</span><strong>{selectedDriver?.position === 1 ? "Leader" : selectedDriver && selectedDriver.lapsBehindLeader > 0 ? `+${selectedDriver.lapsBehindLeader}L` : (selectedDriver?.gapToLeader ?? selectedDriver?.interval) == null ? "—" : `+${(selectedDriver?.gapToLeader ?? selectedDriver?.interval)!.toFixed(3)}`}</strong></div>
-            <div><span>Best lap</span><strong>{formatLapTime(selectedDriver?.bestLap ?? null)}</strong></div>
             <div className={`camera-control camera-${state.camera.controller}`}>
-              <div className="camera-field">
-                <label htmlFor="camera-group">Camera group</label>
-                <select
-                  id="camera-group"
-                  value={state.camera.selectedGroup ?? ""}
-                  disabled={!cameraReady}
-                  onChange={(event) => command({ type: "camera.group.set", cameraGroup: Number(event.target.value) })}
-                >
-                  {cameraGroups.length === 0 && <option value="">No groups available</option>}
-                  {cameraGroups.map((group) => <option key={group.number} value={group.number}>{group.name}</option>)}
-                </select>
+              <div className="camera-control-heading">
+                <span><Camera aria-hidden="true" />Camera groups</span>
+                <span className={`camera-status is-${state.camera.lastResult ?? state.camera.controller}`} role="status">
+                  {cameraStatus}{activeCameraGroup ? ` · Active ${activeCameraGroup.name}` : ""}
+                </span>
               </div>
-              <button className="camera-take" disabled={!cameraReady || !selectedDriver || !selectedCameraGroup || Boolean(state.camera.pendingCommandId)} onClick={() => command({ type: "camera.take" })}>
-                <Camera aria-hidden="true" />{state.camera.pendingCommandId ? "Sending" : "Take camera"}
-              </button>
-              <span className={`camera-status is-${state.camera.lastResult ?? state.camera.controller}`} role="status">
-                {cameraStatus}{activeCameraGroup ? ` · Active ${activeCameraGroup.name}` : ""}
-              </span>
+              {cameraGroups.length > 0 ? (
+                <div className="camera-group-grid" role="group" aria-label="Take camera group" aria-busy={Boolean(state.camera.pendingCommandId)}>
+                  {cameraGroups.map((group) => {
+                    const isSelected = group.number === state.camera.selectedGroup;
+                    const isActive = group.number === state.camera.activeGroup;
+                    return (
+                      <button
+                        key={group.number}
+                        type="button"
+                        className={`camera-group-button${isSelected ? " is-selected" : ""}${isActive ? " is-active" : ""}`}
+                        disabled={!cameraReady || !selectedDriver || Boolean(state.camera.pendingCommandId)}
+                        onClick={() => command({ type: "camera.group.take", cameraGroup: group.number })}
+                        aria-label={`Take ${group.name} camera${selectedDriver ? ` for ${selectedDriver.name}` : ""}`}
+                        aria-pressed={isActive}
+                      >
+                        <strong>{group.name}</strong>
+                        <span>{isActive ? "Active" : isSelected ? "Selected" : "Take"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : <p className="camera-empty">No camera groups available</p>}
             </div>
           </div>
         </section>

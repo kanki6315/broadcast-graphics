@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowLeft, Check, Copy, KeyRound, LogIn, LogOut, Plus, Radio, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Copy, Download, KeyRound, LogIn, LogOut, MonitorDown, Plus, Radio, ShieldCheck, Trash2 } from "lucide-react";
 import type { AccessKey, AccessKeyKind, CreatedAccessKey } from "@racecontrol/protocol";
 import { ControlPanel } from "./control-panel";
 
@@ -188,6 +188,10 @@ function AccessManager({ identity, onLogout }: { identity: AdminIdentity; onLogo
       <main className="access-grid">
         <section className="key-issue" aria-labelledby="issue-title">
           <div className="access-heading"><KeyRound aria-hidden="true" /><div><h1 id="issue-title">Issue a new key</h1><p>Give each telemetry PC and browser-source group its own key so access can be revoked independently.</p></div></div>
+          <div className="client-download">
+            <div className="client-download-copy"><MonitorDown aria-hidden="true" /><div><strong>Windows telemetry client</strong><span>Current win-x64 release · future updates install automatically</span></div></div>
+            <a href="/api/client/download" download="BroadcastGraphicsClient.exe"><Download aria-hidden="true" />Download client</a>
+          </div>
           {created ? <SecretReceipt created={created} onDone={() => setCreated(null)} /> : (
             <form onSubmit={createKey}>
               <fieldset><legend>Access type</legend>

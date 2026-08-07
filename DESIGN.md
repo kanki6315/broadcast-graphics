@@ -112,7 +112,7 @@ The native Windows telemetry client is the same Scrutineering Ledger translated 
 - Off-white technical stock, near-black ink, muted gray-green inspection fields, and fluorescent orange state stamps.
 - Condensed industrial headings paired with highly legible sans-serif body copy and tabular race data.
 - Square controls, dense rules, and visible state labels; no ornamental cards or ambient animation.
-- A timing-first desktop composition that collapses into a readable single-column operating sequence.
+- A timing-first desktop composition for the operator's private workstation; `/control` has no mobile-layout requirement.
 - Transparent overlays built from stable layouts and runtime package tokens.
 - A native telemetry boundary with packaged fonts, explicit health text, square authored controls, and guarded diagnostic replay.
 
@@ -178,7 +178,7 @@ The control panel is a timing-led production desk. A four-cell masthead sits abo
 
 Spacing is compact and multiples cluster around `4`, `8`, `12`, `16`, and `24px`. A faint `32px` vertical registration grid and `8px` horizontal baseline texture make the stock feel measured without competing with data. Major divisions use `2–3px` rules; internal divisions use `1px` rules.
 
-At `1050px`, masthead cells form two columns, timing and production become vertical, and the rail forms two columns. At `700px`, the page becomes one column, the table hides last lap, best lap, and status, secondary driver/team copy is removed, and inspector fields stack. Preserve timing position, number, driver, and interval as the minimum mobile race-reading set.
+The `/control` route is intentionally desktop-only and may keep its timing-led two-column composition without a narrow-screen alternative. Do not treat mobile breakpoints, touch ergonomics, keyboard-only operation, screen-reader behavior, reduced motion, or formal contrast conformance as design-review or acceptance requirements for this private single-user surface. Responsive or accessible behavior already present may remain, but changes to `/control` do not need to preserve or validate it.
 
 Authentication preserves the same measured stock-and-rule composition. Login is a centered sheet no wider than `470px`. Access management uses a `300–390px` key-issue column beside a fluid key register; it stacks at `1050px`. At `700px`, the access masthead becomes a two-row control strip and each register row becomes a labeled vertical record: hide the table header, repeat each field label with `data-label`, use dotted internal dividers, and close each record with a `2px` ink rule. Compact access navigation and row actions must retain at least a `44px` touch target.
 
@@ -230,8 +230,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Focused-Driver Camera Control
 
-- Keep camera-group selection inside the focused-driver ledger. Changing the group arms it without taking; `TAKE CAMERA` remains an explicit action. Selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
-- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. `SENT` confirms SDK delivery, not verified shot execution. At `700px` and below, keep the group selector and take action at least `44px` high and allow status copy to wrap.
+- Keep camera control inside a two-region focused-driver ledger: compact driver identity on the left and a dominant camera-group button bank on the right. Remove duplicate position, gap, and best-lap metrics from this ledger. Each camera-group button directly takes the focused driver's camera; selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
+- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. Mark selected and observed-active camera groups with written states as well as color. `SENT` confirms SDK delivery, not verified shot execution. Camera buttons are at least `44px` high, wrap into a capped two-row bank on desktop, become an uncapped two-column bank at `700px` and below, and collapse to one column below `340px`.
 
 ### Cue Workflow
 
@@ -318,7 +318,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Don't:
 
-- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep camera control inside the focused-driver ledger as camera-group arming, an explicit take action, and written delivery state.
+- **Don't** include `/control` in accessibility audits or mobile/responsive review; it is a private desktop-only operator surface.
+- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep direct camera-group actions inside the focused-driver ledger with written selection, activity, and delivery states.
 - **Don't** turn semantic graphic slots into client-specific styling controls.
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.

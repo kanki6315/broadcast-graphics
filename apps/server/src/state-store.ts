@@ -94,6 +94,16 @@ export class StateStore {
         this.pushEvent("operator", `Camera group armed — ${group.name}`);
         break;
       }
+      case "camera.group.take": {
+        const group = this.state.camera.groups.find((candidate) => candidate.number === command.cameraGroup && candidate.cameras.length > 0);
+        if (!group) throw new Error("That camera group is not available in the current iRacing session.");
+        const driver = this.state.session?.drivers.find((candidate) => candidate.carIdx === this.state.graphics.selectedDriverCarIdx);
+        if (!driver) throw new Error("Select a driver before taking the camera.");
+        this.state.camera.selectedGroup = group.number;
+        this.pushEvent("operator", `Camera group selected — ${group.name}`);
+        cameraCommand = this.createCameraCommand(driver.carIdx, driver.carNumber);
+        break;
+      }
       case "camera.take": {
         const driver = this.state.session?.drivers.find((candidate) => candidate.carIdx === this.state.graphics.selectedDriverCarIdx);
         if (!driver) throw new Error("Select a driver before taking the camera.");

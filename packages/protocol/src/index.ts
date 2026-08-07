@@ -223,6 +223,7 @@ export interface LiveState {
 export type ControlCommand =
   | { type: "focus.set"; carIdx: number }
   | { type: "camera.group.set"; cameraGroup: number }
+  | { type: "camera.group.take"; cameraGroup: number }
   | { type: "camera.take" }
   | { type: "graphics.arm"; slot: GraphicSlot }
   | { type: "graphics.take"; slot: GraphicSlot }

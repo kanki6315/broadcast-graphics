@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../TelemetryClient/DiagnosticCapture.cs" Link="DiagnosticCapture.cs" />
+    <Compile Include="../TelemetryClient/ClientUpdate.cs" Link="ClientUpdate.cs" />
     <Compile Include="../TelemetryClient/HealthWatchdogs.cs" Link="HealthWatchdogs.cs" />
     <Compile Include="../TelemetryClient/LiveTimingTracker.cs" Link="LiveTimingTracker.cs" />
     <Compile Include="../TelemetryClient/Models.cs" Link="Models.cs" />
