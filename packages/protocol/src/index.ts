@@ -10,6 +10,9 @@ export const graphicSlots = [
 export type GraphicSlot = (typeof graphicSlots)[number];
 export type ConnectionStatus = "connected" | "stale" | "disconnected";
 export type SessionFlag = "green" | "yellow" | "red" | "white" | "checkered";
+export type SessionPhase = "invalid" | "get-in-car" | "warmup" | "parade-laps" | "racing" | "checkered" | "cool-down";
+export type StartState = "hidden" | "ready" | "set" | "go";
+export type TrackStatus = "unknown" | "running" | "pit" | "off-track" | "not-in-world" | "retired";
 export type AccessKeyKind = "ingestion" | "view";
 
 export interface AccessKey {
@@ -33,12 +36,35 @@ export interface DriverState {
   name: string;
   team: string;
   className: string;
+  /** @deprecated Use gapToLeader. Retained for format-1 diagnostic replay compatibility. */
   interval: number | null;
   lastLap: number | null;
   bestLap: number | null;
   lapsCompleted: number;
   onPitRoad: boolean;
   incidents: number;
+  classId: number;
+  classColor: string;
+  classPosition: number;
+  gapToLeader: number | null;
+  intervalToAhead: number | null;
+  classGapToLeader: number | null;
+  classIntervalToAhead: number | null;
+  lapsBehindLeader: number;
+  lapsBehindClassLeader: number;
+  currentLap: number;
+  lastLapNumber: number | null;
+  bestLapNumber: number | null;
+  lapDistPct: number | null;
+  trackStatus: TrackStatus;
+  isConnected: boolean;
+}
+
+export interface CarClassState {
+  id: number;
+  name: string;
+  color: string;
+  carCount: number;
 }
 
 export interface SessionState {
@@ -52,6 +78,14 @@ export interface SessionState {
   flag: SessionFlag;
   timestamp: string;
   drivers: DriverState[];
+  lapsCompleted: number;
+  lapsRemaining: number | null;
+  timeElapsed: number | null;
+  totalTime: number | null;
+  phase: SessionPhase;
+  startState: StartState;
+  flags: string[];
+  classes: CarClassState[];
 }
 
 export type GraphicFieldType = "text" | "boolean" | "select" | "number";

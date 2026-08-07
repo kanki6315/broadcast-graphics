@@ -2,6 +2,21 @@ import { useEffect, useMemo } from "react";
 import { formatLapTime, isGraphicSlot, type DriverState, type GraphicPackageManifest, type GraphicSlot } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
+function formatGap(driver: DriverState): string {
+  if (driver.position === 1) return "Leader";
+  if (driver.lapsBehindLeader > 0) return `+${driver.lapsBehindLeader} ${driver.lapsBehindLeader === 1 ? "lap" : "laps"}`;
+  const gap = driver.gapToLeader ?? driver.interval;
+  return gap == null ? "—" : `+${gap.toFixed(3)}`;
+}
+
+function formatBattleGap(selected: DriverState, rival: DriverState): string {
+  const lapDifference = Math.abs(selected.lapsCompleted - rival.lapsCompleted);
+  if (lapDifference > 0) return `${lapDifference} ${lapDifference === 1 ? "lap" : "laps"}`;
+  const selectedGap = selected.gapToLeader ?? selected.interval;
+  const rivalGap = rival.gapToLeader ?? rival.interval;
+  return selectedGap == null || rivalGap == null ? "—" : `${Math.abs(selectedGap - rivalGap).toFixed(3)}`;
+}
+
 function usePackageTheme(packageId: string | undefined) {
   useEffect(() => {
     if (!packageId) return;
@@ -17,14 +32,14 @@ function usePackageTheme(packageId: string | undefined) {
 function TimingTower({ drivers, rows }: { drivers: DriverState[]; rows: number }) {
   return (
     <div className="overlay-surface timing-overlay">
-      <header className="overlay-title"><span>Position</span><strong>Interval</strong></header>
+      <header className="overlay-title"><span>Position</span><strong>Gap</strong></header>
       <ol className="overlay-plate">
         {drivers.slice(0, rows).map((driver) => (
           <li key={driver.carIdx} className="overlay-rule">
             <span className="overlay-accent position-chip">{driver.position}</span>
             <span className="overlay-number">{driver.carNumber}</span>
             <strong>{driver.name}</strong>
-            <span>{driver.interval == null ? "Leader" : `+${driver.interval.toFixed(3)}`}</span>
+            <span>{formatGap(driver)}</span>
           </li>
         ))}
       </ol>
@@ -35,7 +50,9 @@ function TimingTower({ drivers, rows }: { drivers: DriverState[]; rows: number }
 function DriverFocus({ driver, config }: { driver?: DriverState; config: Record<string, string | number | boolean> }) {
   if (!driver) return null;
   const metric = String(config.metric ?? "bestLap");
-  const metricValue = metric === "interval" ? (driver.interval == null ? "Leader" : `+${driver.interval.toFixed(3)}`) : formatLapTime(metric === "lastLap" ? driver.lastLap : driver.bestLap);
+  const metricValue = metric === "interval"
+    ? (driver.intervalToAhead == null ? "—" : `+${driver.intervalToAhead.toFixed(3)}`)
+    : formatLapTime(metric === "lastLap" ? driver.lastLap : driver.bestLap);
   return (
     <div className="overlay-surface lower-overlay overlay-plate">
       <span className="overlay-accent focus-number">{driver.carNumber}</span>
@@ -52,7 +69,7 @@ function RaceStatus({ name, track, lap, total, flag }: { name: string; track: st
 
 function Battle({ selected, rival, label }: { selected?: DriverState; rival?: DriverState; label: string }) {
   if (!selected || !rival) return null;
-  return <div className="overlay-surface battle-overlay overlay-plate"><span className="overlay-title">{label}</span><div><b className="overlay-accent">{selected.carNumber}</b><strong>{selected.name}</strong><em>P{selected.position}</em></div><div><b>{rival.carNumber}</b><strong>{rival.name}</strong><em>{rival.interval == null ? "—" : `+${rival.interval.toFixed(3)}`}</em></div></div>;
+  return <div className="overlay-surface battle-overlay overlay-plate"><span className="overlay-title">{label}</span><div><b className="overlay-accent">{selected.carNumber}</b><strong>{selected.name}</strong><em>P{selected.position}</em></div><div><b>{rival.carNumber}</b><strong>{rival.name}</strong><em>{formatBattleGap(selected, rival)}</em></div></div>;
 }
 
 function FlagOverlay({ flag, message }: { flag: string; message: string }) {

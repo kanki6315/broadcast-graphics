@@ -10,6 +10,8 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
 
+The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, and completed-lap metadata before transmission. See the [telemetry contract](docs/telemetry-contract.md) for the field semantics and verified capture scenarios.
+
 ## Quick start
 
 ```bash

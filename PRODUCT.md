@@ -32,7 +32,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 
 ## Capabilities and Constraints
 
-- Ingest live iRacing session, driver, timing, position, lap, flag, and track-state data.
+- Ingest live iRacing session, driver, timing, position, class, lap, start-state, flag, and track-state data through a documented normalized telemetry contract.
 - Maintain authoritative current session state on the server and retain useful historical data.
 - Serve synchronized browser graphics and an operator control panel in real time.
 - Support initial graphics such as a timing tower, race status, driver focus, battle, flag, and lower-third treatments.
@@ -46,7 +46,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 
 ## Evidence on Hand
 
-No brand assets, customer claims, or benchmarks are currently present. A user-provided Long Beach multi-class capture covering practice, qualifying, and race transitions is available for replay compatibility testing but is not stored in the repository. Demonstration data must be labeled as simulated.
+No brand assets, customer claims, or benchmarks are currently present. User-provided captures from a Long Beach multi-class event and a Phoenix IndyCar race cover practice, qualifying, race starts, green-flag running, cautions, one-lap-to-green, and restarts. They are available for local replay compatibility testing but are not stored in the repository. Demonstration data must be labeled as simulated.
 
 ## Product Principles
 

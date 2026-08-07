@@ -33,6 +33,12 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore telemetry correctness tests
+        run: dotnet restore client/TelemetryClient.Tests/TelemetryClient.Tests.csproj
+
+      - name: Test telemetry mapping
+        run: dotnet test client/TelemetryClient.Tests/TelemetryClient.Tests.csproj --configuration Release --no-restore
+
       - name: Restore client
         run: dotnet restore client/TelemetryClient/TelemetryClient.csproj --runtime win-x64
 

@@ -32,6 +32,21 @@ function drivers(tick: number): DriverState[] {
       lapsCompleted: 18,
       onPitRoad: index === 9 && tick % 24 < 7,
       incidents: index % 4,
+      classId: 1,
+      classColor: "#ff4b2b",
+      classPosition: index + 1,
+      gapToLeader: index === 0 ? 0 : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3)),
+      intervalToAhead: index === 0 ? null : 0.73,
+      classGapToLeader: index === 0 ? 0 : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3)),
+      classIntervalToAhead: index === 0 ? null : 0.73,
+      lapsBehindLeader: 0,
+      lapsBehindClassLeader: 0,
+      currentLap: 19,
+      lastLapNumber: 18,
+      bestLapNumber: 12,
+      lapDistPct: (tick / 90 + index / names.length) % 1,
+      trackStatus: index === 9 && tick % 24 < 7 ? "pit" : "running",
+      isConnected: true,
     };
   });
 }
@@ -51,6 +66,14 @@ export function startSimulator(store: StateStore): () => void {
       flag: tick % 180 > 160 ? "yellow" : "green",
       timestamp: new Date().toISOString(),
       drivers: drivers(tick),
+      lapsCompleted: 18 + Math.floor(tick / 90),
+      lapsRemaining: 22 - Math.floor(tick / 90),
+      timeElapsed: tick,
+      totalTime: null,
+      phase: "racing",
+      startState: "go",
+      flags: tick % 180 > 160 ? ["caution"] : ["green"],
+      classes: [{ id: 1, name: "GT3", color: "#ff4b2b", carCount: names.length }],
     };
     store.telemetry(session);
   };

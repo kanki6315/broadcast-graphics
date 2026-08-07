@@ -14,10 +14,22 @@ const session: SessionState = {
   timeRemaining: null,
   flag: "green",
   timestamp: new Date().toISOString(),
+  lapsCompleted: 0,
+  lapsRemaining: 9,
+  timeElapsed: 10,
+  totalTime: null,
+  phase: "racing",
+  startState: "go",
+  flags: ["green"],
+  classes: [{ id: 1, name: "GT3", color: "#ffffff", carCount: 1 }],
   drivers: [{
     carIdx: 7, position: 1, carNumber: "23", name: "Test Driver", team: "Test Team",
     className: "GT3", interval: null, lastLap: 82, bestLap: 81.5, lapsCompleted: 1,
     onPitRoad: false, incidents: 0,
+    classId: 1, classColor: "#ffffff", classPosition: 1, gapToLeader: 0,
+    intervalToAhead: null, classGapToLeader: 0, classIntervalToAhead: null,
+    lapsBehindLeader: 0, lapsBehindClassLeader: 0, currentLap: 1,
+    lastLapNumber: 1, bestLapNumber: 1, lapDistPct: 0.2, trackStatus: "running", isConnected: true,
   }],
 };
 
