@@ -78,6 +78,18 @@ export interface CarClassState {
   carCount: number;
 }
 
+export interface CameraDefinition {
+  number: number;
+  name: string;
+}
+
+export interface CameraGroupDefinition {
+  number: number;
+  name: string;
+  isScenic: boolean;
+  cameras: CameraDefinition[];
+}
+
 export interface SessionState {
   id: string;
   name: string;
@@ -102,6 +114,10 @@ export interface SessionState {
   externalSubSessionId: number | null;
   externalSessionNumber: number | null;
   trackId: number | null;
+  cameraGroups?: CameraGroupDefinition[];
+  activeCameraCarIdx?: number | null;
+  activeCameraGroup?: number | null;
+  activeCamera?: number | null;
 }
 
 export interface CompletedLap {
@@ -168,6 +184,26 @@ export interface GraphicsState {
   slotConfig: Partial<Record<GraphicSlot, Record<string, string | number | boolean>>>;
 }
 
+export interface CameraControlState {
+  controller: "ready" | "unavailable" | "disconnected";
+  groups: CameraGroupDefinition[];
+  selectedGroup: number | null;
+  activeCarIdx: number | null;
+  activeGroup: number | null;
+  activeCamera: number | null;
+  pendingCommandId: string | null;
+  lastResult: "sent" | "rejected" | null;
+  lastMessage: string | null;
+}
+
+export interface CameraSwitchCommand {
+  id: string;
+  carIdx: number;
+  carNumber: string;
+  cameraGroup: number;
+  camera: number;
+}
+
 export interface EventRecord {
   id: string;
   at: string;
@@ -180,11 +216,14 @@ export interface LiveState {
   connection: ConnectionStatus;
   session: SessionState | null;
   graphics: GraphicsState;
+  camera: CameraControlState;
   events: EventRecord[];
 }
 
 export type ControlCommand =
   | { type: "focus.set"; carIdx: number }
+  | { type: "camera.group.set"; cameraGroup: number }
+  | { type: "camera.take" }
   | { type: "graphics.arm"; slot: GraphicSlot }
   | { type: "graphics.take"; slot: GraphicSlot }
   | { type: "graphics.clear"; slot: GraphicSlot }
@@ -193,13 +232,15 @@ export type ControlCommand =
   | { type: "graphics.config.set"; slot: GraphicSlot; key: string; value: string | number | boolean };
 
 export type ClientMessage =
-  | { type: "hello"; role: "telemetry" | "control" | "overlay"; clientId?: string }
+  | { type: "hello"; role: "telemetry" | "control" | "overlay"; clientId?: string; capabilities?: { cameraControl?: boolean } }
   | { type: "telemetry.update"; payload: SessionState }
+  | { type: "camera.result"; commandId: string; status: "sent" | "rejected"; message: string }
   | { type: "lap.history.request"; carIdx: number; limit?: number }
   | { type: "control.command"; command: ControlCommand };
 
 export type ServerMessage =
   | { type: "state.snapshot"; payload: LiveState }
+  | { type: "camera.command"; command: CameraSwitchCommand }
   | { type: "lap.completed"; payload: CompletedLap }
   | { type: "lap.history"; payload: CompletedLap[] }
   | { type: "error"; message: string };

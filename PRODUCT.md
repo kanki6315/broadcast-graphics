@@ -37,8 +37,8 @@ One live race-state model powers both the on-air graphics and the operator contr
 - Serve synchronized browser graphics and an operator control panel in real time.
 - Support initial graphics such as a timing tower, race status, driver focus, battle, flag, and lower-third treatments.
 - Treat each client-facing graphic style as a replaceable package of layouts, design tokens, assets, and configuration schema. The control panel operates semantic graphic slots and must not require a rebuild when a client package changes presentation.
-- Camera-group and focused-driver control are explicitly deferred beyond the first graphics-focused milestone.
-- Driver selection is part of the first control-panel information model so it can become the future hook for focused-driver camera control without redesigning the workflow.
+- Support focused-driver and camera-group control through the live Windows iRacing bridge. Driver selection remains the shared hook for driver-dependent graphics and camera focus.
+- Camera commands must expose disconnected, unavailable, pending, sent, and rejected states. Simulation and diagnostic replay remain read-only, and SDK delivery must not be described as verified shot execution.
 - The telemetry client must tolerate reconnects and avoid disrupting iRacing.
 - The telemetry client can validate and replay its own diagnostic ZIPs for troubleshooting and broadcast rehearsal, with explicit replay states, remote-server confirmation, and no automatic looping.
 - Authentication uses one administrator account, browser sessions for control, independently revocable ingestion keys for telemetry clients, and revocable view-only keys for browser overlays.

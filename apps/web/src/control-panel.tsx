@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Camera,
   Check,
   ChevronRight,
   CircleStop,
@@ -122,6 +123,14 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
 
   const telemetryHealthy = socketConnected && state.connection === "connected";
   const isSimulated = state.session?.id.toLowerCase().includes("sim") ?? false;
+  const cameraGroups = state.camera.groups.filter((group) => !group.isScenic && group.cameras.length > 0);
+  const selectedCameraGroup = cameraGroups.find((group) => group.number === state.camera.selectedGroup);
+  const activeCameraGroup = state.camera.groups.find((group) => group.number === state.camera.activeGroup);
+  const cameraReady = state.camera.controller === "ready" && cameraGroups.length > 0;
+  const cameraStatus = state.camera.pendingCommandId
+    ? state.camera.lastMessage ?? "Sending camera command"
+    : state.camera.lastMessage
+      ?? (state.camera.controller === "ready" ? "Camera controller ready" : state.camera.controller === "unavailable" ? "Live iRacing source required" : "Telemetry client disconnected");
 
   return (
     <div className="control-shell">
@@ -153,7 +162,7 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
       <main className="production-grid">
         <section className="timing-director" aria-labelledby="timing-title">
           <div className="section-heading">
-            <div><h1 id="timing-title">Timing director</h1><p>Select the driver worth following. This focus is shared by driver-dependent graphics.</p></div>
+            <div><h1 id="timing-title">Timing director</h1><p>Select the driver worth following. Focus is shared by driver graphics and the live iRacing camera.</p></div>
             <div className={`flag-plate flag-${state.session?.flag ?? "green"}`}><Flag aria-hidden="true" /><strong>{state.session?.flag ?? "No flag"}</strong></div>
           </div>
           <div className="timing-table-wrap">
@@ -165,9 +174,9 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
                   const fastest = driver.carIdx === fastestCarIdx;
                   return (
                     <tr key={driver.carIdx} className={focused ? "is-focused" : ""}>
-                      <td><button className="driver-select" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })} aria-label={`Focus ${driver.name}`} aria-pressed={focused}>{driver.position}</button></td>
+                      <td><button className="driver-select" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })} aria-label={`${cameraReady ? "Focus graphics and take camera for" : "Focus graphics on"} ${driver.name}`} aria-pressed={focused}>{driver.position}</button></td>
                       <td><span className="car-number">{driver.carNumber}</span></td>
-                      <td><button className="driver-name" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })}><strong>{driver.name}</strong><span>{driver.team}</span></button></td>
+                      <td><button className="driver-name" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })} aria-label={`${cameraReady ? "Focus graphics and take camera for" : "Focus graphics on"} ${driver.name}`}><strong>{driver.name}</strong><span>{driver.team}</span></button></td>
                       <td className="numeric">{driver.position === 1 ? "Leader" : driver.lapsBehindLeader > 0 ? `+${driver.lapsBehindLeader}L` : (driver.gapToLeader ?? driver.interval) == null ? "—" : `+${(driver.gapToLeader ?? driver.interval)!.toFixed(3)}`}</td>
                       <td className="numeric">{formatLapTime(driver.lastLap)}</td>
                       <td className={`numeric ${fastest ? "fastest" : ""}`}>{formatLapTime(driver.bestLap)}</td>
@@ -183,7 +192,26 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
             <div><span>Position</span><strong>{selectedDriver ? `P${selectedDriver.position}` : "—"}</strong></div>
             <div><span>Gap</span><strong>{selectedDriver?.position === 1 ? "Leader" : selectedDriver && selectedDriver.lapsBehindLeader > 0 ? `+${selectedDriver.lapsBehindLeader}L` : (selectedDriver?.gapToLeader ?? selectedDriver?.interval) == null ? "—" : `+${(selectedDriver?.gapToLeader ?? selectedDriver?.interval)!.toFixed(3)}`}</strong></div>
             <div><span>Best lap</span><strong>{formatLapTime(selectedDriver?.bestLap ?? null)}</strong></div>
-            <div className="future-hook"><Crosshair aria-hidden="true" /><span>Camera focus hook ready</span></div>
+            <div className={`camera-control camera-${state.camera.controller}`}>
+              <div className="camera-field">
+                <label htmlFor="camera-group">Camera group</label>
+                <select
+                  id="camera-group"
+                  value={state.camera.selectedGroup ?? ""}
+                  disabled={!cameraReady}
+                  onChange={(event) => command({ type: "camera.group.set", cameraGroup: Number(event.target.value) })}
+                >
+                  {cameraGroups.length === 0 && <option value="">No groups available</option>}
+                  {cameraGroups.map((group) => <option key={group.number} value={group.number}>{group.name}</option>)}
+                </select>
+              </div>
+              <button className="camera-take" disabled={!cameraReady || !selectedDriver || !selectedCameraGroup || Boolean(state.camera.pendingCommandId)} onClick={() => command({ type: "camera.take" })}>
+                <Camera aria-hidden="true" />{state.camera.pendingCommandId ? "Sending" : "Take camera"}
+              </button>
+              <span className={`camera-status is-${state.camera.lastResult ?? state.camera.controller}`} role="status">
+                {cameraStatus}{activeCameraGroup ? ` · Active ${activeCameraGroup.name}` : ""}
+              </span>
+            </div>
           </div>
         </section>
 

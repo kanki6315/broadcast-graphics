@@ -46,6 +46,25 @@ public sealed record CarClassState(
     [property: JsonPropertyName("color")] string Color,
     [property: JsonPropertyName("carCount")] int CarCount);
 
+public sealed record CameraDefinition(
+    [property: JsonPropertyName("number")] int Number,
+    [property: JsonPropertyName("name")] string Name);
+
+public sealed record CameraGroupDefinition(
+    [property: JsonPropertyName("number")] int Number,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("isScenic")] bool IsScenic,
+    [property: JsonPropertyName("cameras")] IReadOnlyList<CameraDefinition> Cameras);
+
+public sealed record CameraSwitchCommand(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("carIdx")] int CarIdx,
+    [property: JsonPropertyName("carNumber")] string CarNumber,
+    [property: JsonPropertyName("cameraGroup")] int CameraGroup,
+    [property: JsonPropertyName("camera")] int Camera);
+
+public sealed record CameraCommandResult(bool Sent, string Message);
+
 public sealed record SessionState(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
@@ -69,4 +88,8 @@ public sealed record SessionState(
     [property: JsonPropertyName("sourceMode")] string SourceMode = "live",
     [property: JsonPropertyName("externalSubSessionId")] int? ExternalSubSessionId = null,
     [property: JsonPropertyName("externalSessionNumber")] int? ExternalSessionNumber = null,
-    [property: JsonPropertyName("trackId")] int? TrackId = null);
+    [property: JsonPropertyName("trackId")] int? TrackId = null,
+    [property: JsonPropertyName("cameraGroups")] IReadOnlyList<CameraGroupDefinition>? CameraGroups = null,
+    [property: JsonPropertyName("activeCameraCarIdx")] int? ActiveCameraCarIdx = null,
+    [property: JsonPropertyName("activeCameraGroup")] int? ActiveCameraGroup = null,
+    [property: JsonPropertyName("activeCamera")] int? ActiveCamera = null);

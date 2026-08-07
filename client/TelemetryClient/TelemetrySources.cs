@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using SVappsLAB.iRacingTelemetrySDK;
+using SVappsLAB.iRacingTelemetrySDK.SimControl;
 
 namespace RaceControl.TelemetryClient;
 
@@ -9,6 +10,11 @@ public interface ITelemetrySource : IAsyncDisposable
     event Action<bool, string>? ConnectionChanged;
     event Action<string>? Log;
     IAsyncEnumerable<SessionState> ReadAsync(CancellationToken cancellationToken);
+}
+
+public interface ICameraController
+{
+    CameraCommandResult SendCamera(CameraSwitchCommand command);
 }
 
 public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource
@@ -77,10 +83,15 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
     TelemetryVar.CarIdxBestLapTime,
     TelemetryVar.CarIdxBestLapNum,
     TelemetryVar.CarIdxTrackSurface,
-    TelemetryVar.CarIdxOnPitRoad
+    TelemetryVar.CarIdxOnPitRoad,
+    TelemetryVar.CamCarIdx,
+    TelemetryVar.CamGroupNumber,
+    TelemetryVar.CamCameraNumber
 ])]
-public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource
+public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource, ICameraController
 {
+    private readonly object cameraGate = new();
+    private ICameraCommands? cameraCommands;
     public event Action<bool, string>? ConnectionChanged;
     public event Action<string>? Log;
 
@@ -94,6 +105,7 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
         });
         using var monitorCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         await using var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance);
+        lock (cameraGate) cameraCommands = client.SimControl.Camera;
 
         TelemetrySessionInfo? sessionInfo = null;
         string? latestRawSessionInfo = null;
@@ -169,6 +181,7 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
         }
         finally
         {
+            lock (cameraGate) cameraCommands = null;
             await monitorCancellation.CancelAsync();
             try { await monitorTask; } catch (OperationCanceledException) { }
             ConnectionChanged?.Invoke(false, "iRacing SDK disconnected");
@@ -176,6 +189,24 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    public CameraCommandResult SendCamera(CameraSwitchCommand command)
+    {
+        try
+        {
+            lock (cameraGate)
+            {
+                if (cameraCommands is null)
+                    return new(false, "Camera rejected — the live iRacing source is not connected");
+                cameraCommands.SwitchToCar(command.CarNumber, command.CameraGroup, command.Camera);
+            }
+            return new(true, $"Camera sent — #{command.CarNumber} / group {command.CameraGroup}");
+        }
+        catch (Exception error)
+        {
+            return new(false, $"Camera rejected — {error.Message}");
+        }
+    }
 
     private static async Task MonitorAsync(
         ITelemetryClient<TelemetryData> client,
@@ -232,6 +263,16 @@ internal static class TelemetrySnapshotMapper
             .ThenBy(carClass => carClass.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var flags = NormalizeFlags(telemetry.SessionFlags);
+        var cameraGroups = (info.CameraInfo?.Groups ?? [])
+            .Select(group => new CameraGroupDefinition(
+                group.GroupNum,
+                group.GroupName ?? $"Camera group {group.GroupNum}",
+                group.IsScenic,
+                (group.Cameras ?? []).Select(camera => new CameraDefinition(
+                    camera.CameraNum,
+                    camera.CameraName ?? $"Camera {camera.CameraNum}")).ToArray()))
+            .OrderBy(group => group.Number)
+            .ToArray();
 
         return new SessionState(
             $"{weekend?.SubSessionID ?? 0}-{sessionNumber}",
@@ -256,7 +297,11 @@ internal static class TelemetrySnapshotMapper
             "live",
             weekend?.SubSessionID,
             sessionNumber,
-            weekend?.TrackID);
+            weekend?.TrackID,
+            cameraGroups,
+            telemetry.CamCarIdx,
+            telemetry.CamGroupNumber,
+            telemetry.CamCameraNumber);
     }
 
     private static DriverState MapDriver(

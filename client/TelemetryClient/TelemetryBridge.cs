@@ -116,7 +116,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         }
 
         var sourceTask = PumpSourceAsync(source, snapshots.Writer, cancellationToken);
-        var socketTask = SendToServerAsync(options, snapshots.Reader, cancellationToken);
+        var socketTask = SendToServerAsync(options, snapshots.Reader, source as ICameraController, cancellationToken);
         try
         {
             await Task.WhenAll(sourceTask, socketTask);
@@ -168,12 +168,14 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     private async Task SendToServerAsync(
         TelemetryBridgeOptions options,
         ChannelReader<SessionState> snapshots,
+        ICameraController? cameraController,
         CancellationToken cancellationToken)
     {
         var endpoint = BuildTelemetryUri(options.ServerUrl);
         while (!cancellationToken.IsCancellationRequested && await snapshots.WaitToReadAsync(cancellationToken))
         {
             using var socket = new ClientWebSocket();
+            using var sendGate = new SemaphoreSlim(1, 1);
             try
             {
                 socket.Options.SetRequestHeader("Authorization", $"Bearer {options.IngestionKey}");
@@ -193,12 +195,13 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                 {
                     type = "hello",
                     role = "telemetry",
-                    clientId = Environment.MachineName
+                    clientId = Environment.MachineName,
+                    capabilities = new { cameraControl = cameraController is not null }
                 }, JsonOptions);
-                await SendAsync(socket, hello, cancellationToken);
+                await SendAsync(socket, hello, sendGate, cancellationToken);
 
                 using var connectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                var receiveTask = MonitorServerAsync(socket, connectionCancellation.Token);
+                var receiveTask = MonitorServerAsync(socket, cameraController, sendGate, connectionCancellation.Token);
 
                 try
                 {
@@ -217,7 +220,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                         {
                             diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
                             var payload = JsonSerializer.SerializeToUtf8Bytes(new { type = "telemetry.update", payload = snapshot }, JsonOptions);
-                            var sendTask = SendAsync(socket, payload, connectionCancellation.Token);
+                            var sendTask = SendAsync(socket, payload, sendGate, connectionCancellation.Token);
                             completedTask = await Task.WhenAny(sendTask, receiveTask);
                             if (completedTask == receiveTask)
                             {
@@ -261,18 +264,29 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         }
     }
 
-    private static Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken) =>
-        WithTimeoutAsync(
-            token => socket.SendAsync(payload, WebSocketMessageType.Text, true, token).AsTask(),
-            SendTimeout,
-            "Sending telemetry to the server timed out.",
-            cancellationToken);
+    private static async Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, SemaphoreSlim sendGate, CancellationToken cancellationToken)
+    {
+        await sendGate.WaitAsync(cancellationToken);
+        try
+        {
+            await WithTimeoutAsync(
+                token => socket.SendAsync(payload, WebSocketMessageType.Text, true, token).AsTask(),
+                SendTimeout,
+                "Sending telemetry to the server timed out.",
+                cancellationToken);
+        }
+        finally
+        {
+            sendGate.Release();
+        }
+    }
 
-    private static async Task MonitorServerAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    private async Task MonitorServerAsync(ClientWebSocket socket, ICameraController? cameraController, SemaphoreSlim sendGate, CancellationToken cancellationToken)
     {
         var buffer = new byte[8_192];
         while (!cancellationToken.IsCancellationRequested)
         {
+            using var messageBuffer = new MemoryStream();
             WebSocketReceiveResult result;
             do
             {
@@ -284,8 +298,27 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                         : result.CloseStatusDescription;
                     throw new WebSocketException($"Server closed the connection ({result.CloseStatus}: {description}).");
                 }
+                messageBuffer.Write(buffer, 0, result.Count);
             }
             while (!result.EndOfMessage);
+
+            using var document = JsonDocument.Parse(messageBuffer.ToArray());
+            if (!document.RootElement.TryGetProperty("type", out var type) || type.GetString() != "camera.command") continue;
+            if (!document.RootElement.TryGetProperty("command", out var commandElement)) continue;
+            var command = commandElement.Deserialize<CameraSwitchCommand>(JsonOptions);
+            if (command is null) continue;
+            var resultMessage = cameraController?.SendCamera(command)
+                ?? new CameraCommandResult(false, "Camera rejected — this telemetry source cannot control iRacing");
+            diagnostics.TryRecord("events.ndjson", new { type = "camera.command", command.Id, command.CarNumber, command.CameraGroup, command.Camera, resultMessage.Sent, resultMessage.Message });
+            WriteLog(resultMessage.Message);
+            var response = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                type = "camera.result",
+                commandId = command.Id,
+                status = resultMessage.Sent ? "sent" : "rejected",
+                message = resultMessage.Message
+            }, JsonOptions);
+            await SendAsync(socket, response, sendGate, cancellationToken);
         }
     }
 

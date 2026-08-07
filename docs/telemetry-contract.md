@@ -69,4 +69,4 @@ The next useful SDK fields should be added only with a graphic or production dec
 5. Weather and track conditions for race-status graphics.
 6. Radio-transmitting car for an automatic radio identifier.
 
-Camera focus and camera-group control belong to the command path rather than this read-only broadcast-state contract.
+`cameraGroups`, `activeCameraCarIdx`, `activeCameraGroup`, and `activeCamera` report the current session's available camera inventory and observed camera selection. They are optional so older diagnostic captures remain replay-compatible. Camera changes still travel through the separate command path: `focus.set` and `camera.take` produce a server-to-client `camera.command`, and the telemetry client returns a `camera.result` after handing the request to the SDK.

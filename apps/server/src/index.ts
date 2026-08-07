@@ -42,6 +42,7 @@ const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
 const store = new StateStore(packages[0]?.id ?? "apex");
 const sockets = new Map<WebSocket, SocketRole>();
+const cameraSockets = new Set<WebSocket>();
 const history = new RaceHistoryService(
   historyRepository,
   (lap) => broadcastStateSnapshot(sockets, { type: "lap.completed", payload: lap }),
@@ -217,6 +218,10 @@ wss.on("connection", (socket, request) => {
     try {
       const message = JSON.parse(data.toString()) as ClientMessage;
       if (message.type === "hello" && message.role !== role) return socket.close(1008, "Role does not match authenticated connection.");
+      if (message.type === "hello" && role === "telemetry") {
+        if (message.capabilities?.cameraControl) cameraSockets.add(socket);
+        store.setCameraController(true, cameraSockets.size > 0);
+      }
       if (message.type === "telemetry.update" && role === "telemetry") {
         store.telemetry(message.payload);
         history.ingest(message.payload);
@@ -236,7 +241,18 @@ wss.on("connection", (socket, request) => {
           });
         }
       }
-      if (message.type === "control.command" && role === "control") store.command(message.command, await registry.list());
+      if (message.type === "control.command" && role === "control") {
+        const cameraCommand = store.command(message.command, await registry.list());
+        if (cameraCommand) {
+          const payload = JSON.stringify({ type: "camera.command", command: cameraCommand } satisfies ServerMessage);
+          for (const cameraSocket of cameraSockets) {
+            if (cameraSocket.readyState === WebSocket.OPEN) cameraSocket.send(payload);
+          }
+        }
+      }
+      if (message.type === "camera.result" && role === "telemetry") {
+        store.cameraResult(message.commandId, message.status, message.message);
+      }
     } catch (error) {
       send(socket, { type: "error", message: error instanceof Error ? error.message : "Invalid message" });
     }
@@ -246,7 +262,14 @@ wss.on("connection", (socket, request) => {
     sockets.delete(socket);
     app.log.warn({ err: error, role }, "WebSocket connection error");
   });
-  socket.on("close", () => sockets.delete(socket));
+  socket.on("close", () => {
+    sockets.delete(socket);
+    cameraSockets.delete(socket);
+    if (role === "telemetry") {
+      const telemetryConnected = [...sockets.values()].some((candidate) => candidate === "telemetry");
+      store.setCameraController(telemetryConnected, cameraSockets.size > 0);
+    }
+  });
 });
 
 const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store, (session) => history.ingest(session));

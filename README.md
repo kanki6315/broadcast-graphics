@@ -10,7 +10,7 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
 
-The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, and completed-lap metadata before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics and the [race-history model](docs/race-history.md) for durable lap storage.
+The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, completed-lap metadata, and available camera groups before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics and the [race-history model](docs/race-history.md) for durable lap storage.
 
 ## Quick start
 
@@ -102,6 +102,8 @@ Every folder under `graphic-packages/` contains:
 
 The server discovers manifests at runtime. The control panel renders semantic controls from the manifest schema, while overlays load the selected package's stylesheet. This is the key boundary that allows different client styles without rebuilding the operator application.
 
-## Camera-control path
+## Camera control
 
-Selecting a timing row emits a semantic `focus.set` command today. A future iRacing control adapter can subscribe to that stable command and translate it into focused-driver and camera-group SDK calls without changing the timing workflow.
+When the Windows client is connected to a live iRacing source, the focus ledger lists the non-scenic camera groups reported by the current session. Selecting a timing row focuses driver-dependent graphics and sends that car to the armed camera group. Changing the group arms it without disturbing the current shot; **Take camera** applies the armed group to the focused driver.
+
+Camera commands travel from the authenticated control socket to the authenticated telemetry client and then through the SDK's simulator-control interface. The control desk shows disconnected, unavailable, sending, sent, and rejected states. A sent state confirms delivery to the SDK, not that iRacing visibly changed shots; iRacing camera commands are fire-and-forget and only work while spectating or watching a replay (out of the car). Simulation and diagnostic-replay telemetry remain read-only.
