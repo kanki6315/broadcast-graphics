@@ -158,7 +158,7 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
           </div>
           <div className="timing-table-wrap">
             <table className="timing-table">
-              <thead><tr><th>Pos</th><th>No.</th><th>Driver</th><th>Interval</th><th>Last lap</th><th>Best lap</th><th>Status</th></tr></thead>
+              <thead><tr><th>Pos</th><th>No.</th><th>Driver</th><th>Gap</th><th>Last lap</th><th>Best lap</th><th>Status</th></tr></thead>
               <tbody>
                 {state.session?.drivers.map((driver) => {
                   const focused = driver.carIdx === state.graphics.selectedDriverCarIdx;
@@ -168,10 +168,10 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
                       <td><button className="driver-select" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })} aria-label={`Focus ${driver.name}`} aria-pressed={focused}>{driver.position}</button></td>
                       <td><span className="car-number">{driver.carNumber}</span></td>
                       <td><button className="driver-name" onClick={() => command({ type: "focus.set", carIdx: driver.carIdx })}><strong>{driver.name}</strong><span>{driver.team}</span></button></td>
-                      <td className="numeric">{driver.interval == null ? "Leader" : `+${driver.interval.toFixed(3)}`}</td>
+                      <td className="numeric">{driver.position === 1 ? "Leader" : driver.lapsBehindLeader > 0 ? `+${driver.lapsBehindLeader}L` : (driver.gapToLeader ?? driver.interval) == null ? "—" : `+${(driver.gapToLeader ?? driver.interval)!.toFixed(3)}`}</td>
                       <td className="numeric">{formatLapTime(driver.lastLap)}</td>
                       <td className={`numeric ${fastest ? "fastest" : ""}`}>{formatLapTime(driver.bestLap)}</td>
-                      <td><span className={`status-tag ${focused ? "focus" : driver.onPitRoad ? "pit" : fastest ? "fastest-tag" : "running"}`}>{focused ? "Focus" : driver.onPitRoad ? "Pit" : fastest ? "Fastest" : "Running"}</span></td>
+                      <td><span className={`status-tag ${focused ? "focus" : driver.trackStatus === "pit" ? "pit" : fastest ? "fastest-tag" : "running"}`}>{focused ? "Focus" : driver.trackStatus === "pit" ? "Pit" : driver.trackStatus === "off-track" ? "Off track" : driver.trackStatus === "not-in-world" ? "Out" : driver.trackStatus === "retired" ? "Retired" : fastest ? "Fastest" : "Running"}</span></td>
                     </tr>
                   );
                 })}
@@ -181,7 +181,7 @@ export function ControlPanel({ onManageAccess, onLogout }: { onManageAccess: () 
           <div className="focus-ledger">
             <div><span>Focused driver</span><strong>{selectedDriver ? `#${selectedDriver.carNumber} ${selectedDriver.name}` : "None"}</strong></div>
             <div><span>Position</span><strong>{selectedDriver ? `P${selectedDriver.position}` : "—"}</strong></div>
-            <div><span>Gap</span><strong>{selectedDriver?.interval == null ? "Leader" : `+${selectedDriver.interval.toFixed(3)}`}</strong></div>
+            <div><span>Gap</span><strong>{selectedDriver?.position === 1 ? "Leader" : selectedDriver && selectedDriver.lapsBehindLeader > 0 ? `+${selectedDriver.lapsBehindLeader}L` : (selectedDriver?.gapToLeader ?? selectedDriver?.interval) == null ? "—" : `+${(selectedDriver?.gapToLeader ?? selectedDriver?.interval)!.toFixed(3)}`}</strong></div>
             <div><span>Best lap</span><strong>{formatLapTime(selectedDriver?.bestLap ?? null)}</strong></div>
             <div className="future-hook"><Crosshair aria-hidden="true" /><span>Camera focus hook ready</span></div>
           </div>

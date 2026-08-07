@@ -1,0 +1,103 @@
+name: Publish Windows client
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "client/**"
+      - "global.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-client-latest
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and publish win-x64 client
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore telemetry correctness tests
+        run: dotnet restore client/TelemetryClient.Tests/TelemetryClient.Tests.csproj
+
+      - name: Test telemetry mapping
+        run: dotnet test client/TelemetryClient.Tests/TelemetryClient.Tests.csproj --configuration Release --no-restore
+
+      - name: Restore client
+        run: dotnet restore client/TelemetryClient/TelemetryClient.csproj --runtime win-x64
+
+      - name: Publish client
+        run: >-
+          dotnet publish client/TelemetryClient/TelemetryClient.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishProfile=win-x64
+          --no-restore
+          --output artifacts/windows-client
+
+      - name: Package client and checksum
+        id: package
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content "client/TelemetryClient/TelemetryClient.csproj"
+          $version = [string]($project.Project.PropertyGroup.Version | Select-Object -First 1)
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "TelemetryClient.csproj does not declare a Version."
+          }
+
+          $archiveName = "BroadcastGraphicsClient-win-x64.zip"
+          $archivePath = Join-Path "artifacts" $archiveName
+          Compress-Archive -Path "artifacts/windows-client/*" -DestinationPath $archivePath -CompressionLevel Optimal -Force
+          $hash = (Get-FileHash $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksumPath = "$archivePath.sha256"
+          "$hash  $archiveName" | Set-Content $checksumPath -Encoding ascii
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "archive=$archivePath" >> $env:GITHUB_OUTPUT
+          "checksum=$checksumPath" >> $env:GITHUB_OUTPUT
+
+      - name: Publish rolling GitHub prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: windows-client-latest
+          CLIENT_VERSION: ${{ steps.package.outputs.version }}
+          ARCHIVE_PATH: ${{ steps.package.outputs.archive }}
+          CHECKSUM_PATH: ${{ steps.package.outputs.checksum }}
+        run: |
+          $notes = @"
+          Automated Windows telemetry client build.
+
+          Client version: $env:CLIENT_VERSION
+          Commit: $env:GITHUB_SHA
+          Runtime: win-x64, self-contained, single file
+
+          Verify the ZIP against the accompanying SHA-256 checksum before distribution.
+          "@
+
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/git/refs/tags/$env:RELEASE_TAG" -f "sha=$env:GITHUB_SHA" -F force=true | Out-Null
+            gh release upload $env:RELEASE_TAG $env:ARCHIVE_PATH $env:CHECKSUM_PATH --clobber --repo $env:GITHUB_REPOSITORY
+            gh release edit $env:RELEASE_TAG --title "Broadcast Graphics Windows Client $env:CLIENT_VERSION" --notes $notes --prerelease --repo $env:GITHUB_REPOSITORY
+          }
+          else {
+            gh release create $env:RELEASE_TAG $env:ARCHIVE_PATH $env:CHECKSUM_PATH --target $env:GITHUB_SHA --title "Broadcast Graphics Windows Client $env:CLIENT_VERSION" --notes $notes --prerelease --repo $env:GITHUB_REPOSITORY
+          }

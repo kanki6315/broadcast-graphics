@@ -6,14 +6,15 @@ public enum TelemetrySourceMode
 {
     Live,
     Simulation,
-    IbtPlayback
+    DiagnosticReplay
 }
 
 public sealed record ClientSettings(
     string ServerUrl,
     bool RememberKey,
     TelemetrySourceMode SourceMode,
-    string? IbtPath,
+    string? ReplayPath,
+    double ReplaySpeed,
     double DiagnosticSampleRate,
     int? DiagnosticDurationMinutes)
 {
@@ -22,6 +23,7 @@ public sealed record ClientSettings(
         true,
         TelemetrySourceMode.Live,
         null,
+        1,
         1,
         5);
 }
@@ -44,7 +46,11 @@ public sealed class ClientSettingsStore
         {
             if (!File.Exists(path)) return ClientSettings.Default;
             await using var stream = File.OpenRead(path);
-            return await JsonSerializer.DeserializeAsync<ClientSettings>(stream, JsonOptions) ?? ClientSettings.Default;
+            var settings = await JsonSerializer.DeserializeAsync<ClientSettings>(stream, JsonOptions) ?? ClientSettings.Default;
+            return settings with
+            {
+                ReplaySpeed = settings.ReplaySpeed is 0.5 or 1 or 2 or -1 ? settings.ReplaySpeed : 1
+            };
         }
         catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException)
         {

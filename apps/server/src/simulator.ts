@@ -17,8 +17,10 @@ const names = [
 ] as const;
 
 function drivers(tick: number): DriverState[] {
+  const completedLaps = 18 + Math.floor(tick / 90);
   return names.map(([carNumber, name, team], index) => {
     const base = 81.42 + index * 0.23;
+    const gap = index === 0 ? 0 : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3));
     return {
       carIdx: index,
       position: index + 1,
@@ -29,14 +31,38 @@ function drivers(tick: number): DriverState[] {
       interval: index === 0 ? null : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3)),
       lastLap: base + Math.sin(tick / 7 + index) * 0.31,
       bestLap: base - 0.42 - (index % 3) * 0.04,
-      lapsCompleted: 18,
+      lapsCompleted: completedLaps,
       onPitRoad: index === 9 && tick % 24 < 7,
       incidents: index % 4,
+      classId: 1,
+      classColor: "#ff4b2b",
+      classPosition: index + 1,
+      gapToLeader: gap,
+      intervalToAhead: index === 0 ? null : 0.73,
+      classGapToLeader: index === 0 ? 0 : Number((index * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3)),
+      classIntervalToAhead: index === 0 ? null : 0.73,
+      lapsBehindLeader: 0,
+      lapsBehindClassLeader: 0,
+      currentLap: completedLaps + 1,
+      lastLapNumber: completedLaps,
+      bestLapNumber: 12,
+      lapDistPct: (tick / 90 + index / names.length) % 1,
+      trackStatus: index === 9 && tick % 24 < 7 ? "pit" : "running",
+      isConnected: true,
+      userId: 10_000 + index,
+      teamId: 20_000 + index,
+      carId: 1,
+      lastLapPosition: index + 1,
+      lastLapClassPosition: index + 1,
+      lastLapGapToLeader: gap,
+      lastLapGapToClassLeader: gap,
+      lastLapLapsBehindLeader: 0,
+      lastLapLapsBehindClassLeader: 0,
     };
   });
 }
 
-export function startSimulator(store: StateStore): () => void {
+export function startSimulator(store: StateStore, onTelemetry: (session: SessionState) => void = () => {}): () => void {
   let tick = 0;
   const emit = () => {
     tick += 1;
@@ -51,8 +77,22 @@ export function startSimulator(store: StateStore): () => void {
       flag: tick % 180 > 160 ? "yellow" : "green",
       timestamp: new Date().toISOString(),
       drivers: drivers(tick),
+      lapsCompleted: 18 + Math.floor(tick / 90),
+      lapsRemaining: 22 - Math.floor(tick / 90),
+      timeElapsed: tick,
+      totalTime: null,
+      phase: "racing",
+      startState: "go",
+      flags: tick % 180 > 160 ? ["caution"] : ["green"],
+      classes: [{ id: 1, name: "GT3", color: "#ff4b2b", carCount: names.length }],
+      source: "simulation",
+      sourceMode: "simulation",
+      externalSubSessionId: null,
+      externalSessionNumber: null,
+      trackId: null,
     };
     store.telemetry(session);
+    onTelemetry(session);
   };
   emit();
   const timer = setInterval(emit, 1_000);

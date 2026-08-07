@@ -10,6 +10,11 @@ export const graphicSlots = [
 export type GraphicSlot = (typeof graphicSlots)[number];
 export type ConnectionStatus = "connected" | "stale" | "disconnected";
 export type SessionFlag = "green" | "yellow" | "red" | "white" | "checkered";
+export type SessionPhase = "invalid" | "get-in-car" | "warmup" | "parade-laps" | "racing" | "checkered" | "cool-down";
+export type StartState = "hidden" | "ready" | "set" | "go";
+export type TrackStatus = "unknown" | "running" | "pit" | "off-track" | "not-in-world" | "retired";
+export type TelemetrySource = "iracing" | "simulation";
+export type TelemetrySourceMode = "live" | "replay" | "simulation";
 export type AccessKeyKind = "ingestion" | "view";
 
 export interface AccessKey {
@@ -33,12 +38,44 @@ export interface DriverState {
   name: string;
   team: string;
   className: string;
+  /** @deprecated Use gapToLeader. Retained for format-1 diagnostic replay compatibility. */
   interval: number | null;
   lastLap: number | null;
   bestLap: number | null;
   lapsCompleted: number;
   onPitRoad: boolean;
   incidents: number;
+  classId: number;
+  classColor: string;
+  classPosition: number;
+  gapToLeader: number | null;
+  intervalToAhead: number | null;
+  classGapToLeader: number | null;
+  classIntervalToAhead: number | null;
+  lapsBehindLeader: number;
+  lapsBehindClassLeader: number;
+  currentLap: number;
+  lastLapNumber: number | null;
+  bestLapNumber: number | null;
+  lapDistPct: number | null;
+  trackStatus: TrackStatus;
+  isConnected: boolean;
+  userId: number;
+  teamId: number;
+  carId: number;
+  lastLapPosition: number | null;
+  lastLapClassPosition: number | null;
+  lastLapGapToLeader: number | null;
+  lastLapGapToClassLeader: number | null;
+  lastLapLapsBehindLeader: number | null;
+  lastLapLapsBehindClassLeader: number | null;
+}
+
+export interface CarClassState {
+  id: number;
+  name: string;
+  color: string;
+  carCount: number;
 }
 
 export interface SessionState {
@@ -52,6 +89,44 @@ export interface SessionState {
   flag: SessionFlag;
   timestamp: string;
   drivers: DriverState[];
+  lapsCompleted: number;
+  lapsRemaining: number | null;
+  timeElapsed: number | null;
+  totalTime: number | null;
+  phase: SessionPhase;
+  startState: StartState;
+  flags: string[];
+  classes: CarClassState[];
+  source: TelemetrySource;
+  sourceMode: TelemetrySourceMode;
+  externalSubSessionId: number | null;
+  externalSessionNumber: number | null;
+  trackId: number | null;
+}
+
+export interface CompletedLap {
+  id: string;
+  sessionId: string;
+  source: TelemetrySource;
+  sourceMode: TelemetrySourceMode;
+  carIdx: number;
+  carNumber: string;
+  driverName: string;
+  classId: number;
+  className: string;
+  lapNumber: number;
+  lapTime: number;
+  position: number | null;
+  classPosition: number | null;
+  gapToLeader: number | null;
+  gapToClassLeader: number | null;
+  lapsBehindLeader: number | null;
+  lapsBehindClassLeader: number | null;
+  personalBest: boolean;
+  sessionTime: number | null;
+  flag: SessionFlag;
+  phase: SessionPhase;
+  observedAt: string;
 }
 
 export type GraphicFieldType = "text" | "boolean" | "select" | "number";
@@ -120,10 +195,13 @@ export type ControlCommand =
 export type ClientMessage =
   | { type: "hello"; role: "telemetry" | "control" | "overlay"; clientId?: string }
   | { type: "telemetry.update"; payload: SessionState }
+  | { type: "lap.history.request"; carIdx: number; limit?: number }
   | { type: "control.command"; command: ControlCommand };
 
 export type ServerMessage =
   | { type: "state.snapshot"; payload: LiveState }
+  | { type: "lap.completed"; payload: CompletedLap }
+  | { type: "lap.history"; payload: CompletedLap[] }
   | { type: "error"; message: string };
 
 export function formatLapTime(seconds: number | null): string {

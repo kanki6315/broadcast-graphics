@@ -65,7 +65,7 @@ function SecretReceipt({ created, onDone }: { created: CreatedAccessKey; onDone:
   const receiptRef = useRef<HTMLElement>(null);
   const isView = created.key.kind === "view";
   const value = isView
-    ? `${window.location.origin}/overlay/timing-tower#token=${created.secret}`
+    ? `${window.location.origin}/overlay#token=${created.secret}`
     : created.secret;
 
   useEffect(() => receiptRef.current?.focus(), []);
@@ -84,7 +84,7 @@ function SecretReceipt({ created, onDone }: { created: CreatedAccessKey; onDone:
   return (
     <section className="secret-receipt" aria-live="polite" ref={receiptRef} tabIndex={-1}>
       <div><ShieldCheck aria-hidden="true" /><div><h2>Key created</h2><p>Copy it now. The complete value cannot be shown again.</p></div></div>
-      <label><span>{isView ? "Example timing-tower URL" : "Ingestion key"}</span><textarea readOnly value={value} rows={isView ? 3 : 2} /></label>
+      <label><span>{isView ? "Overlay URL" : "Ingestion key"}</span><textarea readOnly value={value} rows={isView ? 3 : 2} /></label>
       <div className="receipt-actions">
         <button className="auth-primary" onClick={copy}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied ? "Copied" : isView ? "Copy overlay URL" : "Copy key"}</button>
         <button className="auth-secondary" onClick={onDone}>Done</button>

@@ -32,20 +32,21 @@ One live race-state model powers both the on-air graphics and the operator contr
 
 ## Capabilities and Constraints
 
-- Ingest live iRacing session, driver, timing, position, lap, flag, and track-state data.
-- Maintain authoritative current session state on the server and retain useful historical data.
+- Ingest live iRacing session, driver, timing, position, class, lap, start-state, flag, and track-state data through a documented normalized telemetry contract.
+- Maintain authoritative current session state in memory and persist broadcast sessions, entries, drivers, completed lap times, and scoring-line gaps in PostgreSQL.
 - Serve synchronized browser graphics and an operator control panel in real time.
 - Support initial graphics such as a timing tower, race status, driver focus, battle, flag, and lower-third treatments.
 - Treat each client-facing graphic style as a replaceable package of layouts, design tokens, assets, and configuration schema. The control panel operates semantic graphic slots and must not require a rebuild when a client package changes presentation.
 - Camera-group and focused-driver control are explicitly deferred beyond the first graphics-focused milestone.
 - Driver selection is part of the first control-panel information model so it can become the future hook for focused-driver camera control without redesigning the workflow.
 - The telemetry client must tolerate reconnects and avoid disrupting iRacing.
+- The telemetry client can validate and replay its own diagnostic ZIPs for troubleshooting and broadcast rehearsal, with explicit replay states, remote-server confirmation, and no automatic looping.
 - Authentication uses one administrator account, browser sessions for control, independently revocable ingestion keys for telemetry clients, and revocable view-only keys for browser overlays.
 - Exact deployment target and data-retention window remain open decisions.
 
 ## Evidence on Hand
 
-No brand assets, customer claims, benchmarks, production telemetry samples, or official iRacing SDK integration code are currently present. Demonstration data must be labeled as simulated.
+No brand assets, customer claims, or benchmarks are currently present. User-provided captures from a Long Beach multi-class event and a Phoenix IndyCar race cover practice, qualifying, race starts, green-flag running, cautions, one-lap-to-green, and restarts. They are available for local replay compatibility testing but are not stored in the repository. Demonstration data must be labeled as simulated.
 
 ## Product Principles
 

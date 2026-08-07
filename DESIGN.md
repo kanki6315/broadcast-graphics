@@ -114,7 +114,7 @@ The native Windows telemetry client is the same Scrutineering Ledger translated 
 - Square controls, dense rules, and visible state labels; no ornamental cards or ambient animation.
 - A timing-first desktop composition that collapses into a readable single-column operating sequence.
 - Transparent overlays built from stable layouts and runtime package tokens.
-- A native telemetry boundary with packaged fonts, explicit health text, and square authored controls.
+- A native telemetry boundary with packaged fonts, explicit health text, square authored controls, and guarded diagnostic replay.
 
 ## Colors
 
@@ -184,6 +184,8 @@ Authentication preserves the same measured stock-and-rule composition. Login is 
 
 The native telemetry client opens centered at `1080 × 760px` with an `880 × 650px` minimum. Its vertical scan is fixed: `82px` identity masthead, `88px` three-cell health strip, flexible work area, then a `34px` privacy/activity footer. The work area uses a `9:11` split with minimum widths of `390px` and `430px`: connection settings scroll independently on the left, while diagnostics sit above a separately ruled activity log on the right. Preserve this source-to-stream reading order; the client is a bridge health instrument, not a telemetry dashboard.
 
+Diagnostic replay expands inside the left connection sheet only when that source is selected. File selection, verification summary, playback speed, high-consequence confirmation, and connect actions stay in the pre-connection flow. Replay transport occupies the same sheet but remains hidden until the bridge is running in replay mode and the server connection is established; it must not imply usable transport before a destination exists.
+
 Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, and lower-third use viewport-relative offsets and purpose-built dimensions; do not apply the control-panel responsive grid to them.
 
 ## Elevation & Depth
@@ -248,6 +250,14 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - The right side keeps diagnostic sampling and duration controls above paired start/stop actions, written status, and capture path. The activity log is a separately ruled lower region with an explicit `CLEAR LOG` action; it is not a decorative console card.
 - Close the window with a full-width inverse footer that states the local-key and no-automatic-upload guarantees on the left and last-send state on the right.
 
+### Native Diagnostic Replay
+
+- Treat replay selection as a preflight, not an immediate start. Disable the connect action while reading or after invalid input; show the verified panel only after compatibility succeeds.
+- The inspection-tinted verification panel summarizes the session sequence in order, track, driver and class counts, duration, sample count, and format version. Keep these facts together so an operator can identify the captured race state before it is sent.
+- Remote destinations require an inline, focusable, assertively announced confirmation panel immediately above the connect actions. Use a `2px` orange rule, a pale orange wash, explicit cancel/start choices, and return focus to connect when canceled.
+- Reveal replay transport only after replay is active and the server is connected. Pair a progress bar with elapsed/total duration and sample position, then provide written `PAUSE`/`RESUME` and `RESTART` controls. Paused and completed conditions must also replace the stream-health text and remove the healthy stream bar; completion disables pause but leaves restart available.
+- Disable diagnostic sample-rate, duration, and capture-start controls throughout replay selection and playback. Explain that capture is unavailable while replaying rather than leaving the disabled group ambiguous.
+
 ### Authored Native Controls
 
 - Native text, password, and combo fields have a `36px` minimum height, `1px` ink border, transparent or stock background, and packaged body type. Hover adds the inspection wash; keyboard focus uses the orange frame plus a `2px` field rule.
@@ -297,6 +307,9 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Do** keep the Windows client scan order as identity, three-source health, connection/diagnostics work, then privacy and last-send assurance.
 - **Do** package and use the shared Barlow Condensed and Source Sans 3 files in native authored surfaces.
 - **Do** pair native state bars with live-updating text so server, source, and stream health remain understandable without color.
+- **Do** verify diagnostic replay content and expose its session, track, field-size, duration, sample, and format facts before enabling connection.
+- **Do** keep remote replay confirmation inline, move focus into it, and return focus to the initiating connect action when canceled.
+- **Do** announce replay progress transitions and write `PAUSED` and `COMPLETE` into stream health instead of relying on a stopped progress bar.
 
 ### Don't:
 
@@ -311,3 +324,5 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Don't** leave keyboard focus behind when the issue form is replaced by the one-time secret receipt.
 - **Don't** let default WPF rounding, gradients, shadows, or typography replace the square Scrutineering Ledger control templates.
 - **Don't** turn the native telemetry client into a race-data or program-preview dashboard; it configures the bridge and exposes source-to-stream health, diagnostics, and local activity.
+- **Don't** reveal replay transport before the server connection exists or present preflight verification as active playback.
+- **Don't** permit diagnostic capture controls during replay or remote replay without an explicit inline confirmation step.
