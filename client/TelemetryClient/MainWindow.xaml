@@ -218,7 +218,7 @@
         <Border Grid.Row="3" Background="{StaticResource InkBrush}" Padding="14,0">
             <Grid>
                 <TextBlock VerticalAlignment="Center" Foreground="{StaticResource StockBrush}" FontFamily="{StaticResource DisplayFont}" FontSize="11" Text="KEYS REMAIN LOCAL · CAPTURES ARE NEVER UPLOADED AUTOMATICALLY" />
-                <TextBlock x:Name="LastSentText" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource InspectionBrush}" FontSize="11" Text="NO TELEMETRY SENT" />
+                <TextBlock x:Name="LastAcknowledgedText" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource InspectionBrush}" FontSize="11" Text="NO TELEMETRY ACKNOWLEDGED" />
             </Grid>
         </Border>
     </Grid>

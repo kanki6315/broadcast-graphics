@@ -248,7 +248,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 
 - The left connection sheet keeps server URL, masked ingestion key, secure local-memory choice, source selector, conditional recording path, and connect/disconnect actions in one vertical sequence. Validation appears immediately before the actions as a focusable, assertive red-outlined panel with wrapping copy.
 - The right side keeps diagnostic sampling and duration controls above paired start/stop actions, written status, and capture path. The activity log is a separately ruled lower region with an explicit `CLEAR LOG` action; it is not a decorative console card.
-- Close the window with a full-width inverse footer that states the local-key and no-automatic-upload guarantees on the left and last-send state on the right.
+- Close the window with a full-width inverse footer that states the local-key and no-automatic-upload guarantees on the left and last-acknowledged state on the right.
 
 ### Native Diagnostic Replay
 
@@ -302,7 +302,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 - **Do** move focus into newly revealed, high-consequence authentication content such as the one-time secret receipt.
 - **Do** write every loading, pending, empty, active, revoked, success, and error state in specific operator language.
 - **Do** preserve `44px` minimum touch targets for compact access navigation and record actions.
-- **Do** keep the Windows client scan order as identity, three-source health, connection/diagnostics work, then privacy and last-send assurance.
+- **Do** keep the Windows client scan order as identity, three-source health, connection/diagnostics work, then privacy and delivery-acknowledgement assurance.
 - **Do** package and use the shared Barlow Condensed and Source Sans 3 files in native authored surfaces.
 - **Do** pair native state bars with live-updating text so server, source, and stream health remain understandable without color.
 - **Do** verify diagnostic replay content and expose its session, track, field-size, duration, sample, and format facts before enabling connection.

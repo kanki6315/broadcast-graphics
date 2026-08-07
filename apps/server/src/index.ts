@@ -12,6 +12,7 @@ import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
 import { startSimulator } from "./simulator.js";
 import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
+import { acceptTelemetry } from "./telemetry-ingestion.js";
 import { StateStore } from "./state-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -218,8 +219,8 @@ wss.on("connection", (socket, request) => {
       const message = JSON.parse(data.toString()) as ClientMessage;
       if (message.type === "hello" && message.role !== role) return socket.close(1008, "Role does not match authenticated connection.");
       if (message.type === "telemetry.update" && role === "telemetry") {
-        store.telemetry(message.payload);
-        history.ingest(message.payload);
+        const sequence = acceptTelemetry(message, store, history);
+        if (sequence !== null) send(socket, { type: "telemetry.ack", sequence });
       }
       if (message.type === "lap.history.request" && role !== "telemetry") {
         const session = store.snapshot().session;

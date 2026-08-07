@@ -7,6 +7,7 @@ namespace RaceControl.TelemetryClient;
 public interface ITelemetrySource : IAsyncDisposable
 {
     event Action<bool, string>? ConnectionChanged;
+    event Action? FrameObserved;
     event Action<string>? Log;
     IAsyncEnumerable<SessionState> ReadAsync(CancellationToken cancellationToken);
 }
@@ -15,6 +16,7 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
 {
     private static readonly string[] Names = ["Maya Anderson", "Jon Bell", "Riley Patterson", "Alejandra Garcia", "Bryn Thompson", "Dev Morris"];
     public event Action<bool, string>? ConnectionChanged;
+    public event Action? FrameObserved;
     public event Action<string>? Log;
 
     public async IAsyncEnumerable<SessionState> ReadAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
@@ -27,6 +29,7 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                FrameObserved?.Invoke();
                 tick++;
                 var drivers = Names.Select((name, index) => new DriverState(
                     index, index + 1, (23 + index * 7).ToString(), name, $"Team {index + 1}", "GT3",
@@ -82,6 +85,7 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
 public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource
 {
     public event Action<bool, string>? ConnectionChanged;
+    public event Action? FrameObserved;
     public event Action<string>? Log;
 
     public async IAsyncEnumerable<SessionState> ReadAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
@@ -113,6 +117,7 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
             },
             OnTelemetryUpdate = telemetry =>
             {
+                FrameObserved?.Invoke();
                 diagnostics.TryRecordSampled("sdk-telemetry", "telemetry.ndjson", telemetry);
                 diagnostics.TryRecordOnce("variable-inventory", "variables.ndjson", new
                 {

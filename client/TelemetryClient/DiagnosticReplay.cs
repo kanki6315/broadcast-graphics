@@ -307,6 +307,7 @@ public sealed class DiagnosticReplayTelemetrySource(
     private ReplayProgress progress = new(TimeSpan.Zero, TimeSpan.Zero, 0, 0, false, false);
 
     public event Action<bool, string>? ConnectionChanged;
+    public event Action? FrameObserved;
     public event Action<string>? Log;
     public event Action<ReplayProgress>? ProgressChanged;
 
@@ -347,6 +348,7 @@ public sealed class DiagnosticReplayTelemetrySource(
                 }
 
                 var frame = frames[index];
+                FrameObserved?.Invoke();
                 yield return frame.State with { SourceMode = "replay" };
                 index++;
                 var position = frame.CapturedAt > firstTimestamp ? frame.CapturedAt - firstTimestamp : TimeSpan.Zero;
