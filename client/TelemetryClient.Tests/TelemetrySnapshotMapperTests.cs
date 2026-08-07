@@ -177,6 +177,55 @@ public sealed class TelemetrySnapshotMapperTests
         AssertClose(2.5, second.GapToLeader);
     }
 
+    [Fact]
+    public void LiveOrderAndGapFollowAnOvertakeBeforeScoringPositionUpdates()
+    {
+        var timing = new LiveTimingTracker();
+        var info = SessionInfo("Race", [Driver(0), Driver(1)]);
+
+        TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [4, 4],
+            f2Times: [0, 5],
+            lapDistances: [0.20f, 0.10f],
+            sessionTime: 100), info, liveTiming: timing);
+
+        var state = TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [4, 4],
+            f2Times: [0, 5],
+            lapDistances: [0.30f, 0.31f],
+            sessionTime: 101), info, liveTiming: timing);
+
+        Assert.Equal([1, 0], state.Drivers.Select(driver => driver.CarIdx));
+        var newLeader = state.Drivers.Single(driver => driver.CarIdx == 1);
+        var overtakenDriver = state.Drivers.Single(driver => driver.CarIdx == 0);
+        Assert.Equal(1, newLeader.Position);
+        Assert.Equal(1, newLeader.ClassPosition);
+        Assert.Equal(2, overtakenDriver.Position);
+        Assert.Equal(2, overtakenDriver.ClassPosition);
+        AssertClose(0.048, overtakenDriver.GapToLeader);
+        AssertClose(0.048, overtakenDriver.IntervalToAhead);
+    }
+
+    [Fact]
+    public void CheckeredOrderRetainsTheSdkClassification()
+    {
+        var state = TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1, 2],
+            classPositions: [1, 2],
+            lapsCompleted: [4, 4],
+            f2Times: [0, 1],
+            lapDistances: [0.40f, 0.45f],
+            sessionState: SVappsLAB.iRacingTelemetrySDK.SessionState.Checkered),
+            SessionInfo("Race", [Driver(0), Driver(1)]));
+
+        Assert.Equal([0, 1], state.Drivers.Select(driver => driver.CarIdx));
+        Assert.Equal(1, state.Drivers.Single(driver => driver.CarIdx == 0).Position);
+    }
+
     private static TelemetryData Telemetry(
         int[] positions,
         int[] classPositions,
@@ -187,10 +236,11 @@ public sealed class TelemetrySnapshotMapperTests
         float[]? bestLapTimes = null,
         int[]? bestLapNumbers = null,
         float[]? lapDistances = null,
-        double sessionTime = 1_000) => new()
+        double sessionTime = 1_000,
+        SVappsLAB.iRacingTelemetrySDK.SessionState sessionState = SVappsLAB.iRacingTelemetrySDK.SessionState.Racing) => new()
     {
         SessionNum = 0,
-        SessionState = SVappsLAB.iRacingTelemetrySDK.SessionState.Racing,
+        SessionState = sessionState,
         SessionTime = sessionTime,
         SessionTimeRemain = 2_000,
         SessionTimeTotal = 3_000,
