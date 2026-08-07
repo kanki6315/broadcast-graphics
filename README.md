@@ -22,7 +22,7 @@ npm run dev:server
 npm run dev:web
 ```
 
-Open `http://localhost:5173/control`. The server starts a simulated session by default. Add the consolidated overlay to vMix/OBS as one transparent browser source. Every graphic taken from the control panel appears in this composition:
+Open `http://localhost:5173/timing` for timing and camera direction, and `http://localhost:5173/graphics` for the fixed graphics board. `/control` remains a compatibility entry point for Timing Director. The server starts a simulated session by default. Add the consolidated overlay to vMix/OBS as one transparent browser source. Every graphic taken from Graphics Director appears in this composition:
 
 ```text
 http://localhost:5173/overlay?package=apex
@@ -110,6 +110,6 @@ The server discovers manifests at runtime. The control panel renders semantic co
 
 ## Camera control
 
-When the Windows client is connected to a live iRacing source, the focus ledger gives every non-scenic camera group reported by the current session its own button. Selecting a timing row focuses driver-dependent graphics and sends that car to the selected camera group. Pressing a camera-group button switches the focused driver directly to that group. Right-clicking a timing row—or pressing `Shift+F10` or the Context Menu key from its driver control—opens a camera menu that takes that driver on a specific group in one action. Arrow keys move through groups; `Escape` or `Tab` dismisses the menu, and dismissal or selection restores focus to the originating driver control.
+When the Windows client is connected to a live iRacing source, Timing Director keeps every non-scenic camera group reported by the current session in a persistent bank along the bottom of the page. Clicking any timing row immediately selects that driver and sends the car to the currently selected camera group. Pressing a camera-group button switches the selected driver directly to that group. Selected-driver and observed-camera readouts remain separate so an operator can see when live telemetry has caught up with the requested shot. Graphics controls live only on the separate `/graphics` page.
 
 Camera commands travel from the authenticated control socket to the authenticated telemetry client and then through the SDK's simulator-control interface. The control desk shows disconnected, unavailable, sending, sent, and rejected states. A sent state confirms delivery to the SDK, not that iRacing visibly changed shots; iRacing camera commands are fire-and-forget and only work while spectating or watching a replay (out of the car). Simulation and diagnostic-replay telemetry remain read-only.

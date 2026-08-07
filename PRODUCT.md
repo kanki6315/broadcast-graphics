@@ -31,16 +31,16 @@ One live race-state model powers both the on-air graphics and the operator contr
 - The telemetry client runs on the same Windows PC as iRacing.
 - Browser graphics are loaded as transparent web sources in software such as vMix or OBS.
 - The operator panel is used during a live session, often on a second display with limited attention available.
-- The `/control` operator panel is a private, single-user desktop tool. Mobile layouts and accessibility conformance are outside its required review and acceptance scope.
+- The `/timing` and `/graphics` operator surfaces are private desktop tools. `/control` remains a compatibility entry point for Timing Director. Mobile layouts and accessibility conformance are outside their required review and acceptance scope.
 - The initial workflow emphasizes automatic live data plus quick manual show/hide and content controls.
-- The control panel is not a multiview or program monitor; vMix/OBS owns video preview. Its dominant surface is live timing and race context for production decisions.
+- The control application is not a multiview or program monitor; vMix/OBS owns video preview. Timing Director owns race monitoring and cameras, while Graphics Director owns a fixed, dense presentation board that can run in another browser or on another PC.
 
 ## Capabilities and Constraints
 
 - Ingest live iRacing session, driver, timing, position, class, lap, start-state, flag, and track-state data through a documented normalized telemetry contract.
 - Maintain authoritative current session state in memory and persist broadcast sessions, entries, drivers, completed lap times, and scoring-line gaps in PostgreSQL.
 - Serve synchronized browser graphics and an operator control panel in real time.
-- Support initial graphics such as a timing tower, race status, driver focus, battle, flag, and lower-third treatments.
+- Support initial graphics such as a timing tower, race status, driver info, position-group battle, flag, and announcement treatments. Planned widgets may appear disabled in Graphics Director, but must not create slots or overlay output until a real graphic exists.
 - Treat each client-facing graphic style as a replaceable package of layouts, design tokens, assets, and configuration schema. The control panel operates semantic graphic slots and must not require a rebuild when a client package changes presentation.
 - Support focused-driver and camera-group control through the live Windows iRacing bridge. Driver selection remains the shared hook for driver-dependent graphics and camera focus.
 - Camera commands must expose disconnected, unavailable, pending, sent, and rejected states. Simulation and diagnostic replay remain read-only, and SDK delivery must not be described as verified shot execution.
@@ -66,4 +66,4 @@ Approved Gantry vector and raster brand assets are stored in `brand/`. No custom
 
 Broadcast graphics should remain legible at typical compressed-stream viewing sizes. Authentication and access-management surfaces should retain their documented accessibility behavior.
 
-The private `/control` operator panel is intentionally exempt from accessibility auditing and mobile or responsive-view validation. Keyboard-only operation, screen-reader behavior, formal contrast conformance, reduced-motion behavior, touch targets, and narrow-screen layouts are not acceptance criteria for that page. Existing accessible or responsive behavior may remain, but it does not need to be preserved or checked when changing `/control`.
+The private `/timing`, `/graphics`, and compatibility `/control` operator surfaces are intentionally exempt from accessibility auditing and mobile or responsive-view validation. Keyboard-only operation, screen-reader behavior, formal contrast conformance, reduced-motion behavior, touch targets, and narrow-screen layouts are not acceptance criteria for those pages. Existing accessible or responsive behavior may remain, but it does not need to be preserved or checked when changing them.
