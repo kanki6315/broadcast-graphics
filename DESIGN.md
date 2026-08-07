@@ -156,7 +156,7 @@ Authentication follows the same discipline: green is limited to the success icon
 **Display Font:** Barlow Condensed (sans-serif fallback)
 
 **Body Font:** Source Sans 3 (sans-serif fallback)
-**Overlay Package Fonts:** supplied through `--gfx-font-display` and `--gfx-font-data`; current packages use condensed system display faces and Segoe UI data text.
+**Overlay Package Fonts:** supplied through `--gfx-font-display` and `--gfx-font-data`; Apex Signal uses the shipped Barlow Condensed and Source Sans 3 faces, while Endurance Blue retains condensed system display faces and Segoe UI data text.
 
 The Windows client packages Barlow Condensed and Source Sans 3 in the application and references them with WPF pack URIs. Do not fall back to a system display face for authored native surfaces when those resources are available.
 
@@ -192,7 +192,7 @@ The control desk is flat. It uses no ambient box shadows: hierarchy comes from t
 
 The native client follows the same flat rule. WPF regions are separated by `1–3px` borders, pale alpha washes, inverse footer ink, and state bars; do not add native drop shadows, raised panels, or floating cards.
 
-Overlays are the exception because they must separate from unpredictable video. Package themes may supply a restrained drop shadow (`0 8px 16px rgba(0,0,0,.35)` in Apex Signal; `0 8px 18px rgba(0,0,0,.4)` in Endurance Blue) and opaque or near-opaque plates.
+Overlays are the exception because they must separate from unpredictable video. Package themes may supply a restrained drop shadow (`0 8px 18px rgba(0,0,0,.48)` in Apex Signal; `0 8px 18px rgba(0,0,0,.4)` in Endurance Blue) and opaque or near-opaque plates.
 
 **The Flat Desk Rule.** Never add floating cards or decorative shadows to the operator surface. Depth belongs to broadcast overlays, where video separation requires it.
 
@@ -202,7 +202,7 @@ Control-panel geometry is square (`0px` radius). Inputs, selects, toggles, row b
 
 Native controls are deliberately authored rather than left to default WPF chrome. Text, password, combo-box, popup, and button templates keep square borders; hover uses the inspection wash, keyboard focus thickens the field rule and adds an external orange focus frame, press/default state thickens the button rule, and disabled controls remain structurally present at `0.48` opacity.
 
-Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: Apex Signal clips two corners by `10px`, while Endurance Blue keeps `0px` corners and uses a colored top rule. Package-specific geometry must remain in `graphic-packages/<id>/theme.css`, not in the global control grammar.
+Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, but each package may override it with a deliberate broadcast silhouette. Apex Signal uses lacquer-black plates, a `3–4px` racing-red perimeter, and large `18–34px` corner radii; Endurance Blue keeps `0px` corners and uses a colored top rule. Package-specific geometry must remain in `graphic-packages/<id>/theme.css`, not in the global control grammar.
 
 ## Components
 
@@ -276,7 +276,9 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`: 
 ### Overlay Plates
 
 - Shared overlay components position and structure content; package themes own `--gfx-ink`, `--gfx-surface`, `--gfx-surface-soft`, `--gfx-accent`, `--gfx-muted`, `--gfx-font-display`, `--gfx-font-data`, and `--gfx-cut`.
-- The timing tower uses `42px` title and `45px` data rows. Driver focus uses a large car-number block, identity, position, and metric. Other slots use similarly direct, labeled facts rather than decorative content.
+- Apex Signal is a black, white, silver, and racing-red broadcast package. Its tower carries a branded masthead, session strip, labeled columns, twelve `40px` data rows by default, red car-number cells, silver rules, and a red rounded perimeter. Driver focus uses the same red number tab above a deep sponsor-style identity field; race status, battle, and flag plates reuse the lacquer-black material and red outline. Semantic green, yellow, red, and checkered flag colors stay scoped to the flag plate or chip so the surrounding browser-source viewport remains transparent.
+- Apex Signal's primary overlay steps are `39px` for the tower wordmark, `30px` for driver identity, `25px` for session titles, `18–24px` for number and data emphasis, and `10–15px` for labels and compact telemetry. Its neutral ramp runs from `#030304` through `#313336`, with silver copy from `#8f9194` through `#f7f7f5`, and uses `#e10613` as the package accent.
+- Other slots use similarly direct, labeled facts rather than decorative content. Lower-third and results treatments are not part of the current Apex Signal refresh.
 - Overlay visibility is a single `180ms ease-out` opacity transition. Package themes may style plates but must preserve legibility at compressed broadcast sizes and transparent canvas behavior.
 
 ## Do's and Don'ts

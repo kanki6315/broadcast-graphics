@@ -9,7 +9,7 @@
       "label": "Timing tower",
       "description": "Running order and live intervals",
       "fields": [
-        { "key": "rows", "label": "Visible drivers", "type": "number", "default": 10, "min": 5, "max": 20 },
+        { "key": "rows", "label": "Visible drivers", "type": "number", "default": 12, "min": 5, "max": 20 },
         { "key": "showLastLap", "label": "Show last lap", "type": "boolean", "default": false }
       ]
     },
