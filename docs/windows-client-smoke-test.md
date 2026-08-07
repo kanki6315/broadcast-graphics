@@ -14,7 +14,7 @@ Run this check on the iRacing PC before treating a client build as release-ready
 1. Confirm the default server is `https://broadcasts.arjunakankipati.com`.
 2. Paste the ingestion key, leave **Live iRacing SDK** selected, and select **Connect**.
 3. Start or join an iRacing session.
-4. Confirm the written statuses progress to **Connected to graphics server**, an SDK connected state, and **Telemetry flowing**.
+4. Confirm the written statuses progress to **Connected to graphics server**, an SDK connected state, and **Telemetry flowing** only after the first server acknowledgement.
 5. Confirm the control panel timing data follows the active iRacing session.
 6. In a race, confirm the displayed current lap equals the leader's completed laps plus one; it must remain zero during parade laps and must not follow the spectator camera's own `Lap` value.
 7. Confirm the leader is labeled **Leader**, same-lap cars show overall-leader gaps, and lapped cars show a lap deficit instead of a seconds gap.
@@ -24,13 +24,15 @@ Run this check on the iRacing PC before treating a client build as release-ready
 11. Disconnect the network briefly, restore it, and confirm the client retries without being restarted.
 12. Move through practice, qualifying, and race without restarting the client. Confirm telemetry resumes after each SDK reconnect.
 13. Restart the server while iRacing remains connected. Confirm the client reports the lost connection, retries, and resumes sending without being restarted.
-14. Leave telemetry connected for at least 20 minutes and confirm **Last sent** continues to advance and the server never marks telemetry stale.
+14. Leave telemetry connected for at least 20 minutes and confirm **Last acknowledged** continues to advance and the server never marks telemetry stale.
+15. Against a test server that accepts telemetry but suppresses acknowledgements, confirm the client shows **Telemetry acknowledgement stalled**, reconnects after approximately three seconds, and resumes without restarting the SDK source when acknowledgements return.
+16. With a test SDK source that remains nominally connected but suppresses raw telemetry callbacks, confirm the client shows **Restarting iRacing SDK source**, recreates the source after the watchdog deadline, and resumes without reconnecting a healthy server socket.
 
 ## Diagnostics
 
 1. Select **Manual stop**, choose **1 sample / second**, and select **Start Capture**.
 2. Exercise the session for at least 30 seconds, then select **Stop & Save**.
-3. Confirm the ZIP contains `manifest.json`, SDK variables, raw session information, sampled telemetry, normalized output, and connection events where that data was available.
+3. Confirm the ZIP contains `manifest.json`, SDK variables, raw session information, sampled telemetry, normalized output, and connection/watchdog events where that data was available.
 4. Repeat with a one-minute duration and confirm it stops and saves automatically.
 5. Search the extracted files for the ingestion-key prefix; the key must not be present.
 

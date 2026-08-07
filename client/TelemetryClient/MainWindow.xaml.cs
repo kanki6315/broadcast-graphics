@@ -233,13 +233,15 @@ public partial class MainWindow : Window
                         ? "Telemetry flowing"
                         : !status.ServerConnected
                             ? "Waiting for server"
-                            : status.SourceConnected && status.LastTelemetryAt is not null
-                                ? "Telemetry transport stalled"
+                            : status.SourceConnected && status.LastSentAt is not null
+                                ? status.LastAcknowledgedAt is null
+                                    ? "Awaiting server acknowledgement"
+                                    : "Telemetry acknowledgement stalled"
                                 : "Waiting for telemetry";
             ReplayTransportPanel.Visibility = replayActive && status.ServerConnected ? Visibility.Visible : Visibility.Collapsed;
-            LastSentText.Text = status.LastTelemetryAt is { } sent
-                ? $"LAST SENT {sent.ToLocalTime():HH:mm:ss}"
-                : "NO TELEMETRY SENT";
+            LastAcknowledgedText.Text = status.LastAcknowledgedAt is { } acknowledged
+                ? $"LAST ACKNOWLEDGED {acknowledged.ToLocalTime():HH:mm:ss}"
+                : "NO TELEMETRY ACKNOWLEDGED";
 
             if (!string.Equals(previousServer, ServerStatusText.Text, StringComparison.Ordinal)) Announce(ServerStatusText);
             if (!string.Equals(previousSource, SourceStatusText.Text, StringComparison.Ordinal)) Announce(SourceStatusText);

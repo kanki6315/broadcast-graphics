@@ -194,12 +194,13 @@ export type ControlCommand =
 
 export type ClientMessage =
   | { type: "hello"; role: "telemetry" | "control" | "overlay"; clientId?: string }
-  | { type: "telemetry.update"; payload: SessionState }
+  | { type: "telemetry.update"; sequence?: number; payload: SessionState }
   | { type: "lap.history.request"; carIdx: number; limit?: number }
   | { type: "control.command"; command: ControlCommand };
 
 export type ServerMessage =
   | { type: "state.snapshot"; payload: LiveState }
+  | { type: "telemetry.ack"; sequence: number }
   | { type: "lap.completed"; payload: CompletedLap }
   | { type: "lap.history"; payload: CompletedLap[] }
   | { type: "error"; message: string };

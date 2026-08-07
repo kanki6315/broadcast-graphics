@@ -2,6 +2,26 @@
 
 The Windows client owns iRacing-specific interpretation. The server and graphic packages receive normalized broadcast facts and must not reinterpret SDK variables.
 
+## Delivery and health
+
+The client sends normalized telemetry at up to 10 Hz. Every new client frame carries a positive, connection-scoped `sequence` number. After the server parses the frame, applies it to live state, and offers it to race-history processing, it replies on the ingestion socket with:
+
+```json
+{ "type": "telemetry.ack", "sequence": 42 }
+```
+
+Acknowledgements are cumulative because WebSocket messages are ordered. An acknowledgement does not promise that a newly observed completed lap has already committed to PostgreSQL; race-history persistence remains asynchronous and idempotent.
+
+The Windows health indicators have separate meanings:
+
+- **Server** means the ingestion WebSocket is established.
+- **iRacing source** means the SDK is nominally connected and producing raw callbacks.
+- **Data stream** means normalized telemetry was acknowledged recently by the server.
+
+If the oldest outstanding frame remains unacknowledged for three seconds, the client reconnects only the WebSocket and resends the newest unacknowledged snapshot. If a live SDK source reports connected but produces no raw callback for ten seconds initially, or three seconds after frames have begun, the client disposes and recreates only the SDK source. Diagnostic replay pause and completion do not run the live-source watchdog.
+
+During rollout, the server continues accepting sequence-less frames from older clients but cannot acknowledge them. Deploy the acknowledgement-capable server before deploying the acknowledgement-dependent Windows client.
+
 This contract was checked against two real diagnostic captures:
 
 - a single-class IndyCar race at Phoenix covering laps 57–71, two cautions, a one-lap-to-green period, and a restart;
