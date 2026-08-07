@@ -27,6 +27,15 @@ const session: SessionState = {
   externalSubSessionId: 123,
   externalSessionNumber: 0,
   trackId: 45,
+  cameraGroups: [{
+    number: 3,
+    name: "TV 1",
+    isScenic: false,
+    cameras: [{ number: 0, name: "TV 1" }],
+  }],
+  activeCameraCarIdx: 7,
+  activeCameraGroup: 3,
+  activeCamera: 0,
   drivers: [{
     carIdx: 7, position: 1, carNumber: "23", name: "Test Driver", team: "Test Team",
     className: "GT3", interval: null, lastLap: 82, bestLap: 81.5, lapsCompleted: 1,
@@ -55,4 +64,34 @@ test("taking and clearing a semantic slot updates on-air state", () => {
   assert.deepEqual(store.snapshot().graphics.activeSlots, ["timing-tower"]);
   store.command({ type: "graphics.clearAll" }, packages);
   assert.deepEqual(store.snapshot().graphics.activeSlots, []);
+});
+
+test("focused-driver and manual camera takes dispatch to the live iRacing controller", () => {
+  const store = new StateStore();
+  store.setCameraController(true, true);
+  store.telemetry(session);
+
+  const focusCommand = store.command({ type: "focus.set", carIdx: 7 }, packages);
+  assert.deepEqual(focusCommand && {
+    carIdx: focusCommand.carIdx,
+    carNumber: focusCommand.carNumber,
+    cameraGroup: focusCommand.cameraGroup,
+    camera: focusCommand.camera,
+  }, { carIdx: 7, carNumber: "23", cameraGroup: 3, camera: 0 });
+  assert.equal(store.snapshot().camera.pendingCommandId, focusCommand?.id);
+
+  store.cameraResult(focusCommand!.id, "sent", "Camera sent — #23 / group 3");
+  assert.equal(store.snapshot().camera.lastResult, "sent");
+  assert.equal(store.snapshot().camera.pendingCommandId, null);
+
+  const takeCommand = store.command({ type: "camera.take" }, packages);
+  assert.equal(takeCommand?.cameraGroup, 3);
+});
+
+test("camera takes remain unavailable without a live camera-capable telemetry source", () => {
+  const store = new StateStore();
+  store.telemetry(session);
+  const cameraCommand = store.command({ type: "camera.take" }, packages);
+  assert.equal(cameraCommand, null);
+  assert.equal(store.snapshot().camera.lastResult, "rejected");
 });

@@ -37,6 +37,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     private CancellationTokenSource? cancellation;
     private Task? runTask;
     private IReplayControl? replayControl;
+    private ICameraController? cameraController;
     private TelemetryBridgeStatus status = new(false, false, false, false, "Not connected", null, null, null);
 
     public event Action<TelemetryBridgeStatus>? StatusChanged;
@@ -175,6 +176,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
             while (!cancellationToken.IsCancellationRequested)
             {
                 await using var source = new IracingSdkTelemetrySource(diagnostics);
+                SetCameraController(source);
                 var activity = new SourceActivityWatchdog();
                 void OnConnectionChanged(bool connected, string label)
                 {
@@ -217,6 +219,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                     source.ConnectionChanged -= OnConnectionChanged;
                     source.FrameObserved -= OnFrameObserved;
                     source.Log -= WriteLog;
+                    ClearCameraController(source);
                 }
 
                 if (cancellationToken.IsCancellationRequested) return;
@@ -279,6 +282,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
             var acknowledgements = new TelemetryAcknowledgementTracker();
             SessionState? latestSnapshot = null;
             long latestSequence = 0;
+            using var sendGate = new SemaphoreSlim(1, 1);
             try
             {
                 socket.Options.SetRequestHeader("Authorization", $"Bearer {options.IngestionKey}");
@@ -303,12 +307,13 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                 {
                     type = "hello",
                     role = "telemetry",
-                    clientId = Environment.MachineName
+                    clientId = Environment.MachineName,
+                    capabilities = new { cameraControl = options.SourceMode == TelemetrySourceMode.Live }
                 }, JsonOptions);
-                await SendAsync(socket, hello, cancellationToken);
+                await SendAsync(socket, hello, sendGate, cancellationToken);
 
                 using var connectionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                var receiveTask = MonitorServerAsync(socket, acknowledgements, OnAcknowledged, connectionCancellation.Token);
+                var receiveTask = MonitorServerAsync(socket, acknowledgements, OnAcknowledged, sendGate, connectionCancellation.Token);
                 var watchdogTask = MonitorTransportAsync(acknowledgements, connectionCancellation.Token);
 
                 async Task SendSnapshotAsync(SessionState snapshot)
@@ -323,7 +328,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                         sequence = latestSequence,
                         payload = snapshot
                     }, JsonOptions);
-                    var sendTask = SendAsync(socket, payload, connectionCancellation.Token);
+                    var sendTask = SendAsync(socket, payload, sendGate, connectionCancellation.Token);
                     var completedTask = await Task.WhenAny(sendTask, receiveTask, watchdogTask);
                     if (completedTask == receiveTask) await receiveTask;
                     if (completedTask == watchdogTask) await watchdogTask;
@@ -410,17 +415,28 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         }
     }
 
-    private static Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, CancellationToken cancellationToken) =>
-        WithTimeoutAsync(
-            token => socket.SendAsync(payload, WebSocketMessageType.Text, true, token).AsTask(),
-            SendTimeout,
-            "Sending telemetry to the server timed out.",
-            cancellationToken);
+    private static async Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, SemaphoreSlim sendGate, CancellationToken cancellationToken)
+    {
+        await sendGate.WaitAsync(cancellationToken);
+        try
+        {
+            await WithTimeoutAsync(
+                token => socket.SendAsync(payload, WebSocketMessageType.Text, true, token).AsTask(),
+                SendTimeout,
+                "Sending telemetry to the server timed out.",
+                cancellationToken);
+        }
+        finally
+        {
+            sendGate.Release();
+        }
+    }
 
-    private static async Task MonitorServerAsync(
+    private async Task MonitorServerAsync(
         ClientWebSocket socket,
         TelemetryAcknowledgementTracker acknowledgements,
         Action<long> acknowledged,
+        SemaphoreSlim sendGate,
         CancellationToken cancellationToken)
     {
         var buffer = new byte[8_192];
@@ -459,6 +475,25 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                     if (!acknowledgements.CanAcknowledge(sequence))
                         throw new InvalidDataException($"The server acknowledged unsent telemetry sequence {sequence}.");
                     acknowledged(sequence);
+                    break;
+                case "camera.command":
+                    if (!root.TryGetProperty("command", out var commandElement))
+                        throw new InvalidDataException("The server sent a camera command without a payload.");
+                    var command = commandElement.Deserialize<CameraSwitchCommand>(JsonOptions)
+                        ?? throw new InvalidDataException("The server sent an invalid camera command.");
+                    var controller = CurrentCameraController();
+                    var resultMessage = controller?.SendCamera(command)
+                        ?? new CameraCommandResult(false, "Camera rejected — the live iRacing source is not connected");
+                    diagnostics.TryRecord("events.ndjson", new { type = "camera.command", command.Id, command.CarNumber, command.CameraGroup, command.Camera, resultMessage.Sent, resultMessage.Message });
+                    WriteLog(resultMessage.Message);
+                    var response = JsonSerializer.SerializeToUtf8Bytes(new
+                    {
+                        type = "camera.result",
+                        commandId = command.Id,
+                        status = resultMessage.Sent ? "sent" : "rejected",
+                        message = resultMessage.Message
+                    }, JsonOptions);
+                    await SendAsync(socket, response, sendGate, cancellationToken);
                     break;
                 case "error":
                     var serverMessage = root.TryGetProperty("message", out var errorElement) && errorElement.ValueKind == JsonValueKind.String
@@ -529,6 +564,24 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                 if (ReferenceEquals(replayControl, control)) replayControl = null;
             }
         }
+    }
+
+    private void SetCameraController(ICameraController controller)
+    {
+        lock (gate) cameraController = controller;
+    }
+
+    private void ClearCameraController(ICameraController controller)
+    {
+        lock (gate)
+        {
+            if (ReferenceEquals(cameraController, controller)) cameraController = null;
+        }
+    }
+
+    private ICameraController? CurrentCameraController()
+    {
+        lock (gate) return cameraController;
     }
 
     private void OnSourceConnectionChanged(bool connected, string label)

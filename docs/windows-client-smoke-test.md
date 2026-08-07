@@ -20,6 +20,9 @@ Run this check on the iRacing PC before treating a client build as release-ready
 7. Confirm the leader is labeled **Leader**, same-lap cars show overall-leader gaps, and lapped cars show a lap deficit instead of a seconds gap.
 8. In a multi-class session, confirm every active class appears and both overall and class positions are one-based.
 9. Cross a timing line and confirm the driver's last-lap time and lap number advance once. Confirm the best-lap number changes only when the best time changes.
+10. While spectating, confirm the control panel lists the session's non-scenic camera groups. Arm a group, select a timing row, and verify iRacing switches to that car and group.
+11. Arm another group and select **Take camera**. Confirm the current driver stays focused, the shot changes, and the control panel reports `CAMERA SENT`.
+12. Disconnect the Windows client and confirm the camera controls disable with explicit disconnected copy while graphic focus remains usable.
 10. Observe a start and caution if available. Confirm ready/set/go and caution/one-lap-to-green details agree with iRacing.
 11. Disconnect the network briefly, restore it, and confirm the client retries without being restarted.
 12. Move through practice, qualifying, and race without restarting the client. Confirm telemetry resumes after each SDK reconnect.

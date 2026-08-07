@@ -228,6 +228,11 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - A focused row becomes an inverse ink plate, gains a `4px` inset orange leading rule, changes the position control to orange, and shows the written `FOCUS` status.
 - Best-lap emphasis uses tabular numerals, stronger weight, purple ink, and a written `FASTEST` status.
 
+### Focused-Driver Camera Control
+
+- Keep camera-group selection inside the focused-driver ledger. Changing the group arms it without taking; `TAKE CAMERA` remains an explicit action. Selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
+- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. `SENT` confirms SDK delivery, not verified shot execution. At `700px` and below, keep the group selector and take action at least `44px` high and allow status copy to wrap.
+
 ### Cue Workflow
 
 - Current and next are paired inside a `2px` frame. Current uses an inverse ink plate and the text `CURRENT / ON AIR`; next uses an orange inset top rule and `NEXT CUE`.
@@ -313,7 +318,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Don't:
 
-- **Don't** add a program-video preview or camera controls to the control panel; the shipped workflow stops at the selected-driver focus boundary.
+- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep camera control inside the focused-driver ledger as camera-group arming, an explicit take action, and written delivery state.
 - **Don't** turn semantic graphic slots into client-specific styling controls.
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.
