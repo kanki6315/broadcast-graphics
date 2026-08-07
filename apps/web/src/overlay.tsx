@@ -72,8 +72,8 @@ function TimingTower({ session, rows }: { session: SessionState; rows: number })
   return (
     <div className="overlay-surface timing-overlay">
       <div className="tower-brand overlay-title">
-        <strong>APEX</strong>
-        <span>RACE CONTROL</span>
+        <strong>PRI</strong>
+        <span>HOOSIER 500</span>
       </div>
       <header className="tower-session overlay-title">
         <strong>{session.type}</strong>

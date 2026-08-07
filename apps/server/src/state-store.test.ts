@@ -3,7 +3,7 @@ import test from "node:test";
 import type { GraphicPackageManifest, SessionState } from "@racecontrol/protocol";
 import { StateStore } from "./state-store.js";
 
-const packages = [{ id: "apex" }] as GraphicPackageManifest[];
+const packages = [{ id: "pri-hoosier-500" }] as GraphicPackageManifest[];
 const session: SessionState = {
   id: "test",
   name: "Test race",
@@ -57,6 +57,7 @@ const session: SessionState = {
 
 test("telemetry establishes a default driver focus", () => {
   const store = new StateStore();
+  assert.equal(store.snapshot().graphics.packageId, "pri-hoosier-500");
   store.telemetry(session);
   assert.equal(store.snapshot().graphics.selectedDriverCarIdx, 7);
   assert.equal(store.snapshot().connection, "connected");

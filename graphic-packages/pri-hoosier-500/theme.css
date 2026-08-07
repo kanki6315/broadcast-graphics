@@ -185,7 +185,7 @@
 .driver-focus-overlay .focus-position strong,
 .driver-focus-overlay .focus-metric strong { margin-top: 3px; font: 700 23px/1 var(--gfx-font-display); }
 .driver-focus-overlay::after {
-  content: "APEX  /  LIVE TIMING";
+  content: "PRI  /  HOOSIER 500";
   grid-column: 1 / -1;
   grid-row: 2;
   display: grid;

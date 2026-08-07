@@ -44,7 +44,10 @@ await historyRepository.initialize();
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
 const clientRelease = await loadClientRelease(clientReleaseRoot);
-const store = new StateStore(packages[0]?.id ?? "apex");
+const defaultPackageId = packages.find((candidate) => candidate.id === "pri-hoosier-500")?.id
+  ?? packages[0]?.id
+  ?? "pri-hoosier-500";
+const store = new StateStore(defaultPackageId);
 const sockets = new Map<WebSocket, SocketRole>();
 const cameraSockets = new Set<WebSocket>();
 const history = new RaceHistoryService(

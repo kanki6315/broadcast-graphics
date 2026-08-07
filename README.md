@@ -25,7 +25,7 @@ npm run dev:web
 Open `http://localhost:5173/control`. The server starts a simulated session by default. Add the consolidated overlay to vMix/OBS as one transparent browser source. Every graphic taken from the control panel appears in this composition:
 
 ```text
-http://localhost:5173/overlay?package=apex
+http://localhost:5173/overlay?package=pri-hoosier-500
 ```
 
 ### Windows telemetry client

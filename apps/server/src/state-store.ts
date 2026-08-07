@@ -15,7 +15,7 @@ export class StateStore {
   private readonly listeners = new Set<Listener>();
   private staleTimer: NodeJS.Timeout | null = null;
 
-  constructor(defaultPackageId = "apex") {
+  constructor(defaultPackageId = "pri-hoosier-500") {
     this.state = {
       revision: 0,
       connection: "disconnected",

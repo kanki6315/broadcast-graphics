@@ -1,9 +1,9 @@
 {
-  "id": "apex",
-  "name": "Apex Signal",
-  "clientName": "Apex Racing",
+  "id": "pri-hoosier-500",
+  "name": "PRI Hoosier 500",
+  "clientName": "PRI",
   "version": "1.0.0",
-  "themeUrl": "/packages/apex/theme.css",
+  "themeUrl": "/packages/pri-hoosier-500/theme.css",
   "slots": {
     "timing-tower": {
       "label": "Timing tower",
