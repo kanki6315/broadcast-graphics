@@ -104,6 +104,21 @@ export class StateStore {
         cameraCommand = this.createCameraCommand(driver.carIdx, driver.carNumber);
         break;
       }
+      case "camera.driver.take": {
+        const group = this.state.camera.groups.find((candidate) => candidate.number === command.cameraGroup && candidate.cameras.length > 0);
+        if (!group) throw new Error("That camera group is not available in the current iRacing session.");
+        const driver = this.state.session?.drivers.find((candidate) => candidate.carIdx === command.carIdx);
+        if (!driver) throw new Error("That driver is not present in the current session.");
+        if (this.state.camera.controller !== "ready") {
+          cameraCommand = this.createCameraCommand(driver.carIdx, driver.carNumber);
+          break;
+        }
+        this.state.graphics.selectedDriverCarIdx = driver.carIdx;
+        this.state.camera.selectedGroup = group.number;
+        this.pushEvent("operator", `Camera selected — #${driver.carNumber} ${driver.name} / ${group.name}`);
+        cameraCommand = this.createCameraCommand(driver.carIdx, driver.carNumber);
+        break;
+      }
       case "camera.take": {
         const driver = this.state.session?.drivers.find((candidate) => candidate.carIdx === this.state.graphics.selectedDriverCarIdx);
         if (!driver) throw new Error("Select a driver before taking the camera.");
