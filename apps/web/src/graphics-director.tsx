@@ -190,11 +190,6 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
 
         <PlaceholderWidget title="Weather" className="widget-weather"><label className="placeholder-note">Weather graphic planned</label></PlaceholderWidget>
 
-        <Widget title="Flag" active={active("flag")} className="widget-flag">
-          <ShowHide active={active("flag")} onShow={() => show("flag")} onHide={() => hide("flag")} />
-          <div className="widget-fields"><label><span>Flag</span><input readOnly value={`${session?.flag ?? "No"} flag`} /></label><label><span>Message</span><input value={String(config("flag").message ?? "")} onChange={(event) => setConfig("flag", "message", event.target.value)} placeholder="Automatic label" /></label><label className="widget-check"><input type="checkbox" checked readOnly />Auto</label></div>
-        </Widget>
-
         <Widget title="Timing tower" active={active("timing-tower")} className="widget-timing-tower">
           <ShowHide active={active("timing-tower")} onShow={() => show("timing-tower")} onHide={() => hide("timing-tower")} />
           <div className="widget-fields is-two-column">

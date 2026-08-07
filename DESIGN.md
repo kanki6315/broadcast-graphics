@@ -297,7 +297,7 @@ The native telemetry client opens centered at `1080 × 760px` with an `880 × 65
 
 Diagnostic replay expands inside the left connection sheet only when that source is selected. File selection, verification summary, playback speed, high-consequence confirmation, and connect actions stay in the pre-connection flow. Replay transport occupies the same sheet but remains hidden until the bridge is running in replay mode and the server connection is established; it must not imply usable transport before a destination exists.
 
-Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, lower-third, and results use purpose-built dimensions; do not apply the control-panel responsive grid to them. The PRI Hoosier 500 tower is authored for a fixed `1920 × 1080px` canvas: its shipped proof places the shell at approximately `x = 67px`, `y = 63px`, with an exact `361px` width (measured `67.0078`, `62.9609`, and `361px`). Its default field includes twenty cars, exposes twelve vertical slots, and holds the top five positions fixed.
+Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, lower-third, and results use purpose-built dimensions; do not apply the control-panel responsive grid to them. The PRI Hoosier 500 tower is authored for a fixed `1920 × 1080px` canvas: its shipped proof places the shell at approximately `x = 67px`, `y = 63px`, with an exact `361px` width (measured `67.0078`, `62.9609`, and `361px`). Its default field includes twenty cars, exposes twelve vertical slots, and holds the top five positions fixed.
 
 The PRI Hoosier 500 Results page is also a fixed `1920 × 1080px` composition with no mobile or responsive variant. Place its shell at `x = 289px`, `y = 177px`, sized `1344 × 783px`. Inside that shell, place the embedded raster panel/background at `x = 6px`, `y = 6px`, sized `1332 × 771px`; center the title across the shell at `y = 39px` and the session subtitle at `y = 102px`. Place the embedded event badge at `x = 75px`, `y = 270px`, sized `284 × 305px`, and the embedded separator at `x = 418px`, `y = 193px`, sized `5 × 539px`.
 
@@ -334,7 +334,6 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 ### Chips and Status Plates
 
 - Status tags are compact outlined rectangles with uppercase text. Focus fills orange, pit fills yellow, and fastest uses purple text plus the literal `FASTEST` label.
-- Flag plates combine the flag name, icon, and relevant fill/pattern. Checkered state uses a checker pattern and text; it is never pattern alone.
 
 ### Timing Table
 

@@ -4,7 +4,6 @@ export const graphicSlots = [
   "race-status",
   "driver-focus",
   "battle",
-  "flag",
   "lower-third",
 ] as const;
 

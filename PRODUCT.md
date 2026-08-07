@@ -40,7 +40,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 - Ingest live iRacing session, driver, timing, position, class, lap, start-state, flag, and track-state data through a documented normalized telemetry contract.
 - Maintain authoritative current session state in memory and persist broadcast sessions, entries, drivers, completed lap times, and scoring-line gaps in PostgreSQL.
 - Serve synchronized browser graphics and an operator control panel in real time.
-- Support initial graphics such as a timing tower, race status, driver info, position-group battle, flag, and announcement treatments. Planned widgets may appear disabled in Graphics Director, but must not create slots or overlay output until a real graphic exists.
+- Support initial graphics such as a timing tower, race status, driver info, position-group battle, and announcement treatments. Planned widgets may appear disabled in Graphics Director, but must not create slots or overlay output until a real graphic exists.
 - Treat each client-facing graphic style as a replaceable package of layouts, design tokens, assets, and configuration schema. The control panel operates semantic graphic slots and must not require a rebuild when a client package changes presentation.
 - Support focused-driver and camera-group control through the live Windows iRacing bridge. Driver selection remains the shared hook for driver-dependent graphics and camera focus.
 - Camera commands must expose disconnected, unavailable, pending, sent, and rejected states. Simulation and diagnostic replay remain read-only, and SDK delivery must not be described as verified shot execution.

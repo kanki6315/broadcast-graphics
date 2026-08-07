@@ -304,10 +304,9 @@ kbd { margin-left: auto; border: 1px solid currentColor; padding: 2px 5px; font:
 .director-nav svg { width: 14px; height: 14px; }
 .director-error { grid-column: 1 / -1; border-top: 1px solid #8d211b; color: #f2c5b8; background: #2b2523; font-size: 11px; }
 
-.graphics-board { min-height: calc(100vh - 68px); display: grid; grid-template-columns: 1fr 1fr 1.15fr 1.15fr; grid-template-areas: "status weather flag tower" "driver driver battle grid" "driver driver battle results" "fastest announcement global global"; grid-template-rows: minmax(210px, .8fr) minmax(190px, .7fr) minmax(190px, .7fr) minmax(150px, .55fr); gap: 10px; padding: 12px; }
+.graphics-board { min-height: calc(100vh - 68px); display: grid; grid-template-columns: 1fr 1fr 1.15fr 1.15fr; grid-template-areas: "status weather tower tower" "driver driver battle grid" "driver driver battle results" "fastest announcement global global"; grid-template-rows: minmax(210px, .8fr) minmax(190px, .7fr) minmax(190px, .7fr) minmax(150px, .55fr); gap: 10px; padding: 12px; }
 .widget-race-status { grid-area: status; }
 .widget-weather { grid-area: weather; }
-.widget-flag { grid-area: flag; }
 .widget-timing-tower { grid-area: tower; }
 .widget-driver-info { grid-area: driver; }
 .widget-battle { grid-area: battle; }
@@ -536,10 +535,6 @@ html.overlay-document #root {
 .battle-overlay > div { min-height: 48px; display: grid; grid-template-columns: 55px 1fr auto; align-items: center; border-top: 1px solid var(--gfx-muted); }
 .battle-overlay b { align-self: stretch; display: grid; place-items: center; font-size: 22px; }
 .battle-overlay em { padding-right: 10px; font-style: normal; }
-.flag-overlay { position: absolute; inset: 0; display: grid; place-items: center; }
-.flag-overlay > div { min-width: 600px; padding: 22px 32px; border-top: 8px solid var(--gfx-accent); text-align: center; }
-.flag-overlay strong { display: block; font-size: 48px; }
-.flag-overlay span { color: var(--gfx-muted); text-transform: uppercase; }
 .lower-mark { width: 16px; }
 .lower-overlay > div:not([class]) { display: flex; flex-direction: column; justify-content: center; padding: 15px 24px; min-width: 520px; }
 .lower-overlay > div:not([class]) strong { font-size: 30px; }

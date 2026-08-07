@@ -41,11 +41,6 @@
       "description": "Position-based group battle",
       "fields": [{ "key": "label", "label": "Headline", "type": "text", "default": "BATTLE FOR POSITION" }]
     },
-    "flag": {
-      "label": "Flag",
-      "description": "Full-width race-control flag notice",
-      "fields": [{ "key": "message", "label": "Override message", "type": "text", "default": "" }]
-    },
     "lower-third": {
       "label": "Announcement",
       "description": "Operator-authored announcement",

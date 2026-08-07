@@ -313,10 +313,6 @@ function Battle({ drivers, label }: { drivers: DriverState[]; label: string }) {
   return <div className="overlay-surface battle-overlay overlay-plate"><span className="overlay-title">{label}</span>{drivers.map((driver, index) => <div key={driver.carIdx}><b className={index === 0 ? "overlay-accent" : ""}>{driver.carNumber}</b><strong>{driver.name}</strong><em>{index === 0 ? `P${driver.position}` : formatBattleGap(drivers[index - 1], driver)}</em></div>)}</div>;
 }
 
-function FlagOverlay({ flag, message }: { flag: string; message: string }) {
-  return <div className={`overlay-surface flag-overlay flag-${flag}`}><div className="overlay-plate"><strong className="overlay-title">{message || `${flag} flag`}</strong><span>Race control</span></div></div>;
-}
-
 function LowerThird({ headline, detail }: { headline: string; detail: string }) {
   return <div className="overlay-surface lower-overlay overlay-plate"><span className="overlay-accent lower-mark" /><div><strong className="overlay-title">{headline}</strong><span>{detail}</span></div></div>;
 }
@@ -378,7 +374,6 @@ export function OverlayApp() {
       <OverlayLayer active={activeSlots.has("driver-focus")}><DriverFocus driver={selected} compareDriver={compareDriver} config={focusConfig} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("race-status")}><RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("battle")}><Battle drivers={battleDrivers} label={String(battleConfig.label ?? `Battle P${battleStart}–P${battleEnd}`)} /></OverlayLayer>
-      <OverlayLayer active={activeSlots.has("flag")}><FlagOverlay flag={state.session.flag} message={String(configFor("flag").message ?? "")} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("lower-third")}><LowerThird headline={String(configFor("lower-third").headline ?? "Race control")} detail={String(configFor("lower-third").detail ?? "")} /></OverlayLayer>
     </main>
   );
