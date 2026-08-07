@@ -251,11 +251,12 @@ internal static class TelemetrySnapshotMapper
             .GroupBy(item => item.CarIdx)
             .ToDictionary(group => group.Key, group => group.First()) ?? [];
         var sessionType = NormalizeSessionType(session?.SessionType ?? info.WeekendInfo?.EventType);
+        var phase = NormalizePhase(telemetry.SessionState);
         var drivers = (info.DriverInfo?.Drivers ?? [])
             .Where(driver => driver.CarIdx >= 0 && driver.CarIsPaceCar == 0 && driver.IsSpectator == 0)
             .Select(driver => MapDriver(driver, telemetry, results, sessionType))
-            .OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position)
             .ToArray();
+        drivers = AddLivePositions(drivers, sessionType, phase);
         var sessionId = $"{info.WeekendInfo?.SubSessionID ?? 0}-{sessionNumber}";
         var sessionTime = NormalizeTime(telemetry.SessionTime);
         liveTiming?.Observe(sessionId, sessionTime, drivers);
@@ -267,7 +268,6 @@ internal static class TelemetrySnapshotMapper
         var leader = drivers.FirstOrDefault(driver => driver.Position == 1);
         var hasLiveLeader = telemetry.CarIdxPosition?.Contains(1) == true;
         var leaderLapsCompleted = Math.Max(leader?.LapsCompleted ?? session?.ResultsLapsComplete ?? 0, 0);
-        var phase = NormalizePhase(telemetry.SessionState);
         var currentLap = CalculateCurrentLap(sessionType, phase, leader, hasLiveLeader, leaderLapsCompleted, telemetry.SessionLapsTotal);
         var classes = drivers
             .GroupBy(driver => new { driver.ClassId, driver.ClassName, driver.ClassColor })
@@ -378,6 +378,53 @@ internal static class TelemetrySnapshotMapper
             hasMatchingResult && string.Equals(sessionType, "race", StringComparison.Ordinal) ? NormalizeGap(result!.Time) : null);
     }
 
+    private static DriverState[] AddLivePositions(DriverState[] drivers, string sessionType, string phase)
+    {
+        if (!string.Equals(sessionType, "race", StringComparison.Ordinal) ||
+            !string.Equals(phase, "racing", StringComparison.Ordinal))
+            return OrderByPosition(drivers);
+
+        var updated = drivers.ToDictionary(driver => driver.CarIdx);
+        var eligible = drivers
+            .Where(driver => driver.Position > 0 && RaceDistance(driver) is not null &&
+                driver.IsConnected && !string.Equals(driver.TrackStatus, "retired", StringComparison.Ordinal))
+            .ToArray();
+
+        var overallSlots = eligible.Select(driver => driver.Position).Order().ToArray();
+        var overallOrder = eligible
+            .OrderByDescending(driver => RaceDistance(driver))
+            .ThenBy(driver => driver.Position)
+            .ThenBy(driver => driver.CarIdx)
+            .ToArray();
+        for (var index = 0; index < overallOrder.Length; index++)
+        {
+            var driver = overallOrder[index];
+            updated[driver.CarIdx] = updated[driver.CarIdx] with { Position = overallSlots[index] };
+        }
+
+        foreach (var classDrivers in eligible.Where(driver => driver.ClassPosition > 0).GroupBy(driver => driver.ClassId))
+        {
+            var classSlots = classDrivers.Select(driver => driver.ClassPosition).Order().ToArray();
+            var classOrder = classDrivers
+                .OrderByDescending(driver => RaceDistance(driver))
+                .ThenBy(driver => driver.ClassPosition)
+                .ThenBy(driver => driver.CarIdx)
+                .ToArray();
+            for (var index = 0; index < classOrder.Length; index++)
+            {
+                var driver = classOrder[index];
+                updated[driver.CarIdx] = updated[driver.CarIdx] with { ClassPosition = classSlots[index] };
+            }
+        }
+
+        return OrderByPosition(updated.Values);
+    }
+
+    private static DriverState[] OrderByPosition(IEnumerable<DriverState> drivers) => drivers
+        .OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position)
+        .ThenBy(driver => driver.CarIdx)
+        .ToArray();
+
     private static DriverState[] AddRaceTiming(
         DriverState[] drivers,
         string sessionType,
@@ -411,7 +458,7 @@ internal static class TelemetrySnapshotMapper
                     ? liveTiming?.GapAtDriverPosition(leader.CarIdx, driver, sessionTime) ?? NormalizeGap(driver.Interval)
                     : null;
             double? intervalToAhead = null;
-            if (byPosition.TryGetValue(driver.Position - 1, out var ahead) && ahead.LapsCompleted == driver.LapsCompleted)
+            if (byPosition.TryGetValue(driver.Position - 1, out var ahead) && CalculateLapsBehind(ahead, driver) == 0)
                 intervalToAhead = liveTiming?.GapAtDriverPosition(ahead.CarIdx, driver, sessionTime)
                     ?? Difference(NormalizeGap(driver.Interval), ahead.Position == leader.Position ? 0d : NormalizeGap(ahead.Interval));
 
@@ -425,7 +472,7 @@ internal static class TelemetrySnapshotMapper
                     : null;
             double? classInterval = null;
             if (byClassPosition.TryGetValue((driver.ClassId, driver.ClassPosition - 1), out var classAhead) &&
-                classAhead.LapsCompleted == driver.LapsCompleted)
+                CalculateLapsBehind(classAhead, driver) == 0)
             {
                 classInterval = liveTiming?.GapAtDriverPosition(classAhead.CarIdx, driver, sessionTime);
                 if (classInterval is null)
@@ -505,16 +552,18 @@ internal static class TelemetrySnapshotMapper
 
     private static int CalculateLapsBehind(DriverState reference, DriverState driver)
     {
-        if (reference.CurrentLap > 0 && driver.CurrentLap > 0 &&
-            reference.LapDistPct is >= 0 and < 1.5 && driver.LapDistPct is >= 0 and < 1.5)
+        if (RaceDistance(reference) is { } referenceDistance && RaceDistance(driver) is { } driverDistance)
         {
-            var referenceDistance = reference.CurrentLap - 1 + reference.LapDistPct.Value;
-            var driverDistance = driver.CurrentLap - 1 + driver.LapDistPct.Value;
             return Math.Max((int)Math.Floor(referenceDistance - driverDistance + 0.001), 0);
         }
 
         return Math.Max(reference.LapsCompleted - driver.LapsCompleted, 0);
     }
+
+    private static double? RaceDistance(DriverState driver) =>
+        driver.CurrentLap > 0 && driver.LapDistPct is >= 0 and < 1.5
+            ? driver.CurrentLap - 1 + driver.LapDistPct.Value
+            : null;
 
     private static double? NormalizeLapDistance(double? value) =>
         value is >= 0 and < 1.5 && double.IsFinite(value.Value) ? value : null;
