@@ -19,8 +19,8 @@
       "fields": [{ "key": "showTrack", "label": "Show track", "type": "boolean", "default": true }]
     },
     "driver-focus": {
-      "label": "Driver focus",
-      "description": "Focused driver identity and performance",
+      "label": "Driver info",
+      "description": "Followed or manually selected driver identity and performance",
       "fields": [
         { "key": "subtitle", "label": "Subtitle", "type": "text", "default": "", "source": "operator" },
         { "key": "metric", "label": "Primary metric", "type": "select", "default": "bestLap", "options": [{ "label": "Best lap", "value": "bestLap" }, { "label": "Last lap", "value": "lastLap" }, { "label": "Interval", "value": "interval" }] }
@@ -28,7 +28,7 @@
     },
     "battle": {
       "label": "Battle",
-      "description": "Focused driver and nearest rival",
+      "description": "Position-based group battle",
       "fields": [{ "key": "label", "label": "Headline", "type": "text", "default": "BATTLE FOR POSITION" }]
     },
     "flag": {
@@ -37,7 +37,7 @@
       "fields": [{ "key": "message", "label": "Override message", "type": "text", "default": "" }]
     },
     "lower-third": {
-      "label": "Lower third",
+      "label": "Announcement",
       "description": "Operator-authored announcement",
       "fields": [
         { "key": "headline", "label": "Headline", "type": "text", "default": "RACE CONTROL" },

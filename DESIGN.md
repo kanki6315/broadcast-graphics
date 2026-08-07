@@ -101,7 +101,7 @@ components:
 
 **Creative North Star: “Scrutineering Ledger”**
 
-The interface is a live race-production instrument printed on technical stock: timing data, measurement rules, inspection fields, and approval marks arranged for fast decisions under divided attention. It should feel exact, physical, and operational rather than like a generic software dashboard. Live timing is the dominant working surface; the narrower production rail carries the cue, its package-defined fields, recent events, and emergency clear.
+The interface is a live race-production instrument printed on technical stock: timing data, measurement rules, inspection fields, and approval marks arranged for fast decisions under divided attention. It should feel exact, physical, and operational rather than like a generic software dashboard. Timing Director makes live timing and cameras dominant; Graphics Director separates presentation into a fixed, dense switchboard of direct Show/Hide controls.
 
 The global control desk has one durable visual identity, while browser-source overlays inherit their visual identity from the selected graphic package. That boundary is intentional: the control panel always operates semantic graphic slots, and package themes may change palette, type, plate geometry, and depth without restyling the operator workflow.
 
@@ -118,7 +118,7 @@ Use the stacked lockup for brand-led surfaces and the horizontal lockup where wi
 - Off-white technical stock, near-black ink, muted gray-green inspection fields, and fluorescent orange state stamps.
 - Condensed industrial headings paired with highly legible sans-serif body copy and tabular race data.
 - Square controls, dense rules, and visible state labels; no ornamental cards or ambient animation.
-- A timing-first desktop composition for the operator's private workstation; `/control` has no mobile-layout requirement.
+- Separate timing-first and graphics-first desktop compositions for the operator's private workstation; `/timing`, `/graphics`, and compatibility `/control` have no mobile-layout requirement.
 - Transparent overlays built from stable layouts and runtime package tokens.
 - A native telemetry boundary with packaged fonts, explicit health text, square authored controls, and guarded diagnostic replay.
 
@@ -180,11 +180,11 @@ The Windows client packages Barlow Condensed and Source Sans 3 in the applicatio
 
 ## Layout
 
-The control panel is a timing-led production desk. A four-cell masthead sits above a two-column grid: the timing director takes all available space and the production rail stays between `340px` and `410px`. Timing has a scrollable table with a sticky ink header, followed by a focused-driver ledger. The rail stacks cue sequence, cue list, schema-driven inspector, event log, and emergency clear with strong horizontal rules rather than card gaps.
+The operator application has two synchronized production desks. `/timing` is graphics-free: a compact session masthead gives way to a full-width scrollable timing ledger where every driver row is an immediate take on the selected camera group. A persistent bottom camera dock keeps the selected driver, requested group, command delivery, and observed driver/group visible together; every available camera group must fit in its center bank without horizontal scrolling. `/graphics` uses a fixed four-column board: race context and timing controls lead, Driver Info and position-based Battle occupy the main working band, planned widgets remain visibly disabled, and the guarded global clear closes the board. Direct Show/Hide actions replace the armed-cue workflow on Graphics Director.
 
 Spacing is compact and multiples cluster around `4`, `8`, `12`, `16`, and `24px`. A faint `32px` vertical registration grid and `8px` horizontal baseline texture make the stock feel measured without competing with data. Major divisions use `2–3px` rules; internal divisions use `1px` rules.
 
-The `/control` route is intentionally desktop-only and may keep its timing-led two-column composition without a narrow-screen alternative. Do not treat mobile breakpoints, touch ergonomics, keyboard-only operation, screen-reader behavior, reduced motion, or formal contrast conformance as design-review or acceptance requirements for this private single-user surface. Responsive or accessible behavior already present may remain, but changes to `/control` do not need to preserve or validate it.
+The operator routes are intentionally desktop-only and may keep their dense fixed compositions without a narrow-screen alternative. Do not treat mobile breakpoints, touch ergonomics, keyboard-only operation, screen-reader behavior, reduced motion, or formal contrast conformance as design-review or acceptance requirements for these private surfaces. Responsive or accessible behavior already present may remain, but changes to `/timing`, `/graphics`, or `/control` do not need to preserve or validate it.
 
 Authentication preserves the same measured stock-and-rule composition. Login is a centered sheet no wider than `470px`. Access management uses a `300–390px` key-issue column beside a fluid key register; it stacks at `1050px`. At `700px`, the access masthead becomes a two-row control strip and each register row becomes a labeled vertical record: hide the table header, repeat each field label with `data-label`, use dotted internal dividers, and close each record with a `2px` ink rule. Compact access navigation and row actions must retain at least a `44px` touch target.
 
@@ -230,21 +230,23 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 ### Timing Table
 
 - The sticky header is inverse carbon ink on stock, with compact uppercase labels and right-aligned numeric columns.
-- Rows are `56px` high on desktop and `52px` on narrow screens. Hover uses a light inspection wash.
-- A focused row becomes an inverse ink plate, gains a `4px` inset orange leading rule, changes the position control to orange, and shows the written `FOCUS` status.
-- Best-lap emphasis uses tabular numerals, stronger weight, purple ink, and a written `FASTEST` status.
+- Timing Director rows are a compact `47px` high. Each row is the camera action itself: clicking it, or pressing Enter or Space while it has focus, requests that driver on the currently selected camera group.
+- Keep requested and observed state distinct. The selected/requested row uses an inspection wash with a `4px` orange leading rule and orange position stamp; the row observed on camera becomes an inverse ink plate. The persistent key names both states.
+- Best-lap emphasis uses tabular numerals and purple ink, reinforced by the persistent `FASTEST LAP` key rather than a dashboard-style badge in every row.
 
-### Focused-Driver Camera Control
+### Persistent Camera Dock
 
-- Keep camera control inside a two-region focused-driver ledger: compact driver identity on the left and a dominant camera-group button bank on the right. Remove duplicate position, gap, and best-lap metrics from this ledger. Each camera-group button directly takes the focused driver's camera; selecting a timing row updates shared driver focus and also takes that driver's camera only when the live controller is ready.
-- Right-clicking any timing row opens a compact, viewport-bound camera-group menu for that driver. `Shift+F10` and the Context Menu key expose the same action from a focused driver control; arrow keys move through available groups, while `Escape` or `Tab` closes the menu and restores focus. Choosing a group atomically updates shared driver focus and takes that driver on the requested group, then returns focus to the originating driver control.
-- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language. Mark selected and observed-active camera groups with written states as well as color. `SENT` confirms SDK delivery, not verified shot execution. Camera buttons are at least `44px` high, wrap into a capped two-row bank on desktop, become an uncapped two-column bank at `700px` and below, and collapse to one column below `340px`.
+- Keep the dock fixed to the bottom of the first viewport in three ruled regions: selected driver and armed group on the left, the complete camera-group bank with delivery status in the center, and observed driver/group on the right. This requested-versus-observed comparison replaces program preview; vMix/OBS remains the visual authority.
+- Camera-group controls act on the selected driver and become the group used by subsequent timing-row takes. Fit every available group into one auto-distributed row of square controls with no horizontal scroll; labels may truncate before the bank wraps or displaces the timing ledger.
+- Use at least `44px`-high group controls. Mark requested groups with an orange inset rule, observed-active groups with an inverse ink plate, and write `SELECTED`, `ACTIVE`, or `TAKE` inside each control as applicable.
+- Write `DISCONNECTED`, `UNAVAILABLE`, `PENDING`, `SENT`, and `REJECTED` delivery states in operator language beside the group-bank heading. `SENT` confirms SDK delivery, not verified shot execution, so the separate observed-camera readout must remain visible.
 
-### Cue Workflow
+### Graphics Director
 
-- Current and next are paired inside a `2px` frame. Current uses an inverse ink plate and the text `CURRENT / ON AIR`; next uses an orange inset top rule and `NEXT CUE`.
-- Cue rows combine a number key, semantic icon, slot label, written state, and chevron. Armed uses an inspection fill and inset outline; live uses an inverse plate; live-and-armed adds the orange state rule.
-- The inspector is generated from the active package manifest. Fields remain visually consistent across packages and must expose package-safe semantic configuration only.
+- Each real semantic slot owns a persistent widget with adjacent `SHOW` and `HIDE` actions, written `OFF` or `ON AIR` state, and its configuration in place.
+- Driver Info owns its followed/manual target and optional comparison target. Manual presentation targets never change the Timing Director selection or camera.
+- Battle selects a position group through fixed or followed start position and a count of cars behind; `P1` and `F` are explicit quick actions.
+- Planned widgets retain the complete future control layout but use disabled controls and written `NOT INSTALLED` state. They do not enter protocol state, package manifests, on-air counts, or overlay output.
 
 ### Inputs and Toggles
 
@@ -307,7 +309,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Do:
 
-- **Do** keep live timing dominant and the production rail narrow, ordered, and operational.
+- **Do** keep live timing dominant on Timing Director and keep Graphics Director fixed, dense, ordered, and operational.
 - **Do** use `1px` rules for measurement, `2px` rules for sections/actions, and `3–4px` orange marks for selected or live state.
 - **Do** keep package selection and manifest-defined fields inside the stable Scrutineering Ledger control grammar.
 - **Do** use text, icons, borders, patterns, and shape together so color never carries state by itself.
@@ -325,8 +327,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Don't:
 
-- **Don't** include `/control` in accessibility audits or mobile/responsive review; it is a private desktop-only operator surface.
-- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep direct camera-group actions inside the focused-driver ledger with written selection, activity, and delivery states.
+- **Don't** include `/timing`, `/graphics`, or compatibility `/control` in accessibility audits or mobile/responsive review; they are private desktop-only operator surfaces.
+- **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep direct camera-group actions in the persistent bottom dock with written requested, observed-active, and delivery states.
 - **Don't** turn semantic graphic slots into client-specific styling controls.
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.

@@ -72,6 +72,23 @@ test("taking and clearing a semantic slot updates on-air state", () => {
   assert.deepEqual(store.snapshot().graphics.activeSlots, []);
 });
 
+test("widget-specific graphic targets do not change the timing and camera focus", () => {
+  const store = new StateStore();
+  const secondDriver = { ...session.drivers[0], carIdx: 8, carNumber: "24", name: "Second Driver" };
+  store.telemetry({ ...session, drivers: [...session.drivers, secondDriver] });
+
+  store.command({ type: "graphics.config.set", slot: "driver-focus", key: "targetMode", value: "manual" }, packages);
+  store.command({ type: "graphics.config.set", slot: "driver-focus", key: "manualCarIdx", value: 8 }, packages);
+  store.command({ type: "graphics.config.set", slot: "battle", key: "positionMode", value: "fixed" }, packages);
+  store.command({ type: "graphics.config.set", slot: "battle", key: "startPosition", value: 4 }, packages);
+
+  const graphics = store.snapshot().graphics;
+  assert.equal(graphics.selectedDriverCarIdx, 7);
+  assert.deepEqual(graphics.slotConfig["driver-focus"], { targetMode: "manual", manualCarIdx: 8 });
+  assert.deepEqual(graphics.slotConfig.battle, { positionMode: "fixed", startPosition: 4 });
+  assert.equal(store.snapshot().camera.activeCarIdx, 7);
+});
+
 test("focused-driver and manual camera takes dispatch to the live iRacing controller", () => {
   const store = new StateStore();
   store.setCameraController(true, true);

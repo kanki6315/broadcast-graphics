@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, Check, Copy, Download, KeyRound, LogIn, LogOut, MonitorDown, Plus, Radio, ShieldCheck, Trash2 } from "lucide-react";
 import type { AccessKey, AccessKeyKind, CreatedAccessKey } from "@racecontrol/protocol";
-import { ControlPanel } from "./control-panel";
+import { TimingDirector } from "./control-panel";
+import { GraphicsDirector } from "./graphics-director";
 
 interface AdminIdentity {
   username: string;
@@ -181,7 +182,7 @@ function AccessManager({ identity, onLogout }: { identity: AdminIdentity; onLogo
   return (
     <div className="access-shell">
       <header className="access-masthead">
-        <a href="/control"><ArrowLeft aria-hidden="true" />Control desk</a>
+        <a href="/timing"><ArrowLeft aria-hidden="true" />Control desk</a>
         <div className="access-identity"><img src="/brand/gantry-mark.svg" alt="" /><div><strong>Gantry access</strong><span>Signed in as {identity.username}</span></div></div>
         <button onClick={() => void logout()} disabled={loggingOut}><LogOut aria-hidden="true" />{loggingOut ? "Signing out…" : "Sign out"}</button>
       </header>
@@ -247,5 +248,7 @@ export function AdminApp() {
   if (checking) return <main className="loading-screen"><Radio aria-hidden="true" /><h1>Checking operator access</h1><p>Confirming this browser session with the server.</p></main>;
   if (!identity) return <LoginScreen onLogin={setIdentity} />;
   if (window.location.pathname === "/access") return <AccessManager identity={identity} onLogout={logout} />;
-  return <ControlPanel onManageAccess={() => { window.location.href = "/access"; }} onLogout={logout} />;
+  const directorProps = { onManageAccess: () => { window.location.href = "/access"; }, onLogout: logout };
+  if (window.location.pathname === "/graphics") return <GraphicsDirector {...directorProps} />;
+  return <TimingDirector {...directorProps} />;
 }
