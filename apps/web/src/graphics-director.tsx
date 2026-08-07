@@ -148,6 +148,11 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
   const resultsMetric = String(resultsConfig.metric ?? "speed");
   const resultsSnapshot = state.sessionResults?.[resultsSessionType as SessionType]
     ?? (session?.type === resultsSessionType ? session : null);
+  const weatherConfig = config("weather");
+  const weatherLocation = String(weatherConfig.location ?? (isPriPackage ? "INDIANAPOLIS, IN" : session?.trackName ?? "TRACK CONDITIONS"));
+  const weatherCondition = session?.weather?.condition === "clear"
+    ? "Clear"
+    : session?.weather?.condition === "partly-cloudy" ? "Partly cloudy" : session?.weather ? "Cloudy" : "No weather data";
 
   const compareGap = (() => {
     if (!primaryDriver || !compareDriver) return "—";
@@ -188,7 +193,14 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
           <div className="widget-fields"><label><span>Mode</span><input readOnly value={session?.type ?? "—"} /></label><label><span>Laps</span><input readOnly value={session ? `${session.lap} / ${session.totalLaps ?? "—"}` : "—"} /></label><label className="widget-check"><input type="checkbox" checked readOnly />Auto</label></div>
         </Widget>
 
-        <PlaceholderWidget title="Weather" className="widget-weather"><label className="placeholder-note">Weather graphic planned</label></PlaceholderWidget>
+        <Widget title="Weather" active={active("weather")} className="widget-weather">
+          <ShowHide active={active("weather")} onShow={() => show("weather")} onHide={() => hide("weather")} />
+          <div className="widget-fields">
+            <label><span>Conditions</span><input readOnly value={weatherCondition} /></label>
+            <label><span>Location</span><input value={weatherLocation} onChange={(event) => setConfig("weather", "location", event.target.value)} /></label>
+            <label className="widget-check"><input type="checkbox" checked readOnly />Live telemetry</label>
+          </div>
+        </Widget>
 
         <Widget title="Flag" active={active("flag")} className="widget-flag">
           <ShowHide active={active("flag")} onShow={() => show("flag")} onHide={() => hide("flag")} />

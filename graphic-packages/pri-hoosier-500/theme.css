@@ -246,10 +246,9 @@
 .pri-results-overlay .results-panel-background {
   position: absolute;
   z-index: 0;
-  top: 6px;
-  left: 6px;
-  width: 1332px;
-  height: 771px;
+  inset: 0;
+  width: 1344px;
+  height: 783px;
 }
 
 .pri-results-overlay .results-heading {
@@ -384,6 +383,144 @@
   color: #8d8d8d;
   font: 500 25px/1 "PRI Eurostile Extended", sans-serif;
   text-align: center;
+}
+
+/* Weather: direct 1080p reconstruction of the supplied Weather smart object. */
+.pri-weather-overlay {
+  top: 729px;
+  left: 1453px;
+  width: 403px;
+  height: 237px;
+  display: block;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  filter: none;
+  color: #f7f7f7;
+  font-family: "PRI Eurostile", sans-serif;
+  font-synthesis: none;
+}
+
+.pri-weather-overlay .weather-background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 403px;
+  height: 237px;
+  clip-path: inset(5px round 13px);
+}
+
+/* Photoshop renders the shape's gradient stroke after transforming the smart
+   object. Recreate that final outline here so the red top edge is continuous. */
+.pri-weather-overlay::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  padding: 5px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ea0010 0%, #d7000e 9%, #6f0003 42%, #000 88%);
+  content: "";
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.pri-weather-overlay h1 {
+  position: absolute;
+  z-index: 2;
+  top: 19px;
+  left: 0;
+  width: 100%;
+  margin: 0;
+  font: 700 39px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.pri-weather-overlay .weather-main-condition {
+  position: absolute;
+  z-index: 2;
+  top: 84px;
+  left: 30px;
+  width: 69px;
+  height: 130px;
+}
+
+.pri-weather-overlay .weather-main-condition img {
+  position: relative;
+  left: -11.5px;
+  display: block;
+  width: 92px;
+  height: 91px;
+  object-fit: fill;
+}
+
+.pri-weather-overlay .weather-main-condition strong {
+  position: absolute;
+  top: 110px;
+  left: 0;
+  width: 69px;
+  font: 700 28.75px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+  transform: scaleX(1.08);
+  white-space: nowrap;
+}
+
+.pri-weather-overlay .weather-details {
+  position: absolute;
+  z-index: 2;
+  top: 84px;
+  left: 126px;
+  width: 247px;
+}
+
+.pri-weather-overlay .weather-details h2 {
+  height: 23px;
+  margin: 0 0 15px;
+  overflow: hidden;
+  font: 700 28.75px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pri-weather-overlay .weather-details dl,
+.pri-weather-overlay .weather-details div {
+  margin: 0;
+  padding: 0;
+}
+
+.pri-weather-overlay .weather-details dl {
+  display: grid;
+  gap: 0;
+}
+
+.pri-weather-overlay .weather-details div {
+  height: 26px;
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: start;
+}
+
+.pri-weather-overlay .weather-details dt {
+  margin: 2px 0 0;
+  font: oblique 400 16.44px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.pri-weather-overlay .weather-details dd {
+  margin: 0;
+  overflow: visible;
+  font: 700 20.54px/1 "PRI Eurostile", sans-serif;
+  letter-spacing: 0;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .pri-results-overlay .results-presenter {

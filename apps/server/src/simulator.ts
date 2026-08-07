@@ -92,6 +92,14 @@ export function startSimulator(store: StateStore, onTelemetry: (session: Session
       externalSubSessionId: null,
       externalSessionNumber: null,
       trackId: null,
+      weather: {
+        condition: "partly-cloudy",
+        airTemperatureC: 25.56,
+        trackTemperatureC: 48.89,
+        windSpeedMps: 3.58,
+        windDirectionRadians: 5.89,
+        relativeHumidityPercent: 30.38,
+      },
       cameraGroups: [
         { number: 1, name: "TV 1", isScenic: false, cameras: [{ number: 0, name: "TV 1" }] },
         { number: 2, name: "TV 2", isScenic: false, cameras: [{ number: 0, name: "TV 2" }] },

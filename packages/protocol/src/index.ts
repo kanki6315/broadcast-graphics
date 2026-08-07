@@ -2,6 +2,7 @@ export const graphicSlots = [
   "timing-tower",
   "results",
   "race-status",
+  "weather",
   "driver-focus",
   "battle",
   "flag",
@@ -80,6 +81,15 @@ export interface CarClassState {
   carCount: number;
 }
 
+export interface WeatherState {
+  condition: "clear" | "partly-cloudy" | "cloudy";
+  airTemperatureC: number | null;
+  trackTemperatureC: number | null;
+  windSpeedMps: number | null;
+  windDirectionRadians: number | null;
+  relativeHumidityPercent: number | null;
+}
+
 export interface CameraDefinition {
   number: number;
   name: string;
@@ -116,6 +126,7 @@ export interface SessionState {
   externalSubSessionId: number | null;
   externalSessionNumber: number | null;
   trackId: number | null;
+  weather?: WeatherState | null;
   cameraGroups?: CameraGroupDefinition[];
   activeCameraCarIdx?: number | null;
   activeCameraGroup?: number | null;

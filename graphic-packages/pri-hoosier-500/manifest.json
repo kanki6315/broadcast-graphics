@@ -28,6 +28,11 @@
       "description": "Session, lap, time, and flag",
       "fields": [{ "key": "showTrack", "label": "Show track", "type": "boolean", "default": true }]
     },
+    "weather": {
+      "label": "Weather",
+      "description": "Live Indianapolis track conditions",
+      "fields": [{ "key": "location", "label": "Location", "type": "text", "default": "INDIANAPOLIS, IN", "source": "operator" }]
+    },
     "driver-focus": {
       "label": "Driver info",
       "description": "Followed or manually selected driver identity and performance",

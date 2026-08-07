@@ -126,6 +126,26 @@ typography:
     fontSize: "25px"
     fontWeight: 500
     lineHeight: 1
+  pri-weather-title:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "39px"
+    fontWeight: 700
+    lineHeight: 1
+  pri-weather-primary:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "28.75px"
+    fontWeight: 700
+    lineHeight: 1
+  pri-weather-label:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "16.44px"
+    fontWeight: 400
+    lineHeight: 1
+  pri-weather-value:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "20.54px"
+    fontWeight: 700
+    lineHeight: 1
 rounded:
   square: "0px"
 spacing:
@@ -281,6 +301,15 @@ These roles reproduce the supplied PSD typography; do not substitute the global 
 
 These roles are literal to the shipped PSD reconstruction. Unlike the timing tower, results rows show each driver's full name rather than extracting a broadcast surname.
 
+### PRI Hoosier 500 Weather
+
+- **Title:** Eurostile Bold through `PRI Eurostile` (700, `39px`, `1`), centered across the plate.
+- **Location and air temperature:** Eurostile Bold through `PRI Eurostile` (700, `28.75px`, `1`); the temperature receives the measured `1.08` horizontal scale.
+- **Detail labels:** Eurostile Regular Oblique through `PRI Eurostile` (400 oblique, `16.44px`, `1`).
+- **Detail values:** Eurostile Bold through `PRI Eurostile` (700, `20.54px`, `1`), right-aligned.
+
+These measured roles reproduce the Weather smart object and remain package-local. Do not substitute Gantry control-desk type or normalize the distinct label and value sizes.
+
 **The Condensed Command Rule.** Use Barlow Condensed for headings, labels, statuses, driver identities, and commands; keep explanatory sentences in Source Sans 3.
 
 ## Layout
@@ -302,6 +331,8 @@ Overlay layouts are fixed broadcast compositions inside a transparent, pointer-i
 The PRI Hoosier 500 Results page is also a fixed `1920 × 1080px` composition with no mobile or responsive variant. Place its shell at `x = 289px`, `y = 177px`, sized `1344 × 783px`. Inside that shell, place the embedded raster panel/background at `x = 6px`, `y = 6px`, sized `1332 × 771px`; center the title across the shell at `y = 39px` and the session subtitle at `y = 102px`. Place the embedded event badge at `x = 75px`, `y = 270px`, sized `284 × 305px`, and the embedded separator at `x = 418px`, `y = 193px`, sized `5 × 539px`.
 
 The results metric label sits at `y = 194px`, right-aligned `89px` from the shell edge. The top-ten list starts at `x = 469px`, `y = 220px`, and is `803px` wide; each row is `41.5px` high with `45px / 92px / fluid / 128px` columns for position, car number, full driver name, and value. The Apotek car-number glyphs receive a `-5px` vertical and `0.5px` horizontal optical correction so their visible bounds share the Eurostile row baseline and the PSD number-column center. The presenter footer begins at `x = 371px`, `y = 709px`, and is `43px` high; its text receives a `1px` downward optical correction and the embedded Visitor Watch Company logo is `178 × 42px` with a `31px` leading gap. If the selected session snapshot does not exist, center `RESULTS UNAVAILABLE` over the list region at `x = 469px`, `y = 391px`, width `803px` while retaining the event, title, subtitle, separator, and presenter artwork.
+
+The PRI Hoosier 500 Weather graphic is a third fixed PSD-authoritative composition on the same `1920 × 1080px` canvas. Place it at `x = 1453px`, `y = 729px`, sized `403 × 237px`, and preserve the extracted background raster at exactly that size. The condition icon occupies the left column from `x = 30px`, `y = 84px`; the location and four-row conditions ledger begin at `x = 126px`, `y = 84px`. Preserve this measured placement rather than fitting the plate to content or moving it into a responsive overlay layout.
 
 ## Elevation & Depth
 
@@ -356,6 +387,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - Driver Info owns its followed/manual target and optional comparison target. Manual presentation targets never change the Timing Director selection or camera.
 - Battle selects a position group through fixed or followed start position and a count of cars behind; `P1` and `F` are explicit quick actions.
 - Planned widgets retain the complete future control layout but use disabled controls and written `NOT INSTALLED` state. They do not enter protocol state, package manifests, on-air counts, or overlay output.
+- Weather is a real semantic slot with adjacent `SHOW` and `HIDE` actions. Its Conditions field is read-only and reflects live skies, its Location field is operator-editable, and its checked `LIVE TELEMETRY` status remains visible so manual location copy is not mistaken for manual weather data.
 
 ### Inputs and Toggles
 
@@ -428,7 +460,18 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - Other slots use similarly direct, labeled facts rather than decorative content. Lower-third remains outside the current PRI Hoosier 500 PSD refresh.
 - Overlay visibility is a single `180ms ease-out` opacity transition. Package themes may style plates but must preserve legibility at compressed broadcast sizes and transparent canvas behavior.
 
-**The PSD Authority Rule.** For the PRI Hoosier 500 timing tower and Results page, the pinned PSD, extracted raster artwork, measured 1080p placement, typography, and component geometry are authoritative. Preserve them exactly; package extensions must not reinterpret either component.
+### PRI Hoosier 500 Weather
+
+- The pinned Weather smart object is visual authority. Preserve its extracted `403 × 237px` background raster as a single asset; do not redraw its plate, texture, separators, or edge treatment in CSS.
+- Map live iRacing weather into six facts: air temperature, track temperature, wind speed, wind direction, relative humidity, and skies. Skies value `0` is `CLEAR`, `1` is `PARTLY CLOUDY`, and every other received value is `CLOUDY`.
+- Use the supplied `sunny.svg`, `partly_cloudy.svg`, and `cloudy.svg` assets for those three conditions. These icons are package artwork, not interchangeable UI symbols.
+- Treat iRacing relative humidity as an already-scaled percentage from `0` to `100`; do not multiply fractional-looking values by 100.
+- Convert temperatures to rounded Fahrenheit values, wind speed to rounded miles per hour, and the continuous wind-direction angle to the nearest 16-point compass label. The on-air wind line reads `[DIRECTION] AT [SPEED] MPH`.
+- Recompute humidity direction on every timestamped telemetry sample. Compare the current percentage with the previous valid sample: changes below `0.01` percentage point are `STEADY`, increases are `RISING`, and decreases are `FALLING`. Reset the comparison when humidity data is lost so the first recovered sample is `STEADY`.
+- Missing weather is explicit: write `UNAVAILABLE` for skies, render no condition icon, and show em dashes for unavailable temperature, wind, or humidity values. Never leave stale measurements or imply a condition from a fallback icon.
+- Graphics Director owns only visibility and event-location copy. Weather measurements and condition remain read-only live telemetry; the operator can edit the location without changing telemetry truth.
+
+**The PSD Authority Rule.** For the PRI Hoosier 500 timing tower, Results page, and Weather graphic, the pinned PSD, extracted raster artwork, measured 1080p placement, typography, and component geometry are authoritative. Preserve them exactly; package extensions must not reinterpret these components.
 
 ## Do's and Don'ts
 
@@ -445,6 +488,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Do** preserve the PRI Hoosier 500 Results page at `x = 289px`, `y = 177px`, `1344 × 783px` on a `1920 × 1080px` canvas, including its embedded raster panel, event badge, separator, and presenter logo.
 - **Do** keep results session selection and metric selection independent, default them to Practice and Speed, and render the selected retained snapshot's top ten full-name rows.
 - **Do** show `RESULTS UNAVAILABLE` when the requested Practice, Qualifying, or Race snapshot has not been retained.
+- **Do** preserve the PRI Hoosier 500 Weather graphic at `x = 1453px`, `y = 729px`, `403 × 237px` on a `1920 × 1080px` canvas, including its extracted background and supplied three-icon condition mapping.
+- **Do** show `UNAVAILABLE`, no icon, and em dashes when live weather is missing; reset humidity direction after data loss.
 - **Do** move focus into newly revealed, high-consequence authentication content such as the one-time secret receipt.
 - **Do** write every loading, pending, empty, active, revoked, success, and error state in specific operator language.
 - **Do** preserve `44px` minimum touch targets for compact access navigation and record actions.
@@ -465,6 +510,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Don't** allow a package theme to alter control-panel layout, control styling, or operator terminology.
 - **Don't** substitute Gantry's global fonts, redraw supplied PRI or Visitor Watch Company artwork, or reinterpret the PSD-derived tower or Results-page proportions.
 - **Don't** make the PRI Results page responsive or create a mobile layout; it is a fixed `1920 × 1080px` broadcast composition.
+- **Don't** substitute generic weather icons, redraw the Weather smart-object background, or let operator-edited location copy override live weather measurements.
 - **Don't** animate continuously; use only decisive stamp/slide or opacity state changes around `180–260ms`.
 - **Don't** use orange or green as generic authentication status fills; reserve orange for action/selection/confirmation and green for a reinforced success cue.
 - **Don't** collapse mobile key records into unlabeled values or require horizontal table scrolling for routine access management.

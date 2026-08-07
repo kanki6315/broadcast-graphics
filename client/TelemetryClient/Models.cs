@@ -65,6 +65,14 @@ public sealed record CameraSwitchCommand(
 
 public sealed record CameraCommandResult(bool Sent, string Message);
 
+public sealed record SessionWeatherState(
+    [property: JsonPropertyName("condition")] string Condition,
+    [property: JsonPropertyName("airTemperatureC")] double? AirTemperatureC,
+    [property: JsonPropertyName("trackTemperatureC")] double? TrackTemperatureC,
+    [property: JsonPropertyName("windSpeedMps")] double? WindSpeedMps,
+    [property: JsonPropertyName("windDirectionRadians")] double? WindDirectionRadians,
+    [property: JsonPropertyName("relativeHumidityPercent")] double? RelativeHumidityPercent);
+
 public sealed record SessionState(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
@@ -89,6 +97,7 @@ public sealed record SessionState(
     [property: JsonPropertyName("externalSubSessionId")] int? ExternalSubSessionId = null,
     [property: JsonPropertyName("externalSessionNumber")] int? ExternalSessionNumber = null,
     [property: JsonPropertyName("trackId")] int? TrackId = null,
+    [property: JsonPropertyName("weather")] SessionWeatherState? Weather = null,
     [property: JsonPropertyName("cameraGroups")] IReadOnlyList<CameraGroupDefinition>? CameraGroups = null,
     [property: JsonPropertyName("activeCameraCarIdx")] int? ActiveCameraCarIdx = null,
     [property: JsonPropertyName("activeCameraGroup")] int? ActiveCameraGroup = null,

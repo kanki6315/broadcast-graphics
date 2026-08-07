@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { formatLapTime, type DriverState, type GraphicSlot, type SessionState, type SessionType } from "@racecontrol/protocol";
+import { formatLapTime, type DriverState, type GraphicSlot, type SessionState, type SessionType, type WeatherState } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
 function formatGap(driver: DriverState): string {
@@ -135,6 +135,73 @@ function ResultsPage({
         <span>RESULTS PRESENTED BY</span>
         <img src="/packages/pri-hoosier-500/results-presenter-logo.png" alt="Visitor Watch Company" />
       </footer>
+    </div>
+  );
+}
+
+function fahrenheit(celsius: number | null): string {
+  if (celsius == null || !Number.isFinite(celsius)) return "—";
+  return `${Math.round(celsius * 9 / 5 + 32)}° F`;
+}
+
+function compassDirection(radians: number | null): string {
+  if (radians == null || !Number.isFinite(radians)) return "—";
+  const points = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  const degrees = ((radians * 180 / Math.PI) % 360 + 360) % 360;
+  return points[Math.round(degrees / 22.5) % points.length];
+}
+
+function WeatherGraphic({ weather, observedAt, location, packageId }: { weather?: WeatherState | null; observedAt: string; location: string; packageId?: string }) {
+  const previousHumidity = useRef<number | null>(null);
+  const [humidityTrend, setHumidityTrend] = useState<"RISING" | "FALLING" | "STEADY">("STEADY");
+
+  useEffect(() => {
+    const humidity = weather?.relativeHumidityPercent;
+    if (humidity == null || !Number.isFinite(humidity)) {
+      previousHumidity.current = null;
+      setHumidityTrend("STEADY");
+      return;
+    }
+    const previous = previousHumidity.current;
+    setHumidityTrend(previous == null || Math.abs(humidity - previous) < 0.01
+      ? "STEADY"
+      : humidity > previous ? "RISING" : "FALLING");
+    previousHumidity.current = humidity;
+  }, [weather?.relativeHumidityPercent, observedAt]);
+
+  const condition = weather?.condition;
+  const skies = condition == null ? "UNAVAILABLE" : condition === "clear" ? "CLEAR" : condition === "partly-cloudy" ? "PARTLY CLOUDY" : "CLOUDY";
+  const icon = condition == null ? null : condition === "clear" ? "sunny.svg" : condition === "partly-cloudy" ? "partly_cloudy.svg" : "cloudy.svg";
+  const windSpeed = weather?.windSpeedMps;
+  const wind = windSpeed == null || !Number.isFinite(windSpeed)
+    ? "—"
+    : `${compassDirection(weather?.windDirectionRadians ?? null)} AT ${Math.round(windSpeed * 2.236936)} MPH`;
+  const humidity = weather?.relativeHumidityPercent;
+  const humidityLabel = humidity == null || !Number.isFinite(humidity)
+    ? "—"
+    : `${humidity.toFixed(2)} ${humidityTrend}`;
+
+  if (packageId !== "pri-hoosier-500") {
+    return <div className="overlay-surface weather-overlay overlay-plate"><strong>WEATHER</strong><span>{location}</span><span>{skies}</span><span>{fahrenheit(weather?.airTemperatureC ?? null)}</span></div>;
+  }
+
+  return (
+    <div className="overlay-surface weather-overlay pri-weather-overlay">
+      <img className="weather-background" src="/packages/pri-hoosier-500/weather-background.png" alt="" />
+      <h1>WEATHER</h1>
+      <div className="weather-main-condition">
+        {icon && <img src={`/packages/pri-hoosier-500/${icon}`} alt="" />}
+        <strong>{fahrenheit(weather?.airTemperatureC ?? null)}</strong>
+      </div>
+      <div className="weather-details">
+        <h2>{location}</h2>
+        <dl>
+          <div><dt>SKIES</dt><dd>{skies}</dd></div>
+          <div><dt>TRACK TEMP</dt><dd>{fahrenheit(weather?.trackTemperatureC ?? null)}</dd></div>
+          <div><dt>WIND</dt><dd>{wind}</dd></div>
+          <div><dt>HUMIDITY</dt><dd>{humidityLabel}</dd></div>
+        </dl>
+      </div>
     </div>
   );
 }
@@ -360,6 +427,8 @@ export function OverlayApp() {
   const resultsSession = state.sessionResults?.[requestedSessionType]
     ?? (state.session.type === requestedSessionType ? state.session : null);
   const resultsMetric = resultsConfig.metric === "gap" ? "gap" : "speed";
+  const weatherConfig = configFor("weather");
+  const weatherLocation = String(weatherConfig.location ?? (packageId === "pri-hoosier-500" ? "INDIANAPOLIS, IN" : state.session.trackName));
 
   return (
     <main>
@@ -374,6 +443,9 @@ export function OverlayApp() {
       </OverlayLayer>
       <OverlayLayer active={activeSlots.has("results")}>
         <ResultsPage session={resultsSession} requestedSessionType={requestedSessionType} metric={resultsMetric} packageId={packageId} />
+      </OverlayLayer>
+      <OverlayLayer active={activeSlots.has("weather")}>
+        <WeatherGraphic weather={state.session.weather} observedAt={state.session.timestamp} location={weatherLocation} packageId={packageId} />
       </OverlayLayer>
       <OverlayLayer active={activeSlots.has("driver-focus")}><DriverFocus driver={selected} compareDriver={compareDriver} config={focusConfig} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("race-status")}><RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} /></OverlayLayer>
