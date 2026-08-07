@@ -53,7 +53,8 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
                     "client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course",
                     19, 40, null, "green", DateTimeOffset.UtcNow.ToString("O"), drivers,
                     18, 21, tick / 4d, null, "racing", "go", ["green"], [new CarClassState(1, "GT3", "#e54b2a", drivers.Length)],
-                    "simulation", "simulation");
+                    "simulation", "simulation", null, null, null,
+                    new SessionWeatherState("partly-cloudy", 25.56, 48.89, 3.58, 5.89, 30.38));
                 await Task.Delay(250, cancellationToken);
             }
         }
@@ -89,7 +90,13 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
     TelemetryVar.CarIdxOnPitRoad,
     TelemetryVar.CamCarIdx,
     TelemetryVar.CamGroupNumber,
-    TelemetryVar.CamCameraNumber
+    TelemetryVar.CamCameraNumber,
+    TelemetryVar.AirTemp,
+    TelemetryVar.TrackTemp,
+    TelemetryVar.WindVel,
+    TelemetryVar.WindDir,
+    TelemetryVar.RelativeHumidity,
+    TelemetryVar.Skies
 ])]
 public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource, ICameraController
 {
@@ -311,11 +318,35 @@ internal static class TelemetrySnapshotMapper
             weekend?.SubSessionID,
             sessionNumber,
             weekend?.TrackID,
+            MapWeather(telemetry),
             cameraGroups,
             telemetry.CamCarIdx,
             telemetry.CamGroupNumber,
             telemetry.CamCameraNumber);
     }
+
+    private static SessionWeatherState? MapWeather(TelemetryData telemetry)
+    {
+        var airTemperature = NormalizeMeasurement(telemetry.AirTemp);
+        var trackTemperature = NormalizeMeasurement(telemetry.TrackTemp);
+        var windSpeed = NormalizeMeasurement(telemetry.WindVel);
+        var windDirection = NormalizeMeasurement(telemetry.WindDir);
+        var humidity = NormalizeMeasurement(telemetry.RelativeHumidity);
+        var condition = NormalizeSkies(telemetry.Skies);
+        if (airTemperature is null && trackTemperature is null && windSpeed is null &&
+            windDirection is null && humidity is null && telemetry.Skies is null) return null;
+        return new SessionWeatherState(condition, airTemperature, trackTemperature, windSpeed, windDirection, humidity);
+    }
+
+    private static string NormalizeSkies(int? skies) => skies switch
+    {
+        0 => "clear",
+        1 => "partly-cloudy",
+        _ => "cloudy"
+    };
+
+    private static double? NormalizeMeasurement(double? value) =>
+        value is not null && double.IsFinite(value.Value) ? value : null;
 
     private static DriverState MapDriver(
         Driver driver,

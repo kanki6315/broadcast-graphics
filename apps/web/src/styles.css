@@ -509,6 +509,7 @@ html.overlay-document #root {
 .results-overlay .results-name { overflow: hidden; padding-left: 18px; font-weight: 700; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .results-overlay .results-value { padding-right: 24px; text-align: right; }
 .results-overlay .results-unavailable { margin: 40px 24px; text-align: center; text-transform: uppercase; }
+.weather-overlay { position: absolute; top: 68vh; right: 3vw; display: grid; gap: 10px; padding: 24px; }
 .lower-overlay { position: absolute; left: 7vw; bottom: 8vh; min-width: 560px; min-height: 104px; display: flex; align-items: stretch; }
 .driver-focus-overlay { gap: 10px; background: transparent !important; }
 .driver-info-card { min-width: 560px; min-height: 104px; display: flex; align-items: stretch; }

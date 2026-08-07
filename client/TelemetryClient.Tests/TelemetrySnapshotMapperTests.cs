@@ -127,6 +127,32 @@ public sealed class TelemetrySnapshotMapperTests
     }
 
     [Fact]
+    public void WeatherTelemetryIsNormalizedForTheBroadcastContract()
+    {
+        var telemetry = Telemetry(
+            positions: [1],
+            classPositions: [1],
+            lapsCompleted: [1],
+            f2Times: [0],
+            airTemp: 25.5f,
+            trackTemp: 48.9f,
+            windVel: 3.6f,
+            windDir: 5.89f,
+            relativeHumidity: 30.38f,
+            skies: 1);
+
+        var state = TelemetrySnapshotMapper.Map(telemetry, SessionInfo("Practice", [Driver(0)]));
+
+        Assert.NotNull(state.Weather);
+        Assert.Equal("partly-cloudy", state.Weather.Condition);
+        AssertClose(25.5, state.Weather.AirTemperatureC);
+        AssertClose(48.9, state.Weather.TrackTemperatureC);
+        AssertClose(3.6, state.Weather.WindSpeedMps);
+        AssertClose(5.89, state.Weather.WindDirectionRadians);
+        AssertClose(30.38, state.Weather.RelativeHumidityPercent);
+    }
+
+    [Fact]
     public void LiveTimingInterpolatesWhenCarsReachTheSameTrackPosition()
     {
         var timing = new LiveTimingTracker();
@@ -236,6 +262,12 @@ public sealed class TelemetrySnapshotMapperTests
         float[]? bestLapTimes = null,
         int[]? bestLapNumbers = null,
         float[]? lapDistances = null,
+        float? airTemp = null,
+        float? trackTemp = null,
+        float? windVel = null,
+        float? windDir = null,
+        float? relativeHumidity = null,
+        int? skies = null,
         double sessionTime = 1_000,
         SVappsLAB.iRacingTelemetrySDK.SessionState sessionState = SVappsLAB.iRacingTelemetrySDK.SessionState.Racing) => new()
     {
@@ -258,7 +290,13 @@ public sealed class TelemetrySnapshotMapperTests
         CarIdxBestLapTime = bestLapTimes ?? Enumerable.Repeat(69f, positions.Length).ToArray(),
         CarIdxBestLapNum = bestLapNumbers ?? Enumerable.Repeat(3, positions.Length).ToArray(),
         CarIdxTrackSurface = Enumerable.Repeat(TrackLocation.OnTrack, positions.Length).ToArray(),
-        CarIdxOnPitRoad = new bool[positions.Length]
+        CarIdxOnPitRoad = new bool[positions.Length],
+        AirTemp = airTemp,
+        TrackTemp = trackTemp,
+        WindVel = windVel,
+        WindDir = windDir,
+        RelativeHumidity = relativeHumidity,
+        Skies = skies
     };
 
     private static TelemetrySessionInfo SessionInfo(
