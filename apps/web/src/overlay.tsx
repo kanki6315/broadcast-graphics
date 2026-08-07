@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from "react";
-import { formatLapTime, type DriverState, type GraphicSlot } from "@racecontrol/protocol";
+import { formatLapTime, type DriverState, type GraphicSlot, type SessionState } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
 function formatGap(driver: DriverState): string {
@@ -29,15 +29,33 @@ function usePackageTheme(packageId: string | undefined) {
   }, [packageId]);
 }
 
-function TimingTower({ drivers, rows }: { drivers: DriverState[]; rows: number }) {
+function formatSessionClock(seconds: number | null): string {
+  if (seconds == null || !Number.isFinite(seconds)) return "LIVE";
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+function broadcastSurname(name: string): string {
+  return name.trim().split(/\s+/).at(-1) ?? name;
+}
+
+function TimingTower({ session, rows }: { session: SessionState; rows: number }) {
   return (
     <div className="overlay-surface timing-overlay">
-      <header className="overlay-title"><span>Position</span><strong>Gap</strong></header>
+      <div className="tower-brand overlay-title">
+        <strong>APEX</strong>
+        <span>RACE CONTROL</span>
+      </div>
+      <header className="tower-session overlay-title">
+        <strong>{session.type}</strong>
+        <span>{session.totalLaps ? `LAP ${session.lap} / ${session.totalLaps}` : formatSessionClock(session.timeRemaining)}</span>
+      </header>
+      <div className="tower-columns overlay-title"><span>Pos</span><span>Car</span><span>Driver</span><strong>Interval</strong></div>
       <ol className="overlay-plate">
-        {drivers.slice(0, rows).map((driver) => (
+        {session.drivers.slice(0, rows).map((driver) => (
           <li key={driver.carIdx} className="overlay-rule">
-            <span className="overlay-accent position-chip">{driver.position}</span>
-            <span className="overlay-number">{driver.carNumber}</span>
+            <span className="position-chip">{driver.position}</span>
+            <span className="overlay-accent overlay-number">{driver.carNumber}</span>
             <strong>{driver.name}</strong>
             <span>{formatGap(driver)}</span>
           </li>
@@ -54,9 +72,9 @@ function DriverFocus({ driver, config }: { driver?: DriverState; config: Record<
     ? (driver.intervalToAhead == null ? "—" : `+${driver.intervalToAhead.toFixed(3)}`)
     : formatLapTime(metric === "lastLap" ? driver.lastLap : driver.bestLap);
   return (
-    <div className="overlay-surface lower-overlay overlay-plate">
+    <div className="overlay-surface lower-overlay driver-focus-overlay overlay-plate">
       <span className="overlay-accent focus-number">{driver.carNumber}</span>
-      <div className="focus-identity"><strong className="overlay-title">{driver.name}</strong><span>{String(config.subtitle || driver.team)}</span></div>
+      <div className="focus-identity"><strong className="overlay-title">{broadcastSurname(driver.name)}</strong><span>{String(config.subtitle || driver.team)}</span></div>
       <div className="focus-position"><span>Position</span><strong>P{driver.position}</strong></div>
       <div className="focus-metric"><span>{metric.replace(/([A-Z])/g, " $1")}</span><strong>{metricValue}</strong></div>
     </div>
@@ -64,7 +82,7 @@ function DriverFocus({ driver, config }: { driver?: DriverState; config: Record<
 }
 
 function RaceStatus({ name, track, lap, total, flag }: { name: string; track: string; lap: number; total: number | null; flag: string }) {
-  return <div className="overlay-surface status-overlay overlay-plate"><div><strong className="overlay-title">{name}</strong><span>{track}</span></div><div><span>Lap</span><strong>{lap}{total ? ` / ${total}` : ""}</strong></div><div className="overlay-accent flag-chip">{flag}</div></div>;
+  return <div className="overlay-surface status-overlay overlay-plate"><div><strong className="overlay-title">{name}</strong><span>{track}</span></div><div><span>Lap</span><strong>{lap}{total ? ` / ${total}` : ""}</strong></div><div className={`overlay-accent flag-chip flag-${flag}`}>{flag}</div></div>;
 }
 
 function Battle({ selected, rival, label }: { selected?: DriverState; rival?: DriverState; label: string }) {
@@ -103,7 +121,7 @@ export function OverlayApp() {
 
   return (
     <main>
-      <OverlayLayer active={activeSlots.has("timing-tower")}><TimingTower drivers={state.session.drivers} rows={Number(configFor("timing-tower").rows ?? 10)} /></OverlayLayer>
+      <OverlayLayer active={activeSlots.has("timing-tower")}><TimingTower session={state.session} rows={Number(configFor("timing-tower").rows ?? 12)} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("driver-focus")}><DriverFocus driver={selected} config={configFor("driver-focus")} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("race-status")}><RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("battle")}><Battle selected={selected} rival={rival} label={String(configFor("battle").label ?? "Battle for position")} /></OverlayLayer>
