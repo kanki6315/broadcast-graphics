@@ -143,6 +143,7 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
   const totalTowerCars = Math.max(1, Number(towerConfig.totalCars ?? 20));
   const visibleTowerRows = Math.max(1, Number(towerConfig.visibleRows ?? towerRows));
   const fixedTowerPositions = Math.max(0, Number(towerConfig.fixedPositions ?? 5));
+  const towerMetric = String(towerConfig.metric ?? "interval");
   const resultsConfig = config("results");
   const resultsSessionType = String(resultsConfig.sessionType ?? "practice");
   const resultsMetric = String(resultsConfig.metric ?? "speed");
@@ -198,8 +199,7 @@ export function GraphicsDirector({ onManageAccess, onLogout }: DirectorProps) {
               <label><span>Visible slots</span><input type="number" min={5} max={20} value={visibleTowerRows} onChange={(event) => setConfig("timing-tower", "visibleRows", Number(event.target.value))} /></label>
               <label><span>Fixed positions</span><input type="number" min={0} max={19} value={fixedTowerPositions} onChange={(event) => setConfig("timing-tower", "fixedPositions", Number(event.target.value))} /></label>
             </> : <label><span>Rows</span><input type="number" min={5} max={20} value={towerRows} onChange={(event) => setConfig("timing-tower", "rows", Number(event.target.value))} /></label>}
-            <label><span>Mode</span><input readOnly value="Interval" /></label>
-            <label className="widget-check"><input type="checkbox" checked readOnly />Auto update</label>
+            <label><span>Mode</span><select value={towerMetric} onChange={(event) => setConfig("timing-tower", "metric", event.target.value)}><option value="gap">Gap</option><option value="interval">Interval</option><option value="lastLap">Last lap</option><option value="bestLap">Best lap</option></select></label>
           </div>
         </Widget>
 

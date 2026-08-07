@@ -9,6 +9,28 @@ function formatGap(driver: DriverState): string {
   return gap == null ? "—" : `+${gap.toFixed(3)}`;
 }
 
+type TimingTowerMetric = "gap" | "interval" | "lastLap" | "bestLap";
+
+const timingTowerMetricLabels: Record<TimingTowerMetric, string> = {
+  gap: "Gap",
+  interval: "Interval",
+  lastLap: "Last lap",
+  bestLap: "Best lap",
+};
+
+function timingTowerMetric(value: unknown): TimingTowerMetric {
+  return value === "gap" || value === "lastLap" || value === "bestLap" ? value : "interval";
+}
+
+function formatTimingTowerMetric(driver: DriverState, metric: TimingTowerMetric): string {
+  if (metric === "gap") return formatGap(driver);
+  if (metric === "interval") {
+    if (driver.position === 1) return "Leader";
+    return driver.intervalToAhead == null ? "—" : `+${driver.intervalToAhead.toFixed(3)}`;
+  }
+  return formatPylonLapTime(metric === "lastLap" ? driver.lastLap : driver.bestLap);
+}
+
 function formatBattleGap(selected: DriverState, rival: DriverState): string {
   const lapDifference = Math.abs(selected.lapsCompleted - rival.lapsCompleted);
   if (lapDifference > 0) return `${lapDifference} ${lapDifference === 1 ? "lap" : "laps"}`;
@@ -144,12 +166,14 @@ function TimingTower({
   totalCars,
   visibleRows,
   fixedPositions,
+  metric,
   packageId,
 }: {
   session: SessionState;
   totalCars: number;
   visibleRows: number;
   fixedPositions: number;
+  metric: TimingTowerMetric;
   packageId?: string;
 }) {
   const includedCount = Math.max(1, Math.min(Math.floor(totalCars), session.drivers.length));
@@ -164,7 +188,8 @@ function TimingTower({
   const rotationPages = needsRotation ? Math.ceil(rotatingPool.length / rotatingSlots) : 1;
   const includedDriverOrder = includedDrivers.map((driver) => driver.carIdx).join(":");
   const [rotationPage, setRotationPage] = useState(0);
-  const isRace = session.type === "race";
+  const metricLabel = timingTowerMetricLabels[metric];
+  const isPositionMetric = metric === "gap" || metric === "interval";
   const visibleDrivers = !needsRotation
     ? includedDrivers
     : [
@@ -219,7 +244,7 @@ function TimingTower({
           <strong>{session.type}</strong>
           <span>{session.totalLaps ? `LAP ${session.lap} / ${session.totalLaps}` : formatSessionClock(session.timeRemaining)}</span>
         </header>
-        <div className="tower-columns overlay-title"><span>Pos</span><span>Car</span><span>Driver</span><strong>Interval</strong></div>
+        <div className="tower-columns overlay-title"><span>Pos</span><span>Car</span><span>Driver</span><strong>{metricLabel}</strong></div>
         <ol className="overlay-plate">
           {visibleDrivers.map((driver) => (
             <li
@@ -233,7 +258,7 @@ function TimingTower({
               <span className="position-chip">{driver.position}</span>
               <span className="overlay-accent overlay-number">{driver.carNumber}</span>
               <strong>{driver.name}</strong>
-              <span>{formatGap(driver)}</span>
+              <span>{formatTimingTowerMetric(driver, metric)}</span>
             </li>
           ))}
         </ol>
@@ -251,8 +276,8 @@ function TimingTower({
             <span>{session.timeRemaining != null ? formatSessionClock(session.timeRemaining) : session.totalLaps ? `${session.lap} / ${session.totalLaps}` : "LIVE"}</span>
           </header>
           <div className="tower-columns overlay-title">
-            <span>{isRace ? "Running order" : "Best lap time"}</span>
-            <strong>{isRace ? "Interval" : "Time"}</strong>
+            <span>{isPositionMetric ? "Running order" : `${metricLabel} time`}</span>
+            <strong>{metricLabel}</strong>
           </div>
           <ol className="overlay-plate">
             {visibleDrivers.map((driver, index) => (
@@ -267,7 +292,7 @@ function TimingTower({
                 <span className="position-chip">{driver.position}</span>
                 <span className="overlay-accent overlay-number">{driver.carNumber}</span>
                 <strong>{broadcastSurname(driver.name)}</strong>
-                <span>{isRace ? formatGap(driver) : formatPylonLapTime(driver.bestLap)}</span>
+                <span>{formatTimingTowerMetric(driver, metric)}</span>
               </li>
             ))}
           </ol>
@@ -346,6 +371,7 @@ export function OverlayApp() {
     .filter((driver) => driver.position >= battleStart && driver.position <= battleEnd)
     .sort((first, second) => first.position - second.position);
   const towerConfig = configFor("timing-tower");
+  const towerMetric = timingTowerMetric(towerConfig.metric);
   const defaultTowerRows = 12;
   const legacyRows = Number(towerConfig.rows ?? defaultTowerRows);
   const totalTowerCars = Number(towerConfig.totalCars ?? (packageId === "pri-hoosier-500" ? 20 : legacyRows));
@@ -365,6 +391,7 @@ export function OverlayApp() {
           totalCars={totalTowerCars}
           visibleRows={visibleTowerRows}
           fixedPositions={fixedTowerPositions}
+          metric={towerMetric}
           packageId={packageId}
         />
       </OverlayLayer>
