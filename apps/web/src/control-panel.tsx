@@ -13,6 +13,7 @@ import {
   PackageOpen,
   Radio,
   TimerReset,
+  Trophy,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { useLiveState } from "./use-live-state";
 
 const slotIcons: Record<GraphicSlot, typeof Radio> = {
   "timing-tower": Layers3,
+  results: Trophy,
   "race-status": TimerReset,
   "driver-focus": Crosshair,
   battle: Radio,

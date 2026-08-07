@@ -15,6 +15,14 @@
         { "key": "showLastLap", "label": "Show last lap", "type": "boolean", "default": false }
       ]
     },
+    "results": {
+      "label": "Results page",
+      "description": "Top-ten results from a retained session",
+      "fields": [
+        { "key": "sessionType", "label": "Session results", "type": "select", "default": "practice", "options": [{ "label": "Practice", "value": "practice" }, { "label": "Qualifying", "value": "qualifying" }, { "label": "Race", "value": "race" }] },
+        { "key": "metric", "label": "Driver data", "type": "select", "default": "speed", "options": [{ "label": "Speed", "value": "speed" }, { "label": "Gap to leader", "value": "gap" }] }
+      ]
+    },
     "race-status": {
       "label": "Race status",
       "description": "Session, lap, time, and flag",

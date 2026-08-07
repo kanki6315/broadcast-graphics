@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { formatLapTime, type DriverState, type GraphicSlot, type SessionState } from "@racecontrol/protocol";
+import { formatLapTime, type DriverState, type GraphicSlot, type SessionState, type SessionType } from "@racecontrol/protocol";
 import { useLiveState } from "./use-live-state";
 
 function formatGap(driver: DriverState): string {
@@ -47,6 +47,96 @@ function broadcastSurname(name: string): string {
 function formatPylonLapTime(seconds: number | null): string {
   if (seconds == null || !Number.isFinite(seconds)) return "—";
   return seconds < 60 ? seconds.toFixed(3) : formatLapTime(seconds);
+}
+
+const priResultsTrackMiles = 2.5;
+
+function formatResultsSpeed(driver: DriverState): string {
+  if (driver.bestLap == null || !Number.isFinite(driver.bestLap) || driver.bestLap <= 0) return "—";
+  return (priResultsTrackMiles * 3600 / driver.bestLap).toFixed(3);
+}
+
+function formatResultsGap(driver: DriverState, leader: DriverState | undefined, sessionType: SessionType): string {
+  if (driver.position === 1) return "LEADER";
+  if (sessionType === "race") {
+    if (driver.lapsBehindLeader > 0) return `+${driver.lapsBehindLeader} ${driver.lapsBehindLeader === 1 ? "LAP" : "LAPS"}`;
+    const gap = driver.gapToLeader ?? driver.interval;
+    return gap == null ? "—" : `+${gap.toFixed(3)}`;
+  }
+  if (driver.bestLap == null || leader?.bestLap == null) return "—";
+  return `+${Math.max(0, driver.bestLap - leader.bestLap).toFixed(3)}`;
+}
+
+function ResultsPage({
+  session,
+  requestedSessionType,
+  metric,
+  packageId,
+}: {
+  session: SessionState | null;
+  requestedSessionType: SessionType;
+  metric: "speed" | "gap";
+  packageId?: string;
+}) {
+  const drivers = [...(session?.drivers ?? [])]
+    .filter((driver) => driver.position > 0)
+    .sort((a, b) => a.position - b.position)
+    .slice(0, 10);
+  const leader = drivers[0];
+  const metricLabel = metric === "speed" ? "SPEED" : "GAP TO LEADER";
+  const metricValue = (driver: DriverState) => metric === "speed"
+    ? formatResultsSpeed(driver)
+    : formatResultsGap(driver, leader, session?.type ?? requestedSessionType);
+
+  if (packageId !== "pri-hoosier-500") {
+    return (
+      <div className="overlay-surface results-overlay overlay-plate">
+        <header className="results-heading overlay-title">
+          <strong>{session?.name ?? requestedSessionType} results</strong>
+          <span>{metricLabel}</span>
+        </header>
+        <ol className="results-list">
+          {drivers.map((driver) => (
+            <li key={driver.carIdx} className="overlay-rule">
+              <span className="results-position">{driver.position}.</span>
+              <strong className="results-number overlay-accent">{driver.carNumber}</strong>
+              <span className="results-name">{driver.name}</span>
+              <span className="results-value">{metricValue(driver)}</span>
+            </li>
+          ))}
+        </ol>
+        {!session && <p className="results-unavailable">{requestedSessionType} results unavailable</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="overlay-surface results-overlay pri-results-overlay">
+      <img className="results-panel-background" src="/packages/pri-hoosier-500/results-panel-background.png" alt="" />
+      <header className="results-heading">
+        <h1>2026 PRI HOOSIER 500</h1>
+        <p>{(session?.type ?? requestedSessionType).toUpperCase()} RESULTS</p>
+      </header>
+      <img className="results-event-logo" src="/packages/pri-hoosier-500/results-event-logo.png" alt="PRI Hoosier 500" />
+      <img className="results-separator" src="/packages/pri-hoosier-500/results-separator.png" alt="" />
+      <span className="results-metric-label">{metricLabel}</span>
+      <ol className="results-list">
+        {drivers.map((driver) => (
+          <li key={driver.carIdx}>
+            <span className="results-position">{driver.position}.</span>
+            <strong className="results-number">{driver.carNumber}</strong>
+            <span className="results-name">{driver.name}</span>
+            <span className="results-value">{metricValue(driver)}</span>
+          </li>
+        ))}
+      </ol>
+      {!session && <p className="results-unavailable">RESULTS UNAVAILABLE</p>}
+      <footer className="results-presenter">
+        <span>RESULTS PRESENTED BY</span>
+        <img src="/packages/pri-hoosier-500/results-presenter-logo.png" alt="Visitor Watch Company" />
+      </footer>
+    </div>
+  );
 }
 
 function TimingTower({
@@ -246,6 +336,11 @@ export function OverlayApp() {
   const totalTowerCars = Number(towerConfig.totalCars ?? (packageId === "pri-hoosier-500" ? 20 : legacyRows));
   const visibleTowerRows = Number(towerConfig.visibleRows ?? legacyRows);
   const fixedTowerPositions = Number(towerConfig.fixedPositions ?? (packageId === "pri-hoosier-500" ? 5 : visibleTowerRows));
+  const resultsConfig = configFor("results");
+  const requestedSessionType = String(resultsConfig.sessionType ?? "practice") as SessionType;
+  const resultsSession = state.sessionResults?.[requestedSessionType]
+    ?? (state.session.type === requestedSessionType ? state.session : null);
+  const resultsMetric = resultsConfig.metric === "gap" ? "gap" : "speed";
 
   return (
     <main>
@@ -257,6 +352,9 @@ export function OverlayApp() {
           fixedPositions={fixedTowerPositions}
           packageId={packageId}
         />
+      </OverlayLayer>
+      <OverlayLayer active={activeSlots.has("results")}>
+        <ResultsPage session={resultsSession} requestedSessionType={requestedSessionType} metric={resultsMetric} packageId={packageId} />
       </OverlayLayer>
       <OverlayLayer active={activeSlots.has("driver-focus")}><DriverFocus driver={selected} config={configFor("driver-focus")} /></OverlayLayer>
       <OverlayLayer active={activeSlots.has("race-status")}><RaceStatus name={state.session.name} track={state.session.trackName} lap={state.session.lap} total={state.session.totalLaps} flag={state.session.flag} /></OverlayLayer>

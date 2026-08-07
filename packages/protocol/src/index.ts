@@ -1,5 +1,6 @@
 export const graphicSlots = [
   "timing-tower",
+  "results",
   "race-status",
   "driver-focus",
   "battle",
@@ -8,6 +9,7 @@ export const graphicSlots = [
 ] as const;
 
 export type GraphicSlot = (typeof graphicSlots)[number];
+export type SessionType = "practice" | "qualifying" | "race";
 export type ConnectionStatus = "connected" | "stale" | "disconnected";
 export type SessionFlag = "green" | "yellow" | "red" | "white" | "checkered";
 export type SessionPhase = "invalid" | "get-in-car" | "warmup" | "parade-laps" | "racing" | "checkered" | "cool-down";
@@ -93,7 +95,7 @@ export interface CameraGroupDefinition {
 export interface SessionState {
   id: string;
   name: string;
-  type: "practice" | "qualifying" | "race";
+  type: SessionType;
   trackName: string;
   lap: number;
   totalLaps: number | null;
@@ -215,6 +217,7 @@ export interface LiveState {
   revision: number;
   connection: ConnectionStatus;
   session: SessionState | null;
+  sessionResults: Partial<Record<SessionType, SessionState>>;
   graphics: GraphicsState;
   camera: CameraControlState;
   events: EventRecord[];

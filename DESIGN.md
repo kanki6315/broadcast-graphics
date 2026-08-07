@@ -19,6 +19,9 @@ colors:
   fastest-purple: "#7e3bd1"
   validation-red: "#8d211b"
   validation-wash: "rgba(197, 49, 39, 0.08)"
+  pri-results-copy: "#f7f7f7"
+  pri-results-muted: "#8d8d8d"
+  pri-results-number-red: "#d71d24"
 typography:
   display:
     fontFamily: "Barlow Condensed, sans-serif"
@@ -82,6 +85,46 @@ typography:
     fontFamily: "PRI Eurostile Extended, sans-serif"
     fontSize: "22.92px"
     fontWeight: 400
+    lineHeight: 1
+  pri-results-title:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "58.33px"
+    fontWeight: 900
+    lineHeight: 1
+  pri-results-subtitle:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "37.5px"
+    fontWeight: 400
+    lineHeight: 1
+  pri-results-metric-label:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "20.83px"
+    fontWeight: 500
+    lineHeight: 1
+  pri-results-row:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "33.33px"
+    fontWeight: 700
+    lineHeight: 1
+  pri-results-value:
+    fontFamily: "PRI Eurostile, sans-serif"
+    fontSize: "33.33px"
+    fontWeight: 500
+    lineHeight: 1
+  pri-results-number:
+    fontFamily: "PRI Apotek Wide, sans-serif"
+    fontSize: "33.33px"
+    fontWeight: 900
+    lineHeight: 1
+  pri-results-footer:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "25px"
+    fontWeight: 400
+    lineHeight: 1
+  pri-results-unavailable:
+    fontFamily: "PRI Eurostile Extended, sans-serif"
+    fontSize: "25px"
+    fontWeight: 500
     lineHeight: 1
 rounded:
   square: "0px"
@@ -176,6 +219,7 @@ The control palette is mostly paper and ink; color is scarce, semantic, and alwa
 - **Fastest Purple** (`#7e3bd1`): fastest-lap data and its written `FASTEST` tag.
 - **Connected Green** (`#177344`): healthy-feed icon only; the adjacent `CONNECTED` and `DATA FEED CURRENT` copy carries the meaning.
 - **Validation Red** (`#8d211b` on `rgba(197, 49, 39, 0.08)`): authentication, key-creation, key-register, revoke, and sign-out failures, always paired with explicit error copy and alert semantics.
+- **PRI Results Number Red** (`#d71d24`): car numbers in the results list only. This is the literal PSD-derived result-number red, distinct from the package's general racing-red accent.
 
 ### Neutral
 
@@ -185,6 +229,7 @@ The control palette is mostly paper and ink; color is scarce, semantic, and alwa
 - **Paper Rule** (`rgba(21, 25, 28, 0.19)`): quiet row dividers and dotted log rules.
 - **Native Rule / Interaction Wash** (`#4d15191c` / `#26b8c2bd`): WPF health-strip divisions and restrained hover feedback, expressed as alpha-bearing ARGB resources rather than new hues.
 - **Disconnected Ink / Copy** (`#2b2523` / `#f2c5b8`): explicit feed-failure plate and supporting diagnostic text.
+- **PRI Results Copy / Muted** (`#f7f7f7` / `#8d8d8d`): PSD-derived result names and values use silver-white; positions, the metric label, and the unavailable message use the quieter gray.
 
 **The Approval Stamp Rule.** Orange marks a state change or decisive action; it is not a general decoration or large ambient background.
 
@@ -197,7 +242,7 @@ Authentication follows the same discipline: green is limited to the success icon
 **Display Font:** Barlow Condensed (sans-serif fallback)
 
 **Body Font:** Source Sans 3 (sans-serif fallback)
-**Overlay Package Fonts:** supplied by each graphic package. Endurance Blue retains condensed system display faces and Segoe UI data text. The PRI Hoosier 500 timing tower bypasses the generic overlay stacks and loads the five supplied OTF masters under three package-local families: `PRI Eurostile`, `PRI Eurostile Extended`, and `PRI Apotek Wide`.
+**Overlay Package Fonts:** supplied by each graphic package. Endurance Blue retains condensed system display faces and Segoe UI data text. The PRI Hoosier 500 timing tower and results page bypass the generic overlay stacks and load seven supplied OTF masters under three package-local families: `PRI Eurostile`, `PRI Eurostile Extended`, and `PRI Apotek Wide`. The results page adds the Eurostile Medium and Eurostile Extended Medium faces used at weight 500.
 
 The Windows client packages Barlow Condensed and Source Sans 3 in the application and references them with WPF pack URIs. Do not fall back to a system display face for authored native surfaces when those resources are available.
 
@@ -223,6 +268,19 @@ The Windows client packages Barlow Condensed and Source Sans 3 in the applicatio
 
 These roles reproduce the supplied PSD typography; do not substitute the global Barlow Condensed or Source Sans 3 faces inside this tower.
 
+### PRI Hoosier 500 Results Page
+
+- **Event title:** Eurostile Extended Black through `PRI Eurostile Extended` (900, `58.33px`, `1`).
+- **Session subtitle:** Eurostile Extended Regular through `PRI Eurostile Extended` (400, `37.5px`, `1`).
+- **Metric label:** Eurostile Extended Medium through `PRI Eurostile Extended` (500, `20.83px`, `1`).
+- **Positions and full driver names:** Eurostile Bold through `PRI Eurostile` (700, `33.33px`, `1`), with names uppercase and ellipsized only when the fixed name column overflows.
+- **Metric values:** Eurostile Medium through `PRI Eurostile` (500, `33.33px`, `1`).
+- **Car numbers:** Apotek Wide Black through `PRI Apotek Wide` (900, `33.33px`, `1`).
+- **Presenter line:** Eurostile Extended Regular through `PRI Eurostile Extended` (400, `25px`, `1`).
+- **Unavailable state:** Eurostile Extended Medium through `PRI Eurostile Extended` (500, `25px`, `1`).
+
+These roles are literal to the shipped PSD reconstruction. Unlike the timing tower, results rows show each driver's full name rather than extracting a broadcast surname.
+
 **The Condensed Command Rule.** Use Barlow Condensed for headings, labels, statuses, driver identities, and commands; keep explanatory sentences in Source Sans 3.
 
 ## Layout
@@ -239,7 +297,11 @@ The native telemetry client opens centered at `1080 × 760px` with an `880 × 65
 
 Diagnostic replay expands inside the left connection sheet only when that source is selected. File selection, verification summary, playback speed, high-consequence confirmation, and connect actions stay in the pre-connection flow. Replay transport occupies the same sheet but remains hidden until the bridge is running in replay mode and the server connection is established; it must not imply usable transport before a destination exists.
 
-Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, and lower-third use viewport-relative offsets and purpose-built dimensions; do not apply the control-panel responsive grid to them. The PRI Hoosier 500 tower is authored for a fixed `1920 × 1080px` canvas: its shipped proof places the shell at approximately `x = 67px`, `y = 63px`, with an exact `361px` width (measured `67.0078`, `62.9609`, and `361px`). Its default field includes twenty cars, exposes twelve vertical slots, and holds the top five positions fixed.
+Overlay layouts are fixed broadcast compositions inside a transparent, pointer-inert viewport. Timing tower, top status, driver focus, battle, flag, lower-third, and results use purpose-built dimensions; do not apply the control-panel responsive grid to them. The PRI Hoosier 500 tower is authored for a fixed `1920 × 1080px` canvas: its shipped proof places the shell at approximately `x = 67px`, `y = 63px`, with an exact `361px` width (measured `67.0078`, `62.9609`, and `361px`). Its default field includes twenty cars, exposes twelve vertical slots, and holds the top five positions fixed.
+
+The PRI Hoosier 500 Results page is also a fixed `1920 × 1080px` composition with no mobile or responsive variant. Place its shell at `x = 289px`, `y = 177px`, sized `1344 × 783px`. Inside that shell, place the embedded raster panel/background at `x = 6px`, `y = 6px`, sized `1332 × 771px`; center the title across the shell at `y = 39px` and the session subtitle at `y = 102px`. Place the embedded event badge at `x = 75px`, `y = 270px`, sized `284 × 305px`, and the embedded separator at `x = 418px`, `y = 193px`, sized `5 × 539px`.
+
+The results metric label sits at `y = 194px`, right-aligned `89px` from the shell edge. The top-ten list starts at `x = 469px`, `y = 220px`, and is `803px` wide; each row is `41.5px` high with `45px / 92px / fluid / 128px` columns for position, car number, full driver name, and value. The Apotek car-number glyphs receive a `-5px` vertical and `0.5px` horizontal optical correction so their visible bounds share the Eurostile row baseline and the PSD number-column center. The presenter footer begins at `x = 371px`, `y = 709px`, and is `43px` high; its text receives a `1px` downward optical correction and the embedded Visitor Watch Company logo is `178 × 42px` with a `31px` leading gap. If the selected session snapshot does not exist, center `RESULTS UNAVAILABLE` over the list region at `x = 469px`, `y = 391px`, width `803px` while retaining the event, title, subtitle, separator, and presenter artwork.
 
 ## Elevation & Depth
 
@@ -350,10 +412,21 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - Practice shows `BEST LAP TIME` / `TIME`; best laps below one minute omit the leading `0:` and render as seconds plus milliseconds. Race shows `RUNNING ORDER` / `INTERVAL`; the first-place value remains `Leader`, while the remaining values use the established gap or laps-behind formatting.
 - `totalCars` chooses how many classified drivers are included (default `20`). `visibleRows` chooses the number of vertical slots (default `12`). `fixedPositions` anchors the top positions (default `5`). When the included field exceeds the visible slots, only the lower slots advance to the next page every `15s`; the fixed positions do not move. When the full included field fits, all included rows remain fixed.
 - The exact tower typography is defined in the Typography section and frontmatter roles. Driver focus remains a separate `30px` Barlow Condensed treatment; do not apply its generic package typography to the PSD-derived timing tower. The PRI neutral ramp runs from `#030304` through `#313336`, silver copy from `#8f9194` through `#f7f7f5`, and the package accent is `#e10613`.
-- Other slots use similarly direct, labeled facts rather than decorative content. Lower-third and results treatments are not part of the current PRI Hoosier 500 refresh.
+
+### PRI Hoosier 500 Results Page
+
+- The pinned visual authority is `/Users/arjunakankipati/Downloads/26-BroadcastElements-Layout-1080.psd`. The shipped page is a direct reconstruction of that PSD's Practice Results smart object at the fixed placement and geometry defined in Layout, not a generic results card or a Gantry-branded reinterpretation.
+- Preserve the four embedded raster assets as indivisible visual evidence: the panel/background, PRI Hoosier 500 event badge, vertical separator, and Visitor Watch Company presenter logo. Do not redraw their textures, logos, edge treatment, or sponsor lockup in CSS or text.
+- The heading is always `2026 PRI HOOSIER 500`; the subtitle is the selected retained session type followed by `RESULTS`. The operator may select Practice, Qualifying, or Race and may show Speed or Gap to leader. Defaults are Practice and Speed.
+- Results use the latest retained snapshot for the selected session type, even after another type becomes current. Include only classified rows with positive positions, sort by position, and show the top ten. Render the driver's full name in uppercase; do not apply the timing tower's surname extraction.
+- Speed is miles per hour derived from the driver's best lap over the `2.5-mile` Indianapolis oval: `2.5 × 3600 ÷ best-lap seconds`, displayed to three decimals. Missing, non-finite, or non-positive best laps display an em dash.
+- Gap to leader always labels first place `LEADER`. In Practice and Qualifying, each remaining value is the non-negative best-lap difference from the leader in seconds, prefixed with `+` and shown to three decimals. In Race, use `+N LAP` or `+N LAPS` when a driver is lapped; otherwise use the available gap-to-leader or interval in seconds, prefixed with `+` and shown to three decimals. Missing source data displays an em dash.
+- When no retained snapshot exists for the selected Practice, Qualifying, or Race session, show the explicit `RESULTS UNAVAILABLE` state rather than substituting the current session or presenting an empty list as valid results.
+- This is a fixed broadcast overlay, so it has no mobile behavior, fluid reflow, narrow-screen layout, or breakpoint acceptance criteria.
+- Other slots use similarly direct, labeled facts rather than decorative content. Lower-third remains outside the current PRI Hoosier 500 PSD refresh.
 - Overlay visibility is a single `180ms ease-out` opacity transition. Package themes may style plates but must preserve legibility at compressed broadcast sizes and transparent canvas behavior.
 
-**The PSD Authority Rule.** For the PRI Hoosier 500 timing tower, source artwork, measured 1080p placement, type roles, band heights, row rhythm, and shell silhouette are authoritative. Preserve them exactly; package extensions must not reinterpret this component.
+**The PSD Authority Rule.** For the PRI Hoosier 500 timing tower and Results page, the pinned PSD, extracted raster artwork, measured 1080p placement, typography, and component geometry are authoritative. Preserve them exactly; package extensions must not reinterpret either component.
 
 ## Do's and Don'ts
 
@@ -367,6 +440,9 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Do** keep overlays transparent outside their graphic plates and let package tokens own their client-facing finish.
 - **Do** preserve the PRI Hoosier 500 tower at `361px` wide and approximately `67px` from the left and `63px` from the top on a `1920 × 1080px` canvas.
 - **Do** keep PRI tower field inclusion, visible slots, and fixed positions as separate controls; rotate only the non-fixed slots at the shipped `15s` cadence.
+- **Do** preserve the PRI Hoosier 500 Results page at `x = 289px`, `y = 177px`, `1344 × 783px` on a `1920 × 1080px` canvas, including its embedded raster panel, event badge, separator, and presenter logo.
+- **Do** keep results session selection and metric selection independent, default them to Practice and Speed, and render the selected retained snapshot's top ten full-name rows.
+- **Do** show `RESULTS UNAVAILABLE` when the requested Practice, Qualifying, or Race snapshot has not been retained.
 - **Do** move focus into newly revealed, high-consequence authentication content such as the one-time secret receipt.
 - **Do** write every loading, pending, empty, active, revoked, success, and error state in specific operator language.
 - **Do** preserve `44px` minimum touch targets for compact access navigation and record actions.
@@ -385,7 +461,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.
 - **Don't** allow a package theme to alter control-panel layout, control styling, or operator terminology.
-- **Don't** substitute Gantry's global fonts, redraw the supplied PRI masthead, or reinterpret the PSD-derived tower proportions.
+- **Don't** substitute Gantry's global fonts, redraw supplied PRI or Visitor Watch Company artwork, or reinterpret the PSD-derived tower or Results-page proportions.
+- **Don't** make the PRI Results page responsive or create a mobile layout; it is a fixed `1920 × 1080px` broadcast composition.
 - **Don't** animate continuously; use only decisive stamp/slide or opacity state changes around `180–260ms`.
 - **Don't** use orange or green as generic authentication status fills; reserve orange for action/selection/confirmation and green for a reinforced success cue.
 - **Don't** collapse mobile key records into unlabeled values or require horizontal table scrolling for routine access management.
