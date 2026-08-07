@@ -210,6 +210,15 @@ kbd { margin-left: auto; border: 1px solid currentColor; padding: 2px 5px; font:
 .access-heading { display: grid; grid-template-columns: 40px 1fr; gap: 12px; padding-bottom: 18px; border-bottom: 3px solid var(--ink); }
 .access-heading > svg { width: 36px; height: 36px; color: var(--ink); }
 .access-heading h1 { font-size: 28px; }
+.client-download { display: grid; gap: 11px; margin-top: 16px; border: 1px solid var(--ink); padding: 12px; background: rgba(184, 194, 189, .28); }
+.client-download-copy { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 9px; }
+.client-download-copy > svg { width: 27px; height: 27px; color: var(--ink); }
+.client-download-copy strong, .client-download-copy span { display: block; }
+.client-download-copy strong { font: 700 17px/1 var(--display); text-transform: uppercase; }
+.client-download-copy span { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.25; }
+.client-download > a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 2px solid var(--ink); padding: 7px 12px; color: var(--stock); background: var(--ink); text-decoration: none; font: 700 16px var(--display); text-transform: uppercase; transition: color 160ms ease-out, background 160ms ease-out; }
+.client-download > a:hover { color: var(--ink); background: var(--orange); }
+.client-download > a svg { width: 18px; height: 18px; }
 .key-issue form { padding-inline: 0; }
 .key-issue fieldset { display: grid; gap: 0; margin: 0; border: 0; padding: 0; }
 .key-issue legend { width: 100%; padding: 0 0 6px; color: var(--muted); font: 600 11px var(--display); text-transform: uppercase; letter-spacing: .06em; }

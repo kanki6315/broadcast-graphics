@@ -8,6 +8,7 @@ import Fastify from "fastify";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ClientMessage, ServerMessage } from "@racecontrol/protocol";
 import { createAuthenticationStore } from "./auth-store.js";
+import { loadClientRelease, streamClientRelease } from "./client-release.js";
 import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
 import { startSimulator } from "./simulator.js";
@@ -20,6 +21,7 @@ const projectRoot = resolve(here, "../../..");
 const packageRoot = resolve(projectRoot, "graphic-packages");
 const webRoot = resolve(projectRoot, "apps/web/dist");
 const authDataPath = process.env.AUTH_DATA_PATH ?? resolve(projectRoot, "apps/server/data/auth.json");
+const clientReleaseRoot = process.env.CLIENT_RELEASE_ROOT ?? resolve(projectRoot, "client-release");
 
 const app = Fastify({ logger: true });
 const adminUsername = process.env.ADMIN_USERNAME ?? "admin";
@@ -41,6 +43,7 @@ const historyRepository = createRaceHistoryRepository(process.env.DATABASE_URL);
 await historyRepository.initialize();
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
+const clientRelease = await loadClientRelease(clientReleaseRoot);
 const store = new StateStore(packages[0]?.id ?? "apex");
 const sockets = new Map<WebSocket, SocketRole>();
 const cameraSockets = new Set<WebSocket>();
@@ -97,6 +100,20 @@ if (existsSync(webRoot)) {
 }
 
 app.get("/api/health", async () => ({ ok: true, revision: store.snapshot().revision }));
+app.get("/api/client/latest", async (_request, reply) => {
+  if (!clientRelease) return reply.code(404).send({ error: "No Windows client release is available." });
+  reply.header("Cache-Control", "no-store");
+  return clientRelease.manifest;
+});
+app.get("/api/client/download", async (_request, reply) => {
+  if (!clientRelease) return reply.code(404).send({ error: "No Windows client release is available." });
+  reply
+    .header("Cache-Control", "no-store")
+    .header("Content-Disposition", 'attachment; filename="BroadcastGraphicsClient.exe"')
+    .header("Content-Length", clientRelease.manifest.size)
+    .type("application/vnd.microsoft.portable-executable");
+  return reply.send(streamClientRelease(clientRelease));
+});
 app.post<{ Body: { username?: unknown; password?: unknown } }>("/api/auth/login", async (request, reply) => {
   const now = Date.now();
   const current = loginAttempts.get(request.ip);

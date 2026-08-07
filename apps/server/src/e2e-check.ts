@@ -7,6 +7,11 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD;
 if (!adminPassword) throw new Error("E2E_ADMIN_PASSWORD is required.");
 const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json()) as { ok: boolean };
 if (!health.ok) throw new Error("Health endpoint did not report ready.");
+const clientReleaseResponse = await fetch(`${baseUrl}/api/client/latest`);
+if (!clientReleaseResponse.ok) throw new Error(`Client release endpoint failed with status ${clientReleaseResponse.status}.`);
+const clientRelease = await clientReleaseResponse.json() as { version?: string; url?: string; sha256?: string; size?: number };
+if (!clientRelease.version || clientRelease.url !== "/api/client/download" || !clientRelease.sha256 || !clientRelease.size)
+  throw new Error("Client release endpoint returned an invalid manifest.");
 
 const login = await fetch(`${baseUrl}/api/auth/login`, {
   method: "POST",
@@ -50,6 +55,7 @@ const taken = await waitFor((state) => state.graphics.activeSlots.includes("timi
 
 console.log(JSON.stringify({
   health: "ok",
+  windowsClientVersion: clientRelease.version,
   track: taken.session?.trackName,
   focusedDriver: target.name,
   timingTower: "on-air",

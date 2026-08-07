@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private readonly ClientSettingsStore settingsStore = new();
     private readonly WindowsCredentialStore credentialStore = new();
     private readonly DiagnosticCapture diagnostics = new();
+    private readonly ClientUpdateService updateService = new();
     private readonly TelemetryBridge bridge;
     private readonly ObservableCollection<string> logEntries = [];
     private DiagnosticReplayArchive? validatedReplay;
@@ -62,6 +63,31 @@ public partial class MainWindow : Window
         if (SelectedSourceMode() == TelemetrySourceMode.DiagnosticReplay && !string.IsNullOrWhiteSpace(ReplayPathBox.Text))
             await ValidateReplayAsync(ReplayPathBox.Text);
         AddLog("Client ready. Configure the connection, then select Connect.");
+        await CheckForUpdateAsync();
+    }
+
+    private async Task CheckForUpdateAsync()
+    {
+        var executablePath = Environment.ProcessPath;
+        if (!ClientUpdateService.CanSelfUpdate(executablePath)) return;
+        try
+        {
+            var currentVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
+            var update = await updateService.CheckAsync(ServerUrlBox.Text, currentVersion);
+            if (update is null) return;
+            AddLog($"Client update {update.Manifest.Version} is available. Downloading verified release…");
+            IsEnabled = false;
+            var stagedPath = await updateService.DownloadAsync(update, executablePath!);
+            AddLog("Update verified. Restarting to install it.");
+            ClientUpdateService.LaunchInstaller(stagedPath, executablePath!, update.Manifest.Sha256);
+            shutdownComplete = true;
+            Application.Current.Shutdown();
+        }
+        catch (Exception error)
+        {
+            IsEnabled = true;
+            AddLog($"Automatic update check failed: {error.Message}");
+        }
     }
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
@@ -510,6 +536,7 @@ public partial class MainWindow : Window
         replayValidationCancellation?.Cancel();
         replayValidationCancellation?.Dispose();
         await diagnostics.DisposeAsync();
+        updateService.Dispose();
         try { await settingsStore.SaveAsync(ReadSettings()); } catch { }
         shutdownComplete = true;
         Close();
