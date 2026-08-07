@@ -27,6 +27,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 - The telemetry client runs on the same Windows PC as iRacing.
 - Browser graphics are loaded as transparent web sources in software such as vMix or OBS.
 - The operator panel is used during a live session, often on a second display with limited attention available.
+- The `/control` operator panel is a private, single-user desktop tool. Mobile layouts and accessibility conformance are outside its required review and acceptance scope.
 - The initial workflow emphasizes automatic live data plus quick manual show/hide and content controls.
 - The control panel is not a multiview or program monitor; vMix/OBS owns video preview. Its dominant surface is live timing and race context for production decisions.
 
@@ -59,4 +60,6 @@ No brand assets, customer claims, or benchmarks are currently present. User-prov
 
 ## Accessibility & Inclusion
 
-The control panel should be fully keyboard operable, maintain strong contrast, and never communicate race state through color alone. Broadcast graphics should remain legible at typical compressed-stream viewing sizes.
+Broadcast graphics should remain legible at typical compressed-stream viewing sizes. Authentication and access-management surfaces should retain their documented accessibility behavior.
+
+The private `/control` operator panel is intentionally exempt from accessibility auditing and mobile or responsive-view validation. Keyboard-only operation, screen-reader behavior, formal contrast conformance, reduced-motion behavior, touch targets, and narrow-screen layouts are not acceptance criteria for that page. Existing accessible or responsive behavior may remain, but it does not need to be preserved or checked when changing `/control`.
