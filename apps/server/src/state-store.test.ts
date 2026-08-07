@@ -22,6 +22,11 @@ const session: SessionState = {
   startState: "go",
   flags: ["green"],
   classes: [{ id: 1, name: "GT3", color: "#ffffff", carCount: 1 }],
+  source: "iracing",
+  sourceMode: "live",
+  externalSubSessionId: 123,
+  externalSessionNumber: 0,
+  trackId: 45,
   drivers: [{
     carIdx: 7, position: 1, carNumber: "23", name: "Test Driver", team: "Test Team",
     className: "GT3", interval: null, lastLap: 82, bestLap: 81.5, lapsCompleted: 1,
@@ -30,6 +35,9 @@ const session: SessionState = {
     intervalToAhead: null, classGapToLeader: 0, classIntervalToAhead: null,
     lapsBehindLeader: 0, lapsBehindClassLeader: 0, currentLap: 1,
     lastLapNumber: 1, bestLapNumber: 1, lapDistPct: 0.2, trackStatus: "running", isConnected: true,
+    userId: 100, teamId: 200, carId: 300, lastLapPosition: 1, lastLapClassPosition: 1,
+    lastLapGapToLeader: 0, lastLapGapToClassLeader: 0,
+    lastLapLapsBehindLeader: 0, lastLapLapsBehindClassLeader: 0,
   }],
 };
 

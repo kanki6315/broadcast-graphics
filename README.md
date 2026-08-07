@@ -10,7 +10,7 @@ A working MVP for turning iRacing race data into browser-source graphics and a t
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
 
-The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, and completed-lap metadata before transmission. See the [telemetry contract](docs/telemetry-contract.md) for the field semantics and verified capture scenarios.
+The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, and completed-lap metadata before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics and the [race-history model](docs/race-history.md) for durable lap storage.
 
 ## Quick start
 
@@ -67,7 +67,7 @@ Pushes to `main` that change `client/**` or `global.json` automatically publish 
 
 Before a release, complete the [Windows telemetry client smoke test](docs/windows-client-smoke-test.md), including the 100% and 150% display-scaling checks.
 
-The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys and admin sessions are stored in PostgreSQL; key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
+The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys, admin sessions, broadcast sessions, entries, drivers, and completed laps are stored in PostgreSQL. Raw telemetry frames remain in memory. Key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
 
 ## Railway deployment
 
@@ -85,7 +85,7 @@ The repository includes a multi-stage production `Dockerfile` and `railway.toml`
    DISABLE_SIMULATOR=1
    ```
 
-   If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its `bg_access_keys` and `bg_admin_sessions` tables during startup.
+   If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its authentication and `bg_*` race-history tables during startup.
 
 4. Confirm that Railway reports `/api/health` as healthy, then open `/control` and create one ingestion key and one view key.
 5. Add `broadcasts.arjunakankipati.com` as the Railway service's custom domain. In Cloudflare DNS, create the CNAME Railway supplies. Keep it DNS-only while validating HTTPS and WebSockets; Cloudflare proxying can be enabled after the end-to-end test succeeds.

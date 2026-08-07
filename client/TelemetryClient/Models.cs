@@ -29,7 +29,16 @@ public sealed record DriverState(
     [property: JsonPropertyName("bestLapNumber")] int? BestLapNumber = null,
     [property: JsonPropertyName("lapDistPct")] double? LapDistPct = null,
     [property: JsonPropertyName("trackStatus")] string TrackStatus = "unknown",
-    [property: JsonPropertyName("isConnected")] bool IsConnected = false);
+    [property: JsonPropertyName("isConnected")] bool IsConnected = false,
+    [property: JsonPropertyName("userId")] int UserId = 0,
+    [property: JsonPropertyName("teamId")] int TeamId = 0,
+    [property: JsonPropertyName("carId")] int CarId = 0,
+    [property: JsonPropertyName("lastLapPosition")] int? LastLapPosition = null,
+    [property: JsonPropertyName("lastLapClassPosition")] int? LastLapClassPosition = null,
+    [property: JsonPropertyName("lastLapGapToLeader")] double? LastLapGapToLeader = null,
+    [property: JsonPropertyName("lastLapGapToClassLeader")] double? LastLapGapToClassLeader = null,
+    [property: JsonPropertyName("lastLapLapsBehindLeader")] int? LastLapLapsBehindLeader = null,
+    [property: JsonPropertyName("lastLapLapsBehindClassLeader")] int? LastLapLapsBehindClassLeader = null);
 
 public sealed record CarClassState(
     [property: JsonPropertyName("id")] int Id,
@@ -55,4 +64,9 @@ public sealed record SessionState(
     [property: JsonPropertyName("phase")] string Phase = "invalid",
     [property: JsonPropertyName("startState")] string StartState = "hidden",
     [property: JsonPropertyName("flags")] IReadOnlyList<string>? Flags = null,
-    [property: JsonPropertyName("classes")] IReadOnlyList<CarClassState>? Classes = null);
+    [property: JsonPropertyName("classes")] IReadOnlyList<CarClassState>? Classes = null,
+    [property: JsonPropertyName("source")] string Source = "iracing",
+    [property: JsonPropertyName("sourceMode")] string SourceMode = "live",
+    [property: JsonPropertyName("externalSubSessionId")] int? ExternalSubSessionId = null,
+    [property: JsonPropertyName("externalSessionNumber")] int? ExternalSessionNumber = null,
+    [property: JsonPropertyName("trackId")] int? TrackId = null);

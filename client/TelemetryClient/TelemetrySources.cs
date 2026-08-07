@@ -43,7 +43,8 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
                 yield return new SessionState(
                     "client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course",
                     19, 40, null, "green", DateTimeOffset.UtcNow.ToString("O"), drivers,
-                    18, 21, tick / 4d, null, "racing", "go", ["green"], [new CarClassState(1, "GT3", "#e54b2a", drivers.Length)]);
+                    18, 21, tick / 4d, null, "racing", "go", ["green"], [new CarClassState(1, "GT3", "#e54b2a", drivers.Length)],
+                    "simulation", "simulation");
                 await Task.Delay(250, cancellationToken);
             }
         }
@@ -211,7 +212,7 @@ internal static class TelemetrySnapshotMapper
         var sessionType = NormalizeSessionType(session?.SessionType ?? info.WeekendInfo?.EventType);
         var drivers = (info.DriverInfo?.Drivers ?? [])
             .Where(driver => driver.CarIdx >= 0 && driver.CarIsPaceCar == 0 && driver.IsSpectator == 0)
-            .Select(driver => MapDriver(driver, telemetry, results))
+            .Select(driver => MapDriver(driver, telemetry, results, sessionType))
             .OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position)
             .ToArray();
         drivers = AddRaceTiming(drivers, sessionType);
@@ -250,13 +251,19 @@ internal static class TelemetrySnapshotMapper
             phase,
             NormalizeStartState(telemetry.SessionFlags),
             flags,
-            classes);
+            classes,
+            "iracing",
+            "live",
+            weekend?.SubSessionID,
+            sessionNumber,
+            weekend?.TrackID);
     }
 
     private static DriverState MapDriver(
         Driver driver,
         TelemetryData telemetry,
-        IReadOnlyDictionary<int, Session.ResultPosition> results)
+        IReadOnlyDictionary<int, Session.ResultPosition> results,
+        string sessionType)
     {
         var index = driver.CarIdx;
         results.TryGetValue(index, out var result);
@@ -266,7 +273,7 @@ internal static class TelemetrySnapshotMapper
         if (classPosition <= 0 && result is not null) classPosition = result.ClassPosition + 1;
         var lapsCompleted = ValueAt(telemetry.CarIdxLapCompleted, index);
         if (lapsCompleted < 0 && result is not null) lapsCompleted = result.LapsComplete;
-        var lastLap = NormalizeTime(ValueAt(telemetry.CarIdxLastLapTime, index));
+        var lastLap = NormalizeTime(ValueAt(telemetry.CarIdxLastLapTime, index)) ?? NormalizeTime(result?.LastTime);
         var bestLap = NormalizeTime(ValueAt(telemetry.CarIdxBestLapTime, index));
         var currentLap = ValueAt(telemetry.CarIdxLap, index);
         if (currentLap <= 0 && lapsCompleted >= 0) currentLap = lapsCompleted + 1;
@@ -275,6 +282,8 @@ internal static class TelemetrySnapshotMapper
         var trackLocation = ValueAt(telemetry.CarIdxTrackSurface, index);
         var onPitRoad = ValueAt(telemetry.CarIdxOnPitRoad, index);
         var trackStatus = NormalizeTrackStatus(trackLocation, onPitRoad, result?.ReasonOutStr, position);
+        int? lastLapNumber = lastLap is not null && lapsCompleted > 0 ? lapsCompleted : null;
+        var hasMatchingResult = lastLapNumber is not null && result?.LapsComplete == lastLapNumber;
         return new DriverState(
             index,
             position,
@@ -298,11 +307,17 @@ internal static class TelemetrySnapshotMapper
             0,
             0,
             Math.Max(currentLap, 0),
-            lastLap is not null && lapsCompleted > 0 ? lapsCompleted : null,
+            lastLapNumber,
             bestLapNumber > 0 ? bestLapNumber : null,
             NormalizeLapDistance(ValueAt(telemetry.CarIdxLapDistPct, index)),
             trackStatus,
-            !string.Equals(trackStatus, "not-in-world", StringComparison.Ordinal));
+            !string.Equals(trackStatus, "not-in-world", StringComparison.Ordinal),
+            driver.UserID,
+            driver.TeamID,
+            driver.CarID,
+            hasMatchingResult && result!.Position > 0 ? result.Position : null,
+            hasMatchingResult && result!.ClassPosition >= 0 ? result.ClassPosition + 1 : null,
+            hasMatchingResult && string.Equals(sessionType, "race", StringComparison.Ordinal) ? NormalizeGap(result!.Time) : null);
     }
 
     private static DriverState[] AddRaceTiming(DriverState[] drivers, string sessionType)
@@ -350,6 +365,26 @@ internal static class TelemetrySnapshotMapper
                 classInterval = Difference(classGap, aheadClassGap);
             }
 
+            int? lastLapLapsBehind = null;
+            double? lastLapGap = null;
+            int? lastLapClassLapsBehind = null;
+            double? lastLapClassGap = null;
+            if (driver.LastLapNumber is { } completedLap && driver.LastLapPosition is not null)
+            {
+                lastLapLapsBehind = Math.Max(leader.LapsCompleted - completedLap, 0);
+                lastLapGap = lastLapLapsBehind == 0 ? driver.LastLapGapToLeader : null;
+                if (classLeader?.LastLapNumber is { } classLeaderLap && classLeader.LastLapPosition is not null)
+                {
+                    lastLapClassLapsBehind = Math.Max(classLeaderLap - completedLap, 0);
+                    if (lastLapClassLapsBehind == 0)
+                    {
+                        lastLapClassGap = driver.CarIdx == classLeader.CarIdx
+                            ? 0d
+                            : Difference(driver.LastLapGapToLeader, classLeader.LastLapGapToLeader);
+                    }
+                }
+            }
+
             return driver with
             {
                 Interval = gap,
@@ -358,7 +393,11 @@ internal static class TelemetrySnapshotMapper
                 ClassGapToLeader = classGap,
                 ClassIntervalToAhead = classInterval,
                 LapsBehindLeader = lapsBehind,
-                LapsBehindClassLeader = classLapsBehind
+                LapsBehindClassLeader = classLapsBehind,
+                LastLapGapToLeader = lastLapGap,
+                LastLapGapToClassLeader = lastLapClassGap,
+                LastLapLapsBehindLeader = lastLapLapsBehind,
+                LastLapLapsBehindClassLeader = lastLapClassLapsBehind
             };
         }).OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position).ToArray();
     }

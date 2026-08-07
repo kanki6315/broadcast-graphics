@@ -22,6 +22,10 @@ public sealed class TelemetrySnapshotMapperTests
         Assert.Equal("racing", state.Phase);
         Assert.Equal("go", state.StartState);
         Assert.Contains("green", state.Flags!);
+        Assert.Equal("iracing", state.Source);
+        Assert.Equal("live", state.SourceMode);
+        Assert.Equal(123, state.ExternalSubSessionId);
+        Assert.Equal(0, state.ExternalSessionNumber);
 
         var leader = state.Drivers.Single(driver => driver.Position == 1);
         var second = state.Drivers.Single(driver => driver.Position == 2);
@@ -46,7 +50,7 @@ public sealed class TelemetrySnapshotMapperTests
             f2Times: [0, 2, 3, 4]);
         var info = SessionInfo("Race",
             [Driver(0, 10, "GT"), Driver(1, 20, "TC"), Driver(2, 10, "GT"), Driver(3, 20, "TC")],
-            [Result(0, 1, 0), Result(1, 2, 0), Result(2, 3, 1), Result(3, 4, 1)]);
+            [Result(0, 1, 0, 0), Result(1, 2, 0, 2), Result(2, 3, 1, 3), Result(3, 4, 1, 4)]);
 
         var state = TelemetrySnapshotMapper.Map(telemetry, info);
 
@@ -62,6 +66,13 @@ public sealed class TelemetrySnapshotMapperTests
         Assert.Equal(2, tcSecond.ClassPosition);
         AssertClose(2, tcSecond.ClassGapToLeader);
         AssertClose(2, tcSecond.ClassIntervalToAhead);
+        Assert.Equal(4, gtSecond.LastLapNumber);
+        Assert.Equal(3, gtSecond.LastLapPosition);
+        Assert.Equal(2, gtSecond.LastLapClassPosition);
+        AssertClose(3, gtSecond.LastLapGapToLeader);
+        AssertClose(3, gtSecond.LastLapGapToClassLeader);
+        Assert.Equal(0, gtSecond.LastLapLapsBehindLeader);
+        Assert.Equal(0, gtSecond.LastLapLapsBehindClassLeader);
     }
 
     [Fact]
@@ -184,15 +195,20 @@ public sealed class TelemetrySnapshotMapperTests
         CarNumber = (carIdx + 1).ToString(),
         CarClassID = classId,
         CarClassShortName = className,
-        CarClassColor = classId == 10 ? 0xff0000 : 0x00ff00
+        CarClassColor = classId == 10 ? 0xff0000 : 0x00ff00,
+        UserID = 1_000 + carIdx,
+        TeamID = 2_000 + carIdx,
+        CarID = 3_000 + carIdx
     };
 
-    private static Session.ResultPosition Result(int carIdx, int position, int classPosition) => new()
+    private static Session.ResultPosition Result(int carIdx, int position, int classPosition, float time = 0) => new()
     {
         CarIdx = carIdx,
         Position = position,
         ClassPosition = classPosition,
         LapsComplete = 4,
+        LastTime = 70,
+        Time = time,
         ReasonOutStr = "Running"
     };
 

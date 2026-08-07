@@ -33,7 +33,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 ## Capabilities and Constraints
 
 - Ingest live iRacing session, driver, timing, position, class, lap, start-state, flag, and track-state data through a documented normalized telemetry contract.
-- Maintain authoritative current session state on the server and retain useful historical data.
+- Maintain authoritative current session state in memory and persist broadcast sessions, entries, drivers, completed lap times, and scoring-line gaps in PostgreSQL.
 - Serve synchronized browser graphics and an operator control panel in real time.
 - Support initial graphics such as a timing tower, race status, driver focus, battle, flag, and lower-third treatments.
 - Treat each client-facing graphic style as a replaceable package of layouts, design tokens, assets, and configuration schema. The control panel operates semantic graphic slots and must not require a rebuild when a client package changes presentation.

@@ -347,7 +347,7 @@ public sealed class DiagnosticReplayTelemetrySource(
                 }
 
                 var frame = frames[index];
-                yield return frame.State;
+                yield return frame.State with { SourceMode = "replay" };
                 index++;
                 var position = frame.CapturedAt > firstTimestamp ? frame.CapturedAt - firstTimestamp : TimeSpan.Zero;
                 PublishProgress(position, archive.Info.Duration, index, frames.Count, index >= frames.Count);

@@ -48,7 +48,11 @@ These fields support trustworthy last-lap, personal-best, class-best, session-be
 
 There is no reliable per-car live current-lap stopwatch in the available spectator data. Do not synthesize one from `lapDistPct`. If a live estimate is added later, it must be labeled as an estimate.
 
-The server should next convert `lastLapNumber` changes into durable `lap.completed` events. Retaining those events will enable lap history, deltas to personal/class/session best, consistency, stint analysis, and automatic “new fastest lap” cues without depending on the current frame alone.
+The client also pairs a completed race lap with `ResultsPositions.Time` only when the result's completed-lap number matches `lastLapNumber`. This produces `lastLapGapToLeader`, a scoring-line gap rather than a sampled in-lap estimate. Overall and class lap deficits remain separate from seconds gaps.
+
+The server converts matching lap results into durable completed-lap records. It deduplicates them by session, entry, and lap number, and emits `lap.completed` only after the database insert succeeds. The resulting history supports lap-time and scoring-gap trends, deltas to personal/class/session best, consistency, stint analysis, and automatic fastest-lap cues.
+
+Sector times are intentionally outside this contract. iRacing exposes sector boundary locations but not completed sector results for every car, and this product does not synthesize sector timing from car position.
 
 ## Track and connection state
 
