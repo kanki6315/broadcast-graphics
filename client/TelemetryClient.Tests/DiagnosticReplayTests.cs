@@ -48,6 +48,8 @@ public sealed class DiagnosticReplayTests
             Assert.Null(driver.LatestPitVisit);
             Assert.Null(driver.StartingPosition);
             Assert.Null(driver.TimingQuality);
+            Assert.Null(driver.Sectors);
+            Assert.Null(Assert.Single(replay.Frames).State.SectorDefinition);
         }
         finally
         {

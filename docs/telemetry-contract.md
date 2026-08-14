@@ -74,7 +74,19 @@ The client also pairs a completed race lap with `ResultsPositions.Time` only whe
 
 The server converts matching lap results into durable completed-lap records. It deduplicates them by session, entry, and lap number, and emits `lap.completed` only after the database insert succeeds. The resulting history supports lap-time and scoring-gap trends, deltas to personal/class/session best, consistency, stint analysis, and automatic fastest-lap cues.
 
-Sector times are intentionally outside this contract. iRacing exposes sector boundary locations but not completed sector results for every car, and this product does not synthesize sector timing from car position.
+## Timing quality, provenance, and sectors
+
+Official iRacing facts and local calculations remain separate:
+
+- `lastLap`, `lastLapNumber`, `bestLap`, and `bestLapNumber` are authoritative iRacing facts. A dirty locally derived sector never clears or invalidates them.
+- Moving gaps and `DriverState.sectors` are locally derived by `TrackTimingTracker` from `SessionTime`, `CarIdxLap`, and `CarIdxLapDistPct` samples.
+- Every derived result carries `source: "derived"`; official timing metadata carries `source: "iracing"`.
+
+`TimingQuality` has four values. `valid` passed all lifecycle and continuity checks. `inferred` has a defensible value containing an explicitly identified inference. `incomplete` lacks enough clean evidence for a value. `invalid` was affected by a known discontinuity. Invalidity reasons are `telemetry-gap`, `lap-jump`, `position-reset`, `implausible-movement`, `tow`, `pit-transition`, `invalid-crossing-order`, `session-transition`, `insufficient-samples`, and `definition-mismatch`. Missing and invalid values are absent/null, never zero.
+
+The optional session `sectorDefinition` comes only from `SessionInfo.SplitTimeInfo.Sectors`. The Windows client orders the variable-length `SectorNum`/`SectorStartPct` list, requires a usable start/finish boundary, associates it with the session and track identity, and hashes those facts into a stable `iracing-…` revision. It does not invent boundaries when the SDK definition is absent or unusable. A definition change resets the local lifecycle; results from different revisions never share rankings.
+
+Each optional `DriverState.sectors` contains the current sector number plus completed sectors for the current and previous lap. A completed sector includes lap, sector number, elapsed value when available, revision, completion/observation session time, source, quality, invalidity reason, and valid-only comparison labels. Only `valid` derived sectors can become personal, class, or overall fastest or support pace comparisons. Before a complete set is accepted, its sum must reconcile with the official completed lap within `max(0.5 seconds, 1% of the official lap time)`, which accommodates sampling/interpolation error without accepting a definition mismatch.
 
 ## Track and connection state
 
@@ -85,6 +97,8 @@ The optional `pitState` is deliberately separate and is one of `not-in-pits`, `p
 Only an unobserved interval bracketed by `pit-stall` on both sides contributes to `inferredBoxTime`. Stall-to-lane, stall-to-track, lane-to-lane, lane-to-stall, and lane-to-track disappearances all remain `unknownTime`. While a car is still absent, the unresolved interval is shown as unknown and the visit quality is `incomplete`. A driver identity change marks the visit but never splits it.
 
 `timingQuality` adds `source`, `quality`, and an optional invalidity reason to named driver timing fields while retaining the existing numeric fields for replay compatibility. New clients send it; old captures may omit it.
+
+The server adds an optional, session-scoped `LiveState.intelligence` snapshot. It contains stabilized same-class battles, bounded-window gap trends, pit cycles, driver stints, and quality warnings. This snapshot is calculated once from normalized telemetry and shared by all viewers; browser filters never change its canonical quality or conclusions.
 
 ## Additional broadcast data
 

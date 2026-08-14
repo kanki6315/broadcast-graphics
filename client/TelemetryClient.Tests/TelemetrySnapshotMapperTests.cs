@@ -174,6 +174,21 @@ public sealed class TelemetrySnapshotMapperTests
     }
 
     [Fact]
+    public void NativeSectorDefinitionsAreNormalizedWithAStableSessionRevision()
+    {
+        var info = SessionInfo("Race", [Driver(0)], sectors: [(2, .35), (1, 0), (3, .72)]);
+
+        var first = TelemetrySnapshotMapper.Map(Telemetry([1], [1], [1], [0]), info);
+        var second = TelemetrySnapshotMapper.Map(Telemetry([1], [1], [1], [0]), info);
+
+        Assert.NotNull(first.SectorDefinition);
+        Assert.Equal("iracing", first.SectorDefinition.Source);
+        Assert.Equal([1, 2, 3], first.SectorDefinition.Boundaries.Select(boundary => boundary.SectorNumber));
+        Assert.Equal(first.SectorDefinition.Revision, second.SectorDefinition!.Revision);
+        Assert.StartsWith("iracing-", first.SectorDefinition.Revision);
+    }
+
+    [Fact]
     public void LiveTimingInterpolatesWhenCarsReachTheSameTrackPosition()
     {
         var timing = new TrackTimingTracker();
@@ -325,7 +340,8 @@ public sealed class TelemetrySnapshotMapperTests
     private static TelemetrySessionInfo SessionInfo(
         string type,
         IReadOnlyList<Driver> drivers,
-        IReadOnlyList<Session.ResultPosition>? results = null) => new()
+        IReadOnlyList<Session.ResultPosition>? results = null,
+        IReadOnlyList<(int Number, double Start)>? sectors = null) => new()
     {
         WeekendInfo = new WeekendInfo
         {
@@ -347,7 +363,15 @@ public sealed class TelemetrySnapshotMapperTests
                 }
             ]
         },
-        DriverInfo = new DriverInfo { Drivers = drivers.ToList() }
+        DriverInfo = new DriverInfo { Drivers = drivers.ToList() },
+        SplitTimeInfo = sectors is null ? null : new SplitTimeInfo
+        {
+            Sectors = sectors.Select(sector => new Sector
+            {
+                SectorNum = sector.Number,
+                SectorStartPct = (float)sector.Start,
+            }).ToList()
+        }
     };
 
     private static Driver Driver(int carIdx, int classId = 10, string className = "Open") => new()

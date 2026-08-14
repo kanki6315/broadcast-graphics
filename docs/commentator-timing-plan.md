@@ -321,6 +321,14 @@ The serial foundation for Increment 1 lives in `packages/protocol/src/index.ts`.
 
 ## Verification and acceptance criteria
 
+### Increment 2 implementation decisions
+
+- Native definition revisions are deterministic SHA-256 identity prefixes over session, track, and ordered boundary facts; there is no custom-definition path in this increment.
+- Boundary interpolation requires adjacent samples no more than three seconds apart. Five seconds is a material telemetry gap. Completed-lap sector sums use `max(0.5 seconds, 1% of official lap time)` reconciliation tolerance.
+- The server retains 30 seconds of gap history, requires three clean samples over at least five seconds, publishes at a 750 ms cadence, and treats a class interval of three seconds or less as a stabilized battle candidate.
+- Stints and current pit cycles are reconstructed incrementally from normalized identity and Increment 1 pit-visit facts. This preserves pit-visit continuity and does not add database reads to live refresh.
+- The commentator ledger uses variable-length previous-lap sector detail plus an expandable intelligence view. At half-monitor width the fixed dense ledger scrolls horizontally inside its ruled region; canonical calculations remain server-owned.
+
 ### Pit timing
 
 - A car that disappears from `InPitStall` and returns to `InPitStall` remains in one pit visit; the missing duration is included in `inferredBoxTime` and `boxTime`.
