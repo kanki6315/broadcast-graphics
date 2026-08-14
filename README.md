@@ -12,7 +12,7 @@ The Gantry identity combines a circular `G`, a timing beam, and an orange termin
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
 
-The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, completed-lap metadata, and available camera groups before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics and the [race-history model](docs/race-history.md) for durable lap storage.
+The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, completed-lap metadata, and available camera groups before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics, the [race-history model](docs/race-history.md) for durable lap storage, and the [commentator timing plan](docs/commentator-timing-plan.md) for the planned read-only endurance timing workspace.
 
 ## Quick start
 
