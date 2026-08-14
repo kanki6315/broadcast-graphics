@@ -161,6 +161,7 @@ test("persists semantic sectors idempotently and isolates definition revisions",
   const sector = {
     carIdx: 7, lapNumber: 1, sectorNumber: 1, definitionRevision: definition.revision,
     source: "derived" as const, quality: "valid" as const, value: 48.2, completedAt: 50,
+    driverId: "99", driverName: "Previous Driver",
   };
   const update = session(driver({ sectors: { currentSectorNumber: 2, currentLap: [], previousLap: [sector] } }), {
     sectorDefinition: definition,
@@ -168,7 +169,9 @@ test("persists semantic sectors idempotently and isolates definition revisions",
 
   history.ingest(update);
   history.ingest(update);
-  assert.deepEqual((await history.listSectors(update, 7)).map((result) => result.value), [48.2]);
+  const persisted = await history.listSectors(update, 7);
+  assert.deepEqual(persisted.map((result) => result.value), [48.2]);
+  assert.equal(persisted[0]?.driverName, "Previous Driver");
 
   const revised = { ...definition, revision: "iracing-b" };
   const revisedSector = { ...sector, definitionRevision: revised.revision, value: 48.1 };

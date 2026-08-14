@@ -353,10 +353,11 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
       const sessionId = await this.upsertSession(client, session, at);
       await this.upsertClass(client, sessionId, session, driver);
       const entryId = await this.upsertEntry(client, sessionId, driver, at);
-      const driverId = await this.upsertDriver(client, entryId, driver, at);
       const definitionId = await this.upsertSectorDefinition(client, sessionId, definition, at);
       const inserted: CompletedSector[] = [];
       for (const sector of sectors) {
+        const sectorDriver = driverForSector(driver, sector);
+        const driverId = await this.upsertDriver(client, entryId, sectorDriver, at);
         const result = await client.query(`
           INSERT INTO bg_completed_sectors (
             id, session_id, entry_id, driver_id, definition_id, lap_number, sector_number,
@@ -506,6 +507,15 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
     }
     return id;
   }
+}
+
+function driverForSector(current: DriverState, sector: CompletedSector): DriverState {
+  const numericId = Number(sector.driverId);
+  return {
+    ...current,
+    name: sector.driverName?.trim() || current.name,
+    userId: Number.isSafeInteger(numericId) && numericId > 0 ? numericId : current.userId,
+  };
 }
 
 export function createRaceHistoryRepository(databaseUrl?: string): RaceHistoryRepository {
