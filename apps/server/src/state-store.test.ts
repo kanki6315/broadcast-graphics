@@ -76,6 +76,21 @@ test("telemetry retains the latest results snapshot for each session type", () =
   assert.equal(store.snapshot().sessionResults.qualifying?.id, "qualifying");
 });
 
+test("live state projects immutable race-start positions and deltas", () => {
+  const store = new StateStore();
+  const starting = { ...session, drivers: [{ ...session.drivers[0], position: 4, classPosition: 3, lapsCompleted: 0, currentLap: 1 }] };
+  const moved = { ...session, drivers: [{ ...session.drivers[0], position: 2, classPosition: 1, lapsCompleted: 2, currentLap: 3, userId: 999 }] };
+
+  store.telemetry(starting);
+  store.telemetry(moved);
+
+  const projected = store.snapshot().session?.drivers[0];
+  assert.equal(projected?.startingPosition, 4);
+  assert.equal(projected?.startingClassPosition, 3);
+  assert.equal(projected?.positionChange, 2);
+  assert.equal(projected?.classPositionChange, 2);
+});
+
 test("taking and clearing a semantic slot updates on-air state", () => {
   const store = new StateStore();
   store.telemetry(session);

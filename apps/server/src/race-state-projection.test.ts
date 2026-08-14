@@ -1,0 +1,56 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { DriverState, SessionState } from "@racecontrol/protocol";
+import { RaceStateProjection } from "./race-state-projection.js";
+
+function driver(overrides: Partial<DriverState> = {}): DriverState {
+  return {
+    carIdx: 7, position: 4, carNumber: "23", name: "Driver", team: "Team", className: "GT3",
+    interval: 2, lastLap: 82, bestLap: 81, lapsCompleted: 0, onPitRoad: false, incidents: 0,
+    classId: 1, classColor: "#fff", classPosition: 3, gapToLeader: 2, intervalToAhead: 1,
+    classGapToLeader: 2, classIntervalToAhead: 1, lapsBehindLeader: 0, lapsBehindClassLeader: 0,
+    currentLap: 1, lastLapNumber: null, bestLapNumber: null, lapDistPct: 0.2, trackStatus: "running",
+    isConnected: true, userId: 41, teamId: 42, carId: 43, lastLapPosition: null,
+    lastLapClassPosition: null, lastLapGapToLeader: null, lastLapGapToClassLeader: null,
+    lastLapLapsBehindLeader: null, lastLapLapsBehindClassLeader: null,
+    ...overrides,
+  };
+}
+
+function session(currentDriver: DriverState): SessionState {
+  return {
+    id: "race", name: "Race", type: "race", trackName: "Track", lap: currentDriver.currentLap,
+    totalLaps: 20, timeRemaining: null, flag: "green", timestamp: new Date().toISOString(),
+    drivers: [currentDriver], lapsCompleted: currentDriver.lapsCompleted, lapsRemaining: 20,
+    timeElapsed: 10, totalTime: null, phase: "racing", startState: "go", flags: ["green"],
+    classes: [{ id: 1, name: "GT3", color: "#fff", carCount: 1 }], source: "iracing",
+    sourceMode: "live", externalSubSessionId: 1, externalSessionNumber: 0, trackId: 2,
+  };
+}
+
+test("captures and preserves immutable starting positions for older clients", () => {
+  const projection = new RaceStateProjection();
+  const start = projection.apply(session(driver()));
+  const moved = projection.apply(session(driver({ position: 2, classPosition: 1, lapsCompleted: 2, currentLap: 3, userId: 99 })));
+
+  assert.equal(start.drivers[0]?.startingPosition, 4);
+  assert.equal(moved.drivers[0]?.startingPosition, 4);
+  assert.equal(moved.drivers[0]?.startingClassPosition, 3);
+  assert.equal(moved.drivers[0]?.positionChange, 2);
+  assert.equal(moved.drivers[0]?.classPositionChange, 2);
+});
+
+test("preserves explicit unavailable baselines from a late-joining telemetry client", () => {
+  const projection = new RaceStateProjection();
+  const late = projection.apply(session(driver({
+    lapsCompleted: 5,
+    currentLap: 6,
+    startingPosition: null,
+    startingClassPosition: null,
+  })));
+  const reconnected = projection.apply(session(driver({ position: 2, classPosition: 1, lapsCompleted: 6, currentLap: 7 })));
+
+  assert.equal(late.drivers[0]?.positionChange, null);
+  assert.equal(reconnected.drivers[0]?.startingPosition, null);
+  assert.equal(reconnected.drivers[0]?.positionChange, null);
+});

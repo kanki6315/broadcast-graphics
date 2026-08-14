@@ -47,6 +47,8 @@ The mapper behavior is also covered by `client/TelemetryClient.Tests` so SDK cha
 | Field | Meaning |
 | --- | --- |
 | `position` / `classPosition` | One-based overall and class running positions. During active racing these are ordered by cumulative race distance (`CarIdxLap` plus `CarIdxLapDistPct`), because `CarIdxPosition` and `CarIdxClassPosition` are scoring positions rather than live spatial order. SDK positions remain the fallback for cars without usable location data and become authoritative again after racing ends. Session-result class positions are converted from iRacing's zero-based values. |
+| `startingPosition` / `startingClassPosition` | Immutable race-start baselines captured only while the field is still on its first race lap. They remain `null` when the client joined too late to establish a trustworthy start. |
+| `positionChange` / `classPositionChange` | Starting position minus current position. Positive values mean places gained and negative values mean places lost. |
 | `gapToLeader` | Race-only moving time gap in seconds to the overall leader when the cars are on the same completed lap. It is interpolated from shared track-position crossings, with `CarIdxF2Time` as the scoring fallback. |
 | `intervalToAhead` | Race-only moving time gap in seconds to the preceding overall-position car, measured at a shared track position. |
 | `classGapToLeader` | Race-only time gap to the driver's class leader. |
@@ -78,15 +80,20 @@ Sector times are intentionally outside this contract. iRacing exposes sector bou
 
 `trackStatus` is one of `running`, `pit`, `off-track`, `not-in-world`, `retired`, or `unknown`. `isConnected` indicates whether the car is represented in the current world; it does not mean that the driver's telemetry client is connected.
 
+The optional `pitState` is deliberately separate and is one of `not-in-pits`, `pit-lane`, `pit-stall`, or `unobserved`. A car becoming unobserved does not imply movement or a pit exit. `latestPitVisit` remains open until an observed return to track and separately reports pit-lane, observed box, inferred box, and unknown time.
+
+Only an unobserved interval bracketed by `pit-stall` on both sides contributes to `inferredBoxTime`. Stall-to-lane, stall-to-track, lane-to-lane, lane-to-stall, and lane-to-track disappearances all remain `unknownTime`. While a car is still absent, the unresolved interval is shown as unknown and the visit quality is `incomplete`. A driver identity change marks the visit but never splits it.
+
+`timingQuality` adds `source`, `quality`, and an optional invalidity reason to named driver timing fields while retaining the existing numeric fields for replay compatibility. New clients send it; old captures may omit it.
+
 ## Additional broadcast data
 
 The next useful SDK fields should be added only with a graphic or production decision in mind:
 
-1. Starting position and derived position gain/loss.
-2. Tire compound and qualifying-compound lock state.
-3. IndyCar push-to-pass availability, activation, and remaining count.
-4. Pace row, pace line, and per-car pace flags for grids and restarts.
-5. Weather and track conditions for race-status graphics.
-6. Radio-transmitting car for an automatic radio identifier.
+1. Tire compound and qualifying-compound lock state.
+2. IndyCar push-to-pass availability, activation, and remaining count.
+3. Pace row, pace line, and per-car pace flags for grids and restarts.
+4. Weather and track conditions for race-status graphics.
+5. Radio-transmitting car for an automatic radio identifier.
 
 `cameraGroups`, `activeCameraCarIdx`, `activeCameraGroup`, and `activeCamera` report the current session's available camera inventory and observed camera selection. They are optional so older diagnostic captures remain replay-compatible. Camera changes still travel through the separate command path: `focus.set`, `camera.group.take`, `camera.driver.take`, and the compatibility `camera.take` action produce a server-to-client `camera.command`; the telemetry client returns a `camera.result` after handing the request to the SDK. `camera.driver.take` carries both `carIdx` and `cameraGroup` so a timing-row context-menu choice updates shared focus and dispatches one atomic camera request.

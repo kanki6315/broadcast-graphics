@@ -2,6 +2,24 @@ using System.Text.Json.Serialization;
 
 namespace RaceControl.TelemetryClient;
 
+public sealed record TimingQualityMetadata(
+    [property: JsonPropertyName("source")] string Source,
+    [property: JsonPropertyName("quality")] string Quality,
+    [property: JsonPropertyName("reason")] string? Reason = null);
+
+public sealed record PitVisitTiming(
+    [property: JsonPropertyName("pitEntryTime")] double PitEntryTime,
+    [property: JsonPropertyName("pitExitTime")] double? PitExitTime,
+    [property: JsonPropertyName("pitLaneTime")] double PitLaneTime,
+    [property: JsonPropertyName("boxTime")] double BoxTime,
+    [property: JsonPropertyName("unknownTime")] double UnknownTime,
+    [property: JsonPropertyName("observedBoxTime")] double ObservedBoxTime,
+    [property: JsonPropertyName("inferredBoxTime")] double InferredBoxTime,
+    [property: JsonPropertyName("driverChange")] bool DriverChange,
+    [property: JsonPropertyName("entryDriverId")] string? EntryDriverId,
+    [property: JsonPropertyName("exitDriverId")] string? ExitDriverId,
+    [property: JsonPropertyName("quality")] string Quality);
+
 public sealed record DriverState(
     [property: JsonPropertyName("carIdx")] int CarIdx,
     [property: JsonPropertyName("position")] int Position,
@@ -38,7 +56,14 @@ public sealed record DriverState(
     [property: JsonPropertyName("lastLapGapToLeader")] double? LastLapGapToLeader = null,
     [property: JsonPropertyName("lastLapGapToClassLeader")] double? LastLapGapToClassLeader = null,
     [property: JsonPropertyName("lastLapLapsBehindLeader")] int? LastLapLapsBehindLeader = null,
-    [property: JsonPropertyName("lastLapLapsBehindClassLeader")] int? LastLapLapsBehindClassLeader = null);
+    [property: JsonPropertyName("lastLapLapsBehindClassLeader")] int? LastLapLapsBehindClassLeader = null,
+    [property: JsonPropertyName("pitState")] string? PitState = null,
+    [property: JsonPropertyName("latestPitVisit")] PitVisitTiming? LatestPitVisit = null,
+    [property: JsonPropertyName("startingPosition")] int? StartingPosition = null,
+    [property: JsonPropertyName("startingClassPosition")] int? StartingClassPosition = null,
+    [property: JsonPropertyName("positionChange")] int? PositionChange = null,
+    [property: JsonPropertyName("classPositionChange")] int? ClassPositionChange = null,
+    [property: JsonPropertyName("timingQuality")] IReadOnlyDictionary<string, TimingQualityMetadata>? TimingQuality = null);
 
 public sealed record CarClassState(
     [property: JsonPropertyName("id")] int Id,

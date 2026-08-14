@@ -13,6 +13,7 @@ import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
 import { startSimulator } from "./simulator.js";
 import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
+import { canIssueControlCommands, helloMatchesAccess, parseSocketAccess } from "./socket-access.js";
 import { acceptTelemetry } from "./telemetry-ingestion.js";
 import { StateStore } from "./state-store.js";
 
@@ -197,11 +198,13 @@ if (existsSync(webRoot)) {
 }
 
 async function authorizeSocket(req: IncomingMessage): Promise<boolean> {
-  const url = new URL(req.url ?? "/socket", "http://localhost");
-  const role = url.searchParams.get("role");
-  if (role === "control") return await auth.validateSession(sessionToken(req.headers.cookie)) !== null;
-  if (role === "telemetry") return auth.validateAccessKey("ingestion", bearerToken(req.headers.authorization));
-  if (role === "overlay") return auth.validateAccessKey("view", viewToken(req.headers["sec-websocket-protocol"]));
+  const access = parseSocketAccess(req.url);
+  if (!access) return false;
+  if (access.role === "control" || access.role === "commentator") {
+    return await auth.validateSession(sessionToken(req.headers.cookie)) !== null;
+  }
+  if (access.role === "telemetry") return auth.validateAccessKey("ingestion", bearerToken(req.headers.authorization));
+  if (access.role === "overlay") return auth.validateAccessKey("view", viewToken(req.headers["sec-websocket-protocol"]));
   return false;
 }
 
@@ -231,14 +234,16 @@ function broadcast(): void {
 store.subscribe(broadcast);
 
 wss.on("connection", (socket, request) => {
-  const role = new URL(request.url ?? "/socket", "http://localhost").searchParams.get("role") as SocketRole;
+  const access = parseSocketAccess(request.url);
+  if (!access) return socket.close(1008, "Invalid socket access mode.");
+  const role: SocketRole = access.role;
   sockets.set(socket, role);
   if (role !== "telemetry") send(socket, { type: "state.snapshot", payload: store.snapshot() });
 
   socket.on("message", async (data) => {
     try {
       const message = JSON.parse(data.toString()) as ClientMessage;
-      if (message.type === "hello" && message.role !== role) return socket.close(1008, "Role does not match authenticated connection.");
+      if (message.type === "hello" && !helloMatchesAccess(message, access)) return socket.close(1008, "Role does not match authenticated connection.");
       if (message.type === "hello" && role === "telemetry") {
         if (message.capabilities?.cameraControl) cameraSockets.add(socket);
         store.setCameraController(true, cameraSockets.size > 0);
@@ -262,12 +267,16 @@ wss.on("connection", (socket, request) => {
           });
         }
       }
-      if (message.type === "control.command" && role === "control") {
-        const cameraCommand = store.command(message.command, await registry.list());
-        if (cameraCommand) {
-          const payload = JSON.stringify({ type: "camera.command", command: cameraCommand } satisfies ServerMessage);
-          for (const cameraSocket of cameraSockets) {
-            if (cameraSocket.readyState === WebSocket.OPEN) cameraSocket.send(payload);
+      if (message.type === "control.command") {
+        if (!canIssueControlCommands(role)) {
+          send(socket, { type: "error", message: "Commentator timing access is read-only." });
+        } else {
+          const cameraCommand = store.command(message.command, await registry.list());
+          if (cameraCommand) {
+            const payload = JSON.stringify({ type: "camera.command", command: cameraCommand } satisfies ServerMessage);
+            for (const cameraSocket of cameraSockets) {
+              if (cameraSocket.readyState === WebSocket.OPEN) cameraSocket.send(payload);
+            }
           }
         }
       }

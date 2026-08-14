@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import type { ServerMessage } from "@racecontrol/protocol";
 
-export type SocketRole = "control" | "overlay" | "telemetry";
+export type SocketRole = "control" | "commentator" | "overlay" | "telemetry";
 
 export interface BroadcastSocket {
   readonly readyState: number;

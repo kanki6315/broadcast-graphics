@@ -124,6 +124,27 @@ public sealed class TelemetrySnapshotMapperTests
         AssertClose(67.111, driver.BestLap);
         AssertClose(0.52, driver.LapDistPct);
         Assert.Equal("running", driver.TrackStatus);
+        Assert.Equal("not-in-pits", driver.PitState);
+        Assert.Equal("valid", driver.TimingQuality!["lapDistPct"].Quality);
+    }
+
+    [Fact]
+    public void DetailedPitStateDoesNotReplaceTrackStatus()
+    {
+        var telemetry = Telemetry(
+            positions: [1, 2, 3],
+            classPositions: [1, 2, 3],
+            lapsCompleted: [1, 1, 1],
+            f2Times: [0, 1, 2],
+            trackSurfaces: [TrackLocation.InPitStall, TrackLocation.AproachingPits, TrackLocation.NotInWorld],
+            onPitRoad: [true, true, false]);
+
+        var state = TelemetrySnapshotMapper.Map(telemetry, SessionInfo("Race", [Driver(0), Driver(1), Driver(2)]));
+
+        Assert.Equal("pit", state.Drivers.Single(driver => driver.CarIdx == 0).TrackStatus);
+        Assert.Equal("pit-stall", state.Drivers.Single(driver => driver.CarIdx == 0).PitState);
+        Assert.Equal("pit-lane", state.Drivers.Single(driver => driver.CarIdx == 1).PitState);
+        Assert.Equal("unobserved", state.Drivers.Single(driver => driver.CarIdx == 2).PitState);
     }
 
     [Fact]
@@ -268,6 +289,8 @@ public sealed class TelemetrySnapshotMapperTests
         float? windDir = null,
         float? relativeHumidity = null,
         int? skies = null,
+        TrackLocation[]? trackSurfaces = null,
+        bool[]? onPitRoad = null,
         double sessionTime = 1_000,
         SVappsLAB.iRacingTelemetrySDK.SessionState sessionState = SVappsLAB.iRacingTelemetrySDK.SessionState.Racing) => new()
     {
@@ -289,8 +312,8 @@ public sealed class TelemetrySnapshotMapperTests
         CarIdxLastLapTime = lastLapTimes ?? Enumerable.Repeat(70f, positions.Length).ToArray(),
         CarIdxBestLapTime = bestLapTimes ?? Enumerable.Repeat(69f, positions.Length).ToArray(),
         CarIdxBestLapNum = bestLapNumbers ?? Enumerable.Repeat(3, positions.Length).ToArray(),
-        CarIdxTrackSurface = Enumerable.Repeat(TrackLocation.OnTrack, positions.Length).ToArray(),
-        CarIdxOnPitRoad = new bool[positions.Length],
+        CarIdxTrackSurface = trackSurfaces ?? Enumerable.Repeat(TrackLocation.OnTrack, positions.Length).ToArray(),
+        CarIdxOnPitRoad = onPitRoad ?? new bool[positions.Length],
         AirTemp = airTemp,
         TrackTemp = trackTemp,
         WindVel = windVel,

@@ -31,23 +31,56 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
         Log?.Invoke("Simulated telemetry started.");
         diagnostics.TryRecord("events.ndjson", new { type = "simulation.started" });
         var tick = 0;
+        var pitTiming = new PitTimingTracker();
+        var racePositions = new RacePositionTracker();
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 FrameObserved?.Invoke();
                 tick++;
-                var drivers = Names.Select((name, index) => new DriverState(
-                    index, index + 1, (23 + index * 7).ToString(), name, $"Team {index + 1}", "GT3",
-                    index == 0 ? null : index * 0.72 + Math.Sin(tick / 8d + index) * 0.15,
-                    81.4 + index * 0.22 + Math.Sin(tick / 7d + index) * 0.2,
-                    81.1 + index * 0.22, 18, false, index % 3,
-                    1, "#e54b2a", index + 1,
-                    index == 0 ? 0 : index * 0.72,
-                    index == 0 ? null : 0.72,
-                    index == 0 ? 0 : index * 0.72,
-                    index == 0 ? null : 0.72,
-                    0, 0, 19, 18, 12, 0.42, "running", true)).ToArray();
+                var pitPhase = tick % 40;
+                var drivers = Names.Select((name, index) =>
+                {
+                    var pitState = index != 5 ? "not-in-pits"
+                        : pitPhase is >= 10 and < 15 ? "pit-stall"
+                        : pitPhase is >= 15 and < 20 ? "unobserved"
+                        : pitPhase is >= 20 and < 25 ? "pit-stall"
+                        : pitPhase is >= 25 and < 30 ? "pit-lane"
+                        : "not-in-pits";
+                    var mapped = new DriverState(
+                        index, index + 1, (23 + index * 7).ToString(), name, $"Team {index + 1}", "GT3",
+                        index == 0 ? null : index * 0.72 + Math.Sin(tick / 8d + index) * 0.15,
+                        81.4 + index * 0.22 + Math.Sin(tick / 7d + index) * 0.2,
+                        81.1 + index * 0.22, 18, false, index % 3,
+                        1, "#e54b2a", index + 1,
+                        index == 0 ? 0 : index * 0.72,
+                        index == 0 ? null : 0.72,
+                        index == 0 ? 0 : index * 0.72,
+                        index == 0 ? null : 0.72,
+                        0, 0, 19, 18, 12, 0.42,
+                        pitState is "pit-stall" or "pit-lane" ? "pit" : pitState == "unobserved" ? "not-in-world" : "running",
+                        pitState != "unobserved");
+                    return mapped with
+                    {
+                        PitState = pitState,
+                        UserId = 1_000 + index,
+                        TeamId = 2_000 + index,
+                        CarId = 3_000 + index,
+                        TimingQuality = new Dictionary<string, TimingQualityMetadata>
+                        {
+                            ["lapDistPct"] = new("derived", "valid"),
+                            ["gapToLeader"] = new("derived", "valid"),
+                            ["intervalToAhead"] = new("derived", index == 0 ? "incomplete" : "valid"),
+                            ["classGapToLeader"] = new("derived", "valid"),
+                            ["classIntervalToAhead"] = new("derived", index == 0 ? "incomplete" : "valid"),
+                            ["lastLap"] = new("derived", "valid"),
+                            ["bestLap"] = new("derived", "valid")
+                        }
+                    };
+                }).ToArray();
+                drivers = pitTiming.Apply("client-sim", tick / 4d, drivers);
+                drivers = racePositions.Apply("client-sim", "race", "racing", drivers);
 
                 yield return new SessionState(
                     "client-sim", "Telemetry client simulation", "race", "Virginia International Raceway — Full Course",
@@ -120,6 +153,8 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
 
         TelemetrySessionInfo? sessionInfo = null;
         var liveTiming = new LiveTimingTracker();
+        var pitTiming = new PitTimingTracker();
+        var racePositions = new RacePositionTracker();
         string? latestRawSessionInfo = null;
         long lastSnapshotTick = 0;
         var handlers = new TelemetryHandlers<TelemetryData>
@@ -164,7 +199,12 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
                 if (session is not null)
                 {
                     lastSnapshotTick = now;
-                    var snapshot = TelemetrySnapshotMapper.Map(telemetry, session, liveTiming: liveTiming);
+                    var snapshot = TelemetrySnapshotMapper.Map(
+                        telemetry,
+                        session,
+                        liveTiming: liveTiming,
+                        pitTiming: pitTiming,
+                        racePositions: racePositions);
                     diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
                     snapshots.Writer.TryWrite(snapshot);
                 }
@@ -250,7 +290,9 @@ internal static class TelemetrySnapshotMapper
         TelemetryData telemetry,
         TelemetrySessionInfo info,
         DateTimeOffset? capturedAt = null,
-        LiveTimingTracker? liveTiming = null)
+        LiveTimingTracker? liveTiming = null,
+        PitTimingTracker? pitTiming = null,
+        RacePositionTracker? racePositions = null)
     {
         var sessionNumber = telemetry.SessionNum ?? info.SessionInfo?.CurrentSessionNum ?? 0;
         var session = info.SessionInfo?.Sessions?.FirstOrDefault(item => item.SessionNum == sessionNumber);
@@ -259,13 +301,15 @@ internal static class TelemetrySnapshotMapper
             .ToDictionary(group => group.Key, group => group.First()) ?? [];
         var sessionType = NormalizeSessionType(session?.SessionType ?? info.WeekendInfo?.EventType);
         var phase = NormalizePhase(telemetry.SessionState);
+        var sessionId = $"{info.WeekendInfo?.SubSessionID ?? 0}-{sessionNumber}";
         var drivers = (info.DriverInfo?.Drivers ?? [])
             .Where(driver => driver.CarIdx >= 0 && driver.CarIsPaceCar == 0 && driver.IsSpectator == 0)
             .Select(driver => MapDriver(driver, telemetry, results, sessionType))
             .ToArray();
         drivers = AddLivePositions(drivers, sessionType, phase);
-        var sessionId = $"{info.WeekendInfo?.SubSessionID ?? 0}-{sessionNumber}";
         var sessionTime = NormalizeTime(telemetry.SessionTime);
+        if (pitTiming is not null) drivers = pitTiming.Apply(sessionId, sessionTime, drivers);
+        if (racePositions is not null) drivers = racePositions.Apply(sessionId, sessionType, phase, drivers);
         liveTiming?.Observe(sessionId, sessionTime, drivers);
         drivers = AddRaceTiming(drivers, sessionType, sessionTime, liveTiming);
 
@@ -371,9 +415,11 @@ internal static class TelemetrySnapshotMapper
         var trackLocation = ValueAt(telemetry.CarIdxTrackSurface, index);
         var onPitRoad = ValueAt(telemetry.CarIdxOnPitRoad, index);
         var trackStatus = NormalizeTrackStatus(trackLocation, onPitRoad, result?.ReasonOutStr, position);
+        var pitState = NormalizePitState(trackLocation, onPitRoad);
+        var lapDistance = NormalizeLapDistance(ValueAt(telemetry.CarIdxLapDistPct, index));
         int? lastLapNumber = lastLap is not null && lapsCompleted > 0 ? lapsCompleted : null;
         var hasMatchingResult = lastLapNumber is not null && result?.LapsComplete == lastLapNumber;
-        return new DriverState(
+        var mapped = new DriverState(
             index,
             position,
             driver.CarNumber ?? string.Empty,
@@ -398,7 +444,7 @@ internal static class TelemetrySnapshotMapper
             Math.Max(currentLap, 0),
             lastLapNumber,
             bestLapNumber > 0 ? bestLapNumber : null,
-            NormalizeLapDistance(ValueAt(telemetry.CarIdxLapDistPct, index)),
+            lapDistance,
             trackStatus,
             !string.Equals(trackStatus, "not-in-world", StringComparison.Ordinal),
             driver.UserID,
@@ -407,6 +453,16 @@ internal static class TelemetrySnapshotMapper
             hasMatchingResult && result!.Position > 0 ? result.Position : null,
             hasMatchingResult && result!.ClassPosition >= 0 ? result.ClassPosition + 1 : null,
             hasMatchingResult && string.Equals(sessionType, "race", StringComparison.Ordinal) ? NormalizeGap(result!.Time) : null);
+        return mapped with
+        {
+            PitState = pitState,
+            TimingQuality = new Dictionary<string, TimingQualityMetadata>
+            {
+                ["lapDistPct"] = Quality("iracing", lapDistance),
+                ["lastLap"] = Quality("iracing", lastLap),
+                ["bestLap"] = Quality("iracing", bestLap)
+            }
+        };
     }
 
     private static DriverState[] AddLivePositions(DriverState[] drivers, string sessionType, string phase)
@@ -483,29 +539,47 @@ internal static class TelemetrySnapshotMapper
         return drivers.Select(driver =>
         {
             var lapsBehind = CalculateLapsBehind(leader, driver);
-            var gap = driver.Position == leader.Position
+            var derivedGap = driver.Position == leader.Position
                 ? 0d
                 : lapsBehind == 0
-                    ? liveTiming?.GapAtDriverPosition(leader.CarIdx, driver, sessionTime) ?? NormalizeGap(driver.Interval)
+                    ? liveTiming?.GapAtDriverPosition(leader.CarIdx, driver, sessionTime)
                     : null;
+            var fallbackGap = driver.Position == leader.Position
+                ? 0d
+                : lapsBehind == 0
+                    ? NormalizeGap(driver.Interval)
+                    : null;
+            var gap = derivedGap ?? fallbackGap;
             double? intervalToAhead = null;
+            var intervalSource = "iracing";
             if (byPosition.TryGetValue(driver.Position - 1, out var ahead) && CalculateLapsBehind(ahead, driver) == 0)
-                intervalToAhead = liveTiming?.GapAtDriverPosition(ahead.CarIdx, driver, sessionTime)
+            {
+                var derivedInterval = liveTiming?.GapAtDriverPosition(ahead.CarIdx, driver, sessionTime);
+                intervalToAhead = derivedInterval
                     ?? Difference(NormalizeGap(driver.Interval), ahead.Position == leader.Position ? 0d : NormalizeGap(ahead.Interval));
+                if (derivedInterval is not null) intervalSource = "derived";
+            }
 
             classLeaders.TryGetValue(driver.ClassId, out var classLeader);
             var classLapsBehind = classLeader is null ? 0 : CalculateLapsBehind(classLeader, driver);
-            var classGap = classLeader is null || driver.CarIdx == classLeader.CarIdx
+            var derivedClassGap = classLeader is null || driver.CarIdx == classLeader.CarIdx
                 ? 0d
                 : classLapsBehind == 0
                     ? liveTiming?.GapAtDriverPosition(classLeader.CarIdx, driver, sessionTime)
-                        ?? Difference(NormalizeGap(driver.Interval), NormalizeGap(classLeader.Interval) ?? 0d)
                     : null;
+            var fallbackClassGap = classLeader is null || driver.CarIdx == classLeader.CarIdx
+                ? 0d
+                : classLapsBehind == 0
+                    ? Difference(NormalizeGap(driver.Interval), NormalizeGap(classLeader.Interval) ?? 0d)
+                    : null;
+            var classGap = derivedClassGap ?? fallbackClassGap;
             double? classInterval = null;
+            var classIntervalSource = "iracing";
             if (byClassPosition.TryGetValue((driver.ClassId, driver.ClassPosition - 1), out var classAhead) &&
                 CalculateLapsBehind(classAhead, driver) == 0)
             {
                 classInterval = liveTiming?.GapAtDriverPosition(classAhead.CarIdx, driver, sessionTime);
+                if (classInterval is not null) classIntervalSource = "derived";
                 if (classInterval is null)
                 {
                     var aheadClassGap = classAhead.CarIdx == classLeader?.CarIdx
@@ -535,6 +609,14 @@ internal static class TelemetrySnapshotMapper
                 }
             }
 
+            var timingQuality = driver.TimingQuality is null
+                ? new Dictionary<string, TimingQualityMetadata>()
+                : new Dictionary<string, TimingQualityMetadata>(driver.TimingQuality);
+            timingQuality["gapToLeader"] = Quality(derivedGap is not null ? "derived" : "iracing", gap);
+            timingQuality["intervalToAhead"] = Quality(intervalSource, intervalToAhead);
+            timingQuality["classGapToLeader"] = Quality(derivedClassGap is not null ? "derived" : "iracing", classGap);
+            timingQuality["classIntervalToAhead"] = Quality(classIntervalSource, classInterval);
+
             return driver with
             {
                 Interval = gap,
@@ -547,7 +629,8 @@ internal static class TelemetrySnapshotMapper
                 LastLapGapToLeader = lastLapGap,
                 LastLapGapToClassLeader = lastLapClassGap,
                 LastLapLapsBehindLeader = lastLapLapsBehind,
-                LastLapLapsBehindClassLeader = lastLapClassLapsBehind
+                LastLapLapsBehindClassLeader = lastLapClassLapsBehind,
+                TimingQuality = timingQuality
             };
         }).OrderBy(driver => driver.Position <= 0 ? int.MaxValue : driver.Position).ToArray();
     }
@@ -691,6 +774,17 @@ internal static class TelemetrySnapshotMapper
         if (location == TrackLocation.OnTrack || position > 0) return "running";
         return "unknown";
     }
+
+    private static string NormalizePitState(TrackLocation? location, bool onPitRoad)
+    {
+        if (location == TrackLocation.NotInWorld) return "unobserved";
+        if (location == TrackLocation.InPitStall) return "pit-stall";
+        if (onPitRoad || location == TrackLocation.AproachingPits) return "pit-lane";
+        return "not-in-pits";
+    }
+
+    private static TimingQualityMetadata Quality(string source, double? value) =>
+        new(source, value is null ? "incomplete" : "valid");
 
     private static string NormalizeFlag(SessionFlags? flags)
     {

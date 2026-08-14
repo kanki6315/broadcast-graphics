@@ -7,12 +7,14 @@ import type {
   LiveState,
   SessionState,
 } from "@racecontrol/protocol";
+import { RaceStateProjection } from "./race-state-projection.js";
 
 type Listener = (state: LiveState) => void;
 
 export class StateStore {
   private state: LiveState;
   private readonly listeners = new Set<Listener>();
+  private readonly raceState = new RaceStateProjection();
   private staleTimer: NodeJS.Timeout | null = null;
 
   constructor(defaultPackageId = "pri-hoosier-500") {
@@ -54,6 +56,7 @@ export class StateStore {
 
   telemetry(session: SessionState): void {
     const wasDisconnected = this.state.connection !== "connected";
+    session = this.raceState.apply(session);
     this.state.session = session;
     this.state.sessionResults[session.type] = session;
     this.state.connection = "connected";
