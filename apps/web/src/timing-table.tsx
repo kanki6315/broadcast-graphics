@@ -1,7 +1,11 @@
 import {
   formatLapTime,
   type DriverState,
+  type DriverStintSummary,
   type DriverTimingField,
+  type GapTrend,
+  type PitCycleSummary,
+  type CompletedSector,
   type TimingQualityMetadata,
 } from "@racecontrol/protocol";
 import React from "react";
@@ -85,7 +89,7 @@ export function TimingTable({
   );
 }
 
-export type CommentatorColumn = "change" | "lap" | "gap" | "interval" | "lapTimes" | "pit" | "status";
+export type CommentatorColumn = "change" | "lap" | "gap" | "interval" | "lapTimes" | "sectors" | "stint" | "pit" | "status";
 
 export const commentatorColumnLabels: Record<CommentatorColumn, string> = {
   change: "Position change",
@@ -93,6 +97,8 @@ export const commentatorColumnLabels: Record<CommentatorColumn, string> = {
   gap: "Gaps",
   interval: "Intervals",
   lapTimes: "Lap times",
+  sectors: "Sectors",
+  stint: "Driver stint",
   pit: "Pit visit",
   status: "Status",
 };
@@ -102,6 +108,8 @@ export const defaultCommentatorColumns: readonly CommentatorColumn[] = [
   "gap",
   "interval",
   "lapTimes",
+  "sectors",
+  "stint",
   "pit",
   "status",
 ];
@@ -113,6 +121,9 @@ export interface CommentatorTimingTableProps {
   expandedCarIdxs: ReadonlySet<number>;
   visibleColumns: ReadonlySet<CommentatorColumn>;
   groupByClass: boolean;
+  stints?: DriverStintSummary[];
+  gapTrends?: GapTrend[];
+  pitCycles?: PitCycleSummary[];
   onSelectCar: (carIdx: number) => void;
   onToggleExpanded: (carIdx: number) => void;
 }
@@ -186,6 +197,34 @@ function pitVisitSummary(driver: DriverState) {
   );
 }
 
+function sectorValue(sector: CompletedSector) {
+  const unavailable = sector.value == null || sector.quality === "invalid" || sector.quality === "incomplete";
+  const marker = sector.quality === "inferred" ? "~" : "";
+  const fastest = sector.quality === "valid" && sector.comparisons?.includes("overall-fastest");
+  const personal = sector.quality === "valid" && sector.comparisons?.includes("personal-best");
+  const title = `${sector.source} · ${sector.quality}${sector.reason ? ` · ${sector.reason.replaceAll("-", " ")}` : ""} · ${sector.definitionRevision}`;
+  return <span key={`${sector.lapNumber}-${sector.sectorNumber}`} className={`sector-time${fastest ? " is-overall-fastest" : personal ? " is-personal-best" : ""}`} title={title}><small>S{sector.sectorNumber}</small>{unavailable ? "--" : `${marker}${sector.value!.toFixed(3)}`}</span>;
+}
+
+function sectorSummary(driver: DriverState) {
+  if (!Object.hasOwn(driver, "sectors")) return <span className="sector-empty" title="This producer does not report derived sectors">--</span>;
+  const sectors = driver.sectors?.previousLap ?? [];
+  if (sectors.length === 0) return <span className="sector-empty">--</span>;
+  return <span className="sector-summary">{sectors.map(sectorValue)}</span>;
+}
+
+function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  return `${minutes}:${Math.floor(safeSeconds % 60).toString().padStart(2, "0")}`;
+}
+
+function stintSummary(stint: DriverStintSummary | undefined) {
+  if (!stint) return <span className="stint-summary is-empty">--</span>;
+  const marker = stint.quality === "inferred" ? "~" : stint.quality === "invalid" || stint.quality === "incomplete" ? "?" : "";
+  return <span className={`stint-summary quality-${stint.quality}`} title={`${stint.changeContext ?? "current driver"} · ${stint.quality}`}><strong>{marker}{formatDuration(stint.duration)}</strong><small>{stint.lapCount} laps{stint.previousDriverName ? ` · from ${stint.previousDriverName}` : ""}</small></span>;
+}
+
 function qualityWarnings(driver: DriverState): string[] {
   if (!driver.timingQuality) return ["Timing quality metadata not reported"];
   return Object.entries(driver.timingQuality)
@@ -229,6 +268,9 @@ export function CommentatorTimingTable({
   expandedCarIdxs,
   visibleColumns,
   groupByClass,
+  stints = [],
+  gapTrends = [],
+  pitCycles = [],
   onSelectCar,
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
@@ -246,6 +288,8 @@ export function CommentatorTimingTable({
           {visibleColumns.has("gap") && <th>Gap <small>overall / class</small></th>}
           {visibleColumns.has("interval") && <th>Interval <small>overall / class</small></th>}
           {visibleColumns.has("lapTimes") && <th>Lap times <small>last / best</small></th>}
+          {visibleColumns.has("sectors") && <th>Sectors <small>previous lap</small></th>}
+          {visibleColumns.has("stint") && <th>Stint <small>time / laps</small></th>}
           {visibleColumns.has("pit") && <th>Pit visit</th>}
           {visibleColumns.has("status") && <th>Status</th>}
         </tr></thead>
@@ -257,6 +301,9 @@ export function CommentatorTimingTable({
             const nearby = nearbyCarIdxs.has(driver.carIdx);
             const expanded = expandedCarIdxs.has(driver.carIdx);
             const status = driverStatus(driver);
+            const stint = stints.find((candidate) => candidate.carIdx === driver.carIdx);
+            const trend = gapTrends.find((candidate) => candidate.chasingCarIdx === driver.carIdx && candidate.quality === "valid");
+            const pitCycle = pitCycles.find((candidate) => candidate.carIdx === driver.carIdx);
             return [
               showClassHeader ? (
                 <tr className="class-divider" key={`class-${driver.classId}`} style={{ "--class-color": driver.classColor } as CSSProperties}>
@@ -280,13 +327,15 @@ export function CommentatorTimingTable({
                 <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small>{driver.team} · {driver.className}</small></span></td>
                 {visibleColumns.has("change") && <td className="change-cell"><span>{positionDelta(driver.positionChange)}<small>overall</small></span><span>{positionDelta(driver.classPositionChange)}<small>class</small></span></td>}
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
-                {visibleColumns.has("gap") && <td className="paired-value"><span>{gapValue(driver, false)}<small>overall</small></span><span>{gapValue(driver, true)}<small>class</small></span></td>}
+                {visibleColumns.has("gap") && <td className="paired-value"><span>{gapValue(driver, false)}<small>overall</small></span><span>{gapValue(driver, true)}<small>class{trend?.direction ? ` · ${trend.direction}` : ""}</small></span></td>}
                 {visibleColumns.has("interval") && <td className="paired-value"><span>{intervalValue(driver, false)}<small>overall</small></span><span>{intervalValue(driver, true)}<small>class</small></span></td>}
                 {visibleColumns.has("lapTimes") && <td className="paired-value"><span>{lapTimeValue(driver, "lastLap")}<small>last</small></span><span>{lapTimeValue(driver, "bestLap")}<small>best</small></span></td>}
+                {visibleColumns.has("sectors") && <td>{sectorSummary(driver)}</td>}
+                {visibleColumns.has("stint") && <td>{stintSummary(stint)}</td>}
                 {visibleColumns.has("pit") && <td>{pitVisitSummary(driver)}</td>}
                 {visibleColumns.has("status") && <td><span className={`commentator-status status-${driver.pitState ?? driver.trackStatus}`}>{status}</span></td>}
               </tr>,
-              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><PitVisitDetail driver={driver} /></td></tr> : null,
+              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><div className="expanded-intelligence"><PitVisitDetail driver={driver} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous driver</dt><dd>{stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
             ];
           })}
         </tbody>

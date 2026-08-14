@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { DriverState } from "@racecontrol/protocol";
+import type { DriverState, RaceIntelligenceSnapshot } from "@racecontrol/protocol";
 import { CommentatorTimingTable, defaultCommentatorColumns } from "./timing-table";
+import { BattleWatch } from "./battle-watch";
 
 function driver(overrides: Partial<DriverState> = {}): DriverState {
   return {
@@ -53,4 +54,48 @@ test("pit summary preserves tracker totals and marks only inferred box time", ()
   assert.match(markup, /Unknown<\/small>0\.000s/);
   assert.match(markup, /Driver change/);
   assert.doesNotMatch(markup, /<small>Lane<\/small>~/);
+});
+
+test("dirty and inferred sectors never receive fastest styling", () => {
+  const markup = render(driver({
+    sectors: {
+      currentSectorNumber: 2,
+      currentLap: [],
+      previousLap: [
+        { carIdx: 7, lapNumber: 4, sectorNumber: 1, definitionRevision: "r1", source: "derived", quality: "invalid", reason: "telemetry-gap", comparisons: ["overall-fastest"] },
+        { carIdx: 7, lapNumber: 4, sectorNumber: 2, definitionRevision: "r1", source: "derived", quality: "inferred", value: 31.2, comparisons: ["overall-fastest"] },
+      ],
+    },
+  }));
+  assert.match(markup, /telemetry gap[^>]*><small>S1<\/small>--/);
+  assert.match(markup, /inferred[^>]*><small>S2<\/small>~31\.200/);
+  assert.doesNotMatch(markup, /is-overall-fastest/);
+});
+
+test("stint context is presented from the canonical intelligence snapshot", () => {
+  const current = driver();
+  const markup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set([7])}
+    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onSelectCar={() => {}} onToggleExpanded={() => {}}
+    stints={[{ carIdx: 7, currentDriverId: "41", currentDriverName: "Driver", previousDriverName: "Previous Driver", startedAt: 100, duration: 372, lapCount: 5, changeContext: "inferred-box", quality: "inferred" }]}
+  />);
+  assert.match(markup, /~6:12/);
+  assert.match(markup, /from Previous Driver/);
+  assert.match(markup, /inferred-box · inferred/);
+});
+
+test("Battle Watch filters shared candidates by class and contains no control commands", () => {
+  const drivers = [driver({ carIdx: 1, carNumber: "1", classId: 1 }), driver({ carIdx: 2, carNumber: "2", classId: 1 }), driver({ carIdx: 3, carNumber: "3", classId: 2 }), driver({ carIdx: 4, carNumber: "4", classId: 2 })];
+  const intelligence: RaceIntelligenceSnapshot = {
+    sessionId: "race", generatedAt: 1,
+    battles: [
+      { id: "gt", classId: 1, className: "GT3", carIdxs: [1, 2], currentGap: 1.2, lapDeficit: 0, windowSeconds: 12, direction: "closing", quality: "valid" },
+      { id: "tcr", classId: 2, className: "TCR", carIdxs: [3, 4], currentGap: .8, lapDeficit: 0, windowSeconds: 12, direction: "opening", quality: "valid" },
+    ], gapTrends: [], pitCycles: [], stints: [], qualityWarnings: [],
+  };
+  const markup = renderToStaticMarkup(<BattleWatch intelligence={intelligence} drivers={drivers} classId={2} selectedCarIdx={3} />);
+  assert.match(markup, /#3/);
+  assert.match(markup, /#4/);
+  assert.doesNotMatch(markup, /#1/);
+  assert.doesNotMatch(markup, /camera\.command|control\.command|graphics\./);
 });

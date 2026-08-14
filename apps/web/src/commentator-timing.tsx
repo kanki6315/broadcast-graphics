@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Columns3, Flag, LogOut, MonitorCog, Wifi, WifiOff } from "lucide-react";
+import { Columns3, Flag, LogOut, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import type { DriverState } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
@@ -8,6 +8,7 @@ import {
   type CommentatorColumn,
 } from "./timing-table";
 import { LinearTrackRibbon } from "./linear-track-ribbon";
+import { BattleWatch } from "./battle-watch";
 import { useLiveState } from "./use-live-state";
 import "./commentator-timing.css";
 
@@ -132,6 +133,9 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const telemetryHealthy = socketConnected && state.connection === "connected";
   const session = state.session;
   const isSimulated = session?.sourceMode === "simulation";
+  const intelligence = state.intelligence;
+  const warningCarIdxs = new Set(filteredDrivers.map((driver) => driver.carIdx));
+  const warnings = (intelligence?.qualityWarnings ?? []).filter((warning) => warning.carIdx == null || warningCarIdxs.has(warning.carIdx));
 
   return (
     <div className="commentator-shell">
@@ -195,6 +199,14 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           </details>
         </section>
 
+        <section className="commentator-intelligence" aria-label="Live race intelligence">
+          <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} selectedCarIdx={preferences.selectedCarIdx} onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))} />
+          <div className={`quality-watch${warnings.length > 0 ? " has-warnings" : ""}`}>
+            <TriangleAlert aria-hidden="true" />
+            <div><strong>{warnings.length > 0 ? `${warnings.length} timing warning${warnings.length === 1 ? "" : "s"}` : "Timing quality clear"}</strong><span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span></div>
+          </div>
+        </section>
+
         <LinearTrackRibbon
           drivers={filteredDrivers}
           selectedCarIdx={preferences.selectedCarIdx}
@@ -210,6 +222,9 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}
           groupByClass={preferences.classId === "all"}
+          stints={intelligence?.stints}
+          gapTrends={intelligence?.gapTrends}
+          pitCycles={intelligence?.pitCycles}
           onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
           onToggleExpanded={toggleExpanded}
         />
