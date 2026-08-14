@@ -31,7 +31,13 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
         Log?.Invoke("Simulated telemetry started.");
         diagnostics.TryRecord("events.ndjson", new { type = "simulation.started" });
         var tick = 0;
-        var pitTiming = new PitTimingTracker();
+        var pitTiming = new PitTimingTracker(gap =>
+        {
+            if (gap.EndTime is null)
+                diagnostics.TryRecordSampled($"pit-gap-{gap.SessionId}-{gap.CarIdx}", "pit-gaps.ndjson", gap);
+            else
+                diagnostics.TryRecord("pit-gaps.ndjson", gap);
+        });
         var racePositions = new RacePositionTracker();
         try
         {
@@ -153,7 +159,13 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
 
         TelemetrySessionInfo? sessionInfo = null;
         var liveTiming = new LiveTimingTracker();
-        var pitTiming = new PitTimingTracker();
+        var pitTiming = new PitTimingTracker(gap =>
+        {
+            if (gap.EndTime is null)
+                diagnostics.TryRecordSampled($"pit-gap-{gap.SessionId}-{gap.CarIdx}", "pit-gaps.ndjson", gap);
+            else
+                diagnostics.TryRecord("pit-gaps.ndjson", gap);
+        });
         var racePositions = new RacePositionTracker();
         string? latestRawSessionInfo = null;
         long lastSnapshotTick = 0;

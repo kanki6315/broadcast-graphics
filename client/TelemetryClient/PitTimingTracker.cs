@@ -2,8 +2,21 @@ using System.Globalization;
 
 namespace RaceControl.TelemetryClient;
 
-internal sealed class PitTimingTracker
+internal sealed record PitTimingGap(
+    string SessionId,
+    int CarIdx,
+    double StartTime,
+    double? EndTime,
+    double Duration,
+    string? StateBefore,
+    string? StateAfter,
+    bool DriverChange,
+    string Classification,
+    string Reason);
+
+internal sealed class PitTimingTracker(Action<PitTimingGap>? onGapRecord = null)
 {
+    private const int MaximumRetainedGapsPerCar = 64;
     private readonly Dictionary<int, CarPitTimingState> cars = [];
     private string? sessionId;
     private double lastSessionTime = double.NegativeInfinity;
@@ -24,7 +37,7 @@ internal sealed class PitTimingTracker
         {
             if (!cars.TryGetValue(driver.CarIdx, out var state))
             {
-                state = new CarPitTimingState();
+                state = new CarPitTimingState(currentSessionId, driver.CarIdx, onGapRecord);
                 cars[driver.CarIdx] = state;
             }
 
@@ -35,8 +48,15 @@ internal sealed class PitTimingTracker
         }).ToArray();
     }
 
-    private sealed class CarPitTimingState
+    public IReadOnlyList<PitTimingGap> GetGaps(int carIdx) =>
+        cars.TryGetValue(carIdx, out var state) ? state.Gaps(lastSessionTime) : [];
+
+    private sealed class CarPitTimingState(
+        string sessionId,
+        int carIdx,
+        Action<PitTimingGap>? onGapRecord)
     {
+        private readonly List<PitTimingGap> completedGaps = [];
         private string? lastObservedState;
         private double? lastObservedTime;
         private string? lastObservedDriverId;
@@ -73,6 +93,12 @@ internal sealed class PitTimingTracker
             return activeVisit.Snapshot(null, unresolved, open: true);
         }
 
+        public IReadOnlyList<PitTimingGap> Gaps(double observedAt)
+        {
+            if (!isUnobserved) return completedGaps.ToArray();
+            return [.. completedGaps, CurrentGap(observedAt)];
+        }
+
         private void BeginOrContinueGap(double observedAt, string? driverId)
         {
             if (!isUnobserved)
@@ -89,6 +115,7 @@ internal sealed class PitTimingTracker
             }
 
             if (gapDriverChange && activeVisit is not null) activeVisit.DriverChange = true;
+            onGapRecord?.Invoke(CurrentGap(observedAt));
         }
 
         private void ResolveGap(double observedAt, string pitState, string? driverId)
@@ -98,27 +125,64 @@ internal sealed class PitTimingTracker
             var duration = Duration(start, observedAt);
             var beforeWasPit = IsPit(before);
             var afterIsPit = IsPit(pitState);
+            var driverChanged = gapDriverChange || DifferentDriver(gapStartDriverId, driverId);
+            var inferredBox = string.Equals(before, "pit-stall", StringComparison.Ordinal) &&
+                string.Equals(pitState, "pit-stall", StringComparison.Ordinal);
 
             if (activeVisit is null && (beforeWasPit || afterIsPit))
                 activeVisit = new MutablePitVisit(start, gapStartDriverId ?? driverId);
 
             if (activeVisit is not null)
             {
-                if (string.Equals(before, "pit-stall", StringComparison.Ordinal) &&
-                    string.Equals(pitState, "pit-stall", StringComparison.Ordinal))
+                if (inferredBox)
                     activeVisit.InferredBoxTime += duration;
                 else
                     activeVisit.UnknownTime += duration;
 
-                if (gapDriverChange || DifferentDriver(gapStartDriverId, driverId)) activeVisit.DriverChange = true;
+                if (driverChanged) activeVisit.DriverChange = true;
                 if (!afterIsPit) CloseVisit(observedAt, driverId);
             }
+
+            var completedGap = new PitTimingGap(
+                sessionId,
+                carIdx,
+                start,
+                observedAt,
+                duration,
+                before,
+                pitState,
+                driverChanged,
+                inferredBox ? "inferred-box-time" : beforeWasPit || afterIsPit ? "unknown-time" : "unknown-timing-gap",
+                inferredBox
+                    ? "pit-stall observed before and after the missing interval"
+                    : beforeWasPit || afterIsPit
+                        ? "missing interval was not bracketed by pit-stall observations"
+                        : "car was unobserved away from a pit visit");
+            completedGaps.Add(completedGap);
+            if (completedGaps.Count > MaximumRetainedGapsPerCar) completedGaps.RemoveAt(0);
+            onGapRecord?.Invoke(completedGap);
 
             isUnobserved = false;
             gapStartTime = null;
             gapStartState = null;
             gapStartDriverId = null;
             gapDriverChange = false;
+        }
+
+        private PitTimingGap CurrentGap(double observedAt)
+        {
+            var start = gapStartTime ?? observedAt;
+            return new PitTimingGap(
+                sessionId,
+                carIdx,
+                start,
+                null,
+                Duration(start, observedAt),
+                gapStartState,
+                null,
+                gapDriverChange,
+                "unresolved-unknown-time",
+                "car is still unobserved");
         }
 
         private void ObserveContinuousState(double observedAt, string pitState, string? driverId)
