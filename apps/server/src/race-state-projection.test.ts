@@ -40,6 +40,34 @@ test("captures and preserves immutable starting positions for older clients", ()
   assert.equal(moved.drivers[0]?.classPositionChange, 2);
 });
 
+test("position change survives a disconnect, reconnect, and driver change", () => {
+  const projection = new RaceStateProjection();
+  const start = projection.apply(session(driver()));
+  const missing = projection.apply(session(driver({
+    position: 3,
+    classPosition: 2,
+    lapsCompleted: 1,
+    currentLap: 2,
+    pitState: "unobserved",
+    trackStatus: "not-in-world",
+    isConnected: false,
+  })));
+  const reconnected = projection.apply(session(driver({
+    position: 2,
+    classPosition: 1,
+    lapsCompleted: 2,
+    currentLap: 3,
+    userId: 99,
+  })));
+
+  assert.equal(start.drivers[0]?.startingPosition, 4);
+  assert.equal(missing.drivers[0]?.startingPosition, 4);
+  assert.equal(reconnected.drivers[0]?.startingPosition, 4);
+  assert.equal(reconnected.drivers[0]?.startingClassPosition, 3);
+  assert.equal(reconnected.drivers[0]?.positionChange, 2);
+  assert.equal(reconnected.drivers[0]?.classPositionChange, 2);
+});
+
 test("preserves explicit unavailable baselines from a late-joining telemetry client", () => {
   const projection = new RaceStateProjection();
   const late = projection.apply(session(driver({

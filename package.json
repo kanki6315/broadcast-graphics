@@ -10,7 +10,10 @@
     "build": "npm run build -w @racecontrol/protocol && npm run build -w @racecontrol/server && npm run build -w @racecontrol/web",
     "dev:server": "npm run dev -w @racecontrol/server",
     "dev:web": "npm run dev -w @racecontrol/web",
-    "test": "npm run test -w @racecontrol/server",
+    "test": "npm run test -w @racecontrol/server && npm run test -w @racecontrol/web",
+    "test:client": "dotnet test client/TelemetryClient.Tests/TelemetryClient.Tests.csproj --no-restore --nologo",
+    "test:integration": "npm test && npm run test:client",
+    "test:e2e": "npm run e2e -w @racecontrol/server",
     "typecheck": "npm run build -w @racecontrol/protocol && npm run typecheck -w @racecontrol/server && npm run typecheck -w @racecontrol/web"
   }
 }

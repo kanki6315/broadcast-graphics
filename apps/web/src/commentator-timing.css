@@ -94,10 +94,12 @@
 .lap-cell { text-align: right; }
 .lap-cell strong { display: block; font: 700 13px var(--display); }
 .pit-summary { display: flex; flex-direction: column; align-items: flex-end; }
-.pit-summary strong { white-space: nowrap; font: 700 12px var(--display); }
-.pit-summary span { color: var(--muted); white-space: nowrap; font-size: 9px; }
-.pit-summary.quality-contains-inference strong { color: var(--orange); }
-.pit-summary.quality-incomplete strong { color: #a22b23; }
+.pit-summary > strong { margin-top: 2px; white-space: nowrap; color: var(--muted); font: 700 9px var(--display); text-transform: uppercase; }
+.pit-summary-totals { display: grid; grid-template-columns: repeat(3, auto); gap: 5px; white-space: nowrap; font: 600 10px var(--display); }
+.pit-summary-totals > span { color: inherit; }
+.pit-summary-totals small { margin-right: 2px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
+.pit-summary-totals .contains-inference { color: var(--orange); }
+.pit-summary-totals .contains-unknown { color: #a22b23; }
 .pit-summary.is-empty { color: var(--muted); font-size: 10px; }
 .commentator-status { display: inline-block; width: 100%; padding: 3px 4px; border: 1px solid currentColor; text-align: center; font: 700 10px var(--display); text-transform: uppercase; white-space: nowrap; }
 .commentator-status.status-pit-lane, .commentator-status.status-pit-stall, .commentator-status.status-pit { background: #f1c933; color: #17150a; }

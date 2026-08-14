@@ -4,6 +4,7 @@ import {
   type DriverTimingField,
   type TimingQualityMetadata,
 } from "@racecontrol/protocol";
+import React from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -130,7 +131,7 @@ function qualityValue(
   value: number | null | undefined,
   quality: TimingQualityMetadata | undefined,
   formatter: (value: number) => string,
-  empty = "—",
+  empty = "--",
 ) {
   if (value == null || quality?.quality === "invalid" || quality?.quality === "incomplete") {
     return <span className="quality-value is-unavailable" title={qualityLabel(quality)}>{empty}</span>;
@@ -144,7 +145,7 @@ function timingQuality(driver: DriverState, field: DriverTimingField): TimingQua
 }
 
 function positionDelta(value: number | null | undefined) {
-  if (value == null) return <span className="position-change is-unknown">—</span>;
+  if (value == null) return <span className="position-change is-unknown">--</span>;
   if (value === 0) return <span className="position-change is-neutral">0</span>;
   return <span className={`position-change ${value > 0 ? "is-gain" : "is-loss"}`}>{value > 0 ? "+" : ""}{value}</span>;
 }
@@ -160,7 +161,7 @@ function gapValue(driver: DriverState, classValue: boolean) {
 
 function intervalValue(driver: DriverState, classValue: boolean) {
   const position = classValue ? driver.classPosition : driver.position;
-  if (position === 1) return <span className="quality-value">—</span>;
+  if (position === 1) return <span className="quality-value">--</span>;
   const field: DriverTimingField = classValue ? "classIntervalToAhead" : "intervalToAhead";
   return qualityValue(driver[field], timingQuality(driver, field), formatSeconds);
 }
@@ -171,12 +172,16 @@ function lapTimeValue(driver: DriverState, field: "lastLap" | "bestLap") {
 
 function pitVisitSummary(driver: DriverState) {
   const visit = driver.latestPitVisit;
-  if (!Object.hasOwn(driver, "latestPitVisit")) return <span className="pit-summary is-empty" title="This producer does not report pit summaries">Not reported</span>;
+  if (!Object.hasOwn(driver, "latestPitVisit")) return <span className="pit-summary is-empty" title="This producer does not report pit summaries">--</span>;
   if (!visit) return <span className="pit-summary is-empty">No visit</span>;
   return (
     <span className={`pit-summary quality-${visit.quality}`} title={`Pit visit quality: ${visit.quality}`}>
-      <strong>{visit.quality === "contains-inference" ? "~" : visit.quality === "incomplete" ? "!" : ""}{formatSeconds(visit.pitLaneTime)}</strong>
-      <span>{visit.driverChange ? "Driver change" : `${formatSeconds(visit.boxTime)} box`}</span>
+      <span className="pit-summary-totals">
+        <span><small>Lane</small>{formatSeconds(visit.pitLaneTime)}</span>
+        <span className={visit.inferredBoxTime > 0 ? "contains-inference" : ""}><small>Box</small>{visit.inferredBoxTime > 0 ? "~" : ""}{formatSeconds(visit.boxTime)}</span>
+        <span className={visit.unknownTime > 0 ? "contains-unknown" : ""}><small>Unknown</small>{formatSeconds(visit.unknownTime)}</span>
+      </span>
+      {visit.driverChange && <strong>Driver change</strong>}
     </span>
   );
 }
