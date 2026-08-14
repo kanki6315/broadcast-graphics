@@ -7,6 +7,7 @@ import type {
   LiveState,
   RaceIntelligenceSnapshot,
   SessionState,
+  TrackConfigurationSnapshot,
 } from "@racecontrol/protocol";
 import { RaceStateProjection } from "./race-state-projection.js";
 
@@ -44,6 +45,7 @@ export class StateStore {
       },
       events: [this.event("system", "Server ready — waiting for telemetry")],
       intelligence: null,
+      trackConfiguration: null,
     };
   }
 
@@ -83,6 +85,12 @@ export class StateStore {
 
   raceIntelligence(snapshot: RaceIntelligenceSnapshot | null): void {
     this.state.intelligence = snapshot;
+  }
+
+  trackConfiguration(snapshot: TrackConfigurationSnapshot | null): void {
+    const changed = JSON.stringify(this.state.trackConfiguration) !== JSON.stringify(snapshot);
+    this.state.trackConfiguration = structuredClone(snapshot);
+    if (changed) this.bump();
   }
 
   command(command: ControlCommand, packages: GraphicPackageManifest[]): CameraSwitchCommand | null {

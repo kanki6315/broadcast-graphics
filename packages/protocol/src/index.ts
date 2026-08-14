@@ -61,13 +61,88 @@ export interface SectorBoundary {
   startPct: number;
 }
 
+export interface TrackLayoutIdentity {
+  trackId?: number | null;
+  configurationId?: number | null;
+  trackName: string;
+  configurationName?: string | null;
+  trackLengthMeters?: number | null;
+}
+
+export type TrackMapSource = "iracing" | "imported" | "bundled";
+
+export interface TrackMapPathCandidate {
+  id: string;
+  pathData: string;
+  length: number;
+  closed: boolean;
+}
+
+export interface TrackMapDefinition {
+  id: string;
+  layout: TrackLayoutIdentity;
+  source: TrackMapSource;
+  sourceChecksum: string;
+  sourceVersion?: string | null;
+  originalFilename?: string | null;
+  importedAt: string;
+  sanitizationStatus: "sanitized" | "bundled" | "verified";
+  sanitizedSvg?: string;
+  centerlinePath: string;
+  centerlinePathId: string;
+  viewBox: [number, number, number, number];
+  createdAt: string;
+}
+
+export interface TrackMapCalibration {
+  id: string;
+  mapDefinitionId: string;
+  revision: number;
+  startFinishPathPct: number;
+  direction: "forward" | "reverse";
+  rotationDegrees?: number;
+  active: boolean;
+  createdAt: string;
+  createdBy?: string | null;
+}
+
+export interface ActiveTrackMap {
+  mapDefinitionId: string;
+  calibrationId: string;
+  calibrationRevision: number;
+  sourceChecksum: string;
+}
+
 export interface SectorDefinition {
   revision: string;
-  source: "iracing";
+  source: "iracing" | "custom";
   sessionId: string;
   trackId?: number | null;
   trackName: string;
   boundaries: SectorBoundary[];
+  layout?: TrackLayoutIdentity;
+  mapCalibrationId?: string | null;
+  mapCalibrationRevision?: number | null;
+  createdAt?: string;
+  createdBy?: string | null;
+  active?: boolean;
+  draft?: boolean;
+  locked?: boolean;
+  effectiveSessionId?: string | null;
+  effectiveAt?: string | null;
+}
+
+export interface SectorDefinitionRevision extends SectorDefinition {
+  createdAt: string;
+  active: boolean;
+  draft: boolean;
+  locked: boolean;
+}
+
+export interface TrackConfigurationSnapshot {
+  layout: TrackLayoutIdentity;
+  activeMap?: ActiveTrackMap | null;
+  activeSectorDefinition?: Pick<SectorDefinitionRevision, "revision" | "source" | "boundaries" | "mapCalibrationId" | "mapCalibrationRevision" | "locked"> | null;
 }
 
 export type SectorComparison = "personal-best" | "class-fastest" | "overall-fastest";
@@ -348,6 +423,7 @@ export interface TimingQualityWarning {
 
 export interface RaceIntelligenceSnapshot {
   sessionId: string;
+  sectorDefinitionRevision?: string | null;
   generatedAt: number;
   battles: BattleSummary[];
   gapTrends: GapTrend[];
@@ -432,6 +508,8 @@ export interface LiveState {
   events: EventRecord[];
   /** Shared session-scoped cache; absent until the server has normalized live evidence. */
   intelligence?: RaceIntelligenceSnapshot | null;
+  /** Compact, low-frequency identifiers. Full sanitized geometry is fetched over HTTP. */
+  trackConfiguration?: TrackConfigurationSnapshot | null;
 }
 
 export type ControlCommand =
@@ -458,6 +536,7 @@ export type ServerMessage =
   | { type: "state.snapshot"; payload: LiveState }
   | { type: "telemetry.ack"; sequence: number }
   | { type: "camera.command"; command: CameraSwitchCommand }
+  | { type: "sector.definition"; payload: SectorDefinition | null }
   | { type: "lap.completed"; payload: CompletedLap }
   | { type: "lap.history"; payload: CompletedLap[] }
   | { type: "error"; message: string };

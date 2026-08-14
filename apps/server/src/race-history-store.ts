@@ -254,6 +254,9 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
       );
       CREATE INDEX IF NOT EXISTS bg_completed_sectors_entry_lap_idx
         ON bg_completed_sectors (entry_id, lap_number DESC, sector_number);
+
+      ALTER TABLE bg_sector_definitions DROP CONSTRAINT IF EXISTS bg_sector_definitions_source_check;
+      ALTER TABLE bg_sector_definitions ADD CONSTRAINT bg_sector_definitions_source_check CHECK (source IN ('iracing', 'custom'));
     `);
   }
 

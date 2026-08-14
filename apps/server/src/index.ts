@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { WebSocket, WebSocketServer } from "ws";
-import type { ClientMessage, ServerMessage } from "@racecontrol/protocol";
+import type { ClientMessage, SectorBoundary, ServerMessage, TrackLayoutIdentity } from "@racecontrol/protocol";
 import { createAuthenticationStore } from "./auth-store.js";
 import { loadClientRelease, streamClientRelease } from "./client-release.js";
 import { PackageRegistry } from "./package-registry.js";
@@ -17,6 +17,11 @@ import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
 import { canIssueControlCommands, helloMatchesAccess, parseSocketAccess } from "./socket-access.js";
 import { acceptTelemetry } from "./telemetry-ingestion.js";
 import { StateStore } from "./state-store.js";
+import {
+  configurationError,
+  createTrackConfigurationRepository,
+  sessionLayout,
+} from "./track-configuration-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "../../..");
@@ -43,6 +48,8 @@ const auth = createAuthenticationStore({
 await auth.initialize();
 const historyRepository = createRaceHistoryRepository(process.env.DATABASE_URL);
 await historyRepository.initialize();
+const trackConfiguration = createTrackConfigurationRepository(process.env.DATABASE_URL);
+await trackConfiguration.initialize();
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
 const clientRelease = await loadClientRelease(clientReleaseRoot);
@@ -52,6 +59,7 @@ const defaultPackageId = packages.find((candidate) => candidate.id === "pri-hoos
 const store = new StateStore(defaultPackageId);
 const sockets = new Map<WebSocket, SocketRole>();
 const cameraSockets = new Set<WebSocket>();
+const sentSectorRevisions = new Map<WebSocket, string | null>();
 const history = new RaceHistoryService(
   historyRepository,
   (lap) => broadcastStateSnapshot(sockets, { type: "lap.completed", payload: lap }),
@@ -89,6 +97,49 @@ async function requireAdmin(request: { headers: { cookie?: string } }, reply: { 
   const admin = await auth.validateSession(sessionToken(request.headers.cookie));
   if (!admin) reply.code(401).send({ error: "Authentication required." });
   return admin;
+}
+
+function currentLayout(): TrackLayoutIdentity | null {
+  const session = store.snapshot().session;
+  return session ? sessionLayout(session) : null;
+}
+
+function requestedLayout(value: unknown): TrackLayoutIdentity {
+  if (!value || typeof value !== "object") throw new Error("Track layout identity is required.");
+  const input = value as Record<string, unknown>;
+  return {
+    trackId: typeof input.trackId === "number" ? input.trackId : null,
+    configurationId: typeof input.configurationId === "number" ? input.configurationId : null,
+    trackName: typeof input.trackName === "string" ? input.trackName : "",
+    configurationName: typeof input.configurationName === "string" ? input.configurationName : null,
+    trackLengthMeters: typeof input.trackLengthMeters === "number" ? input.trackLengthMeters : null,
+  };
+}
+
+function sendConfigurationFailure(reply: { code(status: number): { send(body: unknown): unknown } }, error: unknown): unknown {
+  const normalized = configurationError(error);
+  return reply.code("status" in normalized ? normalized.status : 400).send({ error: normalized.message, code: normalized.code });
+}
+
+async function refreshTrackConfiguration(): Promise<void> {
+  const layout = currentLayout();
+  store.trackConfiguration(layout ? await trackConfiguration.snapshot(layout) : null);
+}
+
+async function activeSectorMessage(): Promise<Extract<ServerMessage, { type: "sector.definition" }>> {
+  const layout = currentLayout();
+  if (!layout) return { type: "sector.definition", payload: null };
+  const snapshot = await trackConfiguration.snapshot(layout);
+  const active = snapshot.activeSectorDefinition;
+  const session = store.snapshot().session;
+  return {
+    type: "sector.definition",
+    payload: active?.source === "custom" && session ? {
+      revision: active.revision, source: "custom", sessionId: session.id, trackId: layout.trackId,
+      trackName: layout.trackName, boundaries: active.boundaries, layout,
+      mapCalibrationId: active.mapCalibrationId, mapCalibrationRevision: active.mapCalibrationRevision,
+    } : null,
+  };
 }
 
 await app.register(fastifyStatic, {
@@ -185,6 +236,122 @@ app.get<{ Querystring: { carIdx?: string; limit?: string } }>("/api/history/laps
   }
   return history.listLaps(session, carIdx, limit);
 });
+
+app.get("/api/track-config/active", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  const layout = currentLayout();
+  if (!layout) return reply.code(404).send({ error: "No active track layout is available." });
+  return trackConfiguration.snapshot(layout);
+});
+
+app.get<{ Params: { id: string } }>("/api/track-config/maps/:id", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  const map = await trackConfiguration.getMap(request.params.id);
+  if (!map) return reply.code(404).send({ error: "Track map not found." });
+  reply.header("Cache-Control", "private, max-age=3600, immutable");
+  return map;
+});
+
+app.post<{ Body: { svg?: unknown } }>("/api/track-config/import-preview", { bodyLimit: 1_050_000 }, async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  try {
+    if (typeof request.body?.svg !== "string") return reply.code(400).send({ error: "SVG text is required." });
+    return await trackConfiguration.previewImport(request.body.svg);
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.post<{ Body: Record<string, unknown> }>("/api/track-config/maps", { bodyLimit: 1_100_000 }, async (request, reply) => {
+  const admin = await requireAdmin(request, reply); if (!admin) return;
+  try {
+    const body = request.body ?? {};
+    if (typeof body.svg !== "string" || typeof body.selectedPathId !== "string") return reply.code(400).send({ error: "SVG text and a selected centerline are required." });
+    const map = await trackConfiguration.importMap({
+      svg: body.svg, layout: requestedLayout(body.layout), selectedPathId: body.selectedPathId,
+      source: body.source === "iracing" || body.source === "bundled" ? body.source : "imported",
+      sourceVersion: typeof body.sourceVersion === "string" ? body.sourceVersion : undefined,
+      originalFilename: typeof body.originalFilename === "string" ? body.originalFilename : undefined,
+      author: admin.username,
+    });
+    return reply.code(201).send(map);
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.get<{ Querystring: { layout?: string } }>("/api/track-config/maps", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  try {
+    const layout = request.query.layout ? requestedLayout(JSON.parse(request.query.layout)) : currentLayout();
+    if (!layout) return reply.code(404).send({ error: "No active track layout is available." });
+    return trackConfiguration.listMaps(layout);
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.post<{ Body: Record<string, unknown> }>("/api/track-config/calibrations", async (request, reply) => {
+  const admin = await requireAdmin(request, reply); if (!admin) return;
+  try {
+    const body = request.body ?? {};
+    if (typeof body.mapDefinitionId !== "string" || (body.direction !== "forward" && body.direction !== "reverse") || typeof body.startFinishPathPct !== "number")
+      return reply.code(400).send({ error: "Map, start/finish position, and direction are required." });
+    const calibration = await trackConfiguration.saveCalibration({
+      mapDefinitionId: body.mapDefinitionId, startFinishPathPct: body.startFinishPathPct, direction: body.direction,
+      rotationDegrees: typeof body.rotationDegrees === "number" ? body.rotationDegrees : undefined, author: admin.username,
+    });
+    return reply.code(201).send(calibration);
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.post<{ Params: { id: string }; Body: { layout?: unknown } }>("/api/track-config/calibrations/:id/activate", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  try {
+    const layout = request.body?.layout ? requestedLayout(request.body.layout) : currentLayout();
+    if (!layout) return reply.code(404).send({ error: "No active track layout is available." });
+    const result = await trackConfiguration.activateCalibration(request.params.id, layout);
+    await refreshTrackConfiguration();
+    return result;
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.get<{ Querystring: { mapDefinitionId?: string } }>("/api/track-config/calibrations", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  if (!request.query.mapDefinitionId) return reply.code(400).send({ error: "mapDefinitionId is required." });
+  return trackConfiguration.listCalibrations(request.query.mapDefinitionId);
+});
+
+app.get("/api/track-config/sectors", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  const layout = currentLayout();
+  if (!layout) return reply.code(404).send({ error: "No active track layout is available." });
+  return trackConfiguration.listSectorRevisions(layout);
+});
+
+app.post<{ Body: { layout?: unknown; boundaries?: unknown; mapCalibrationId?: unknown } }>("/api/track-config/sectors", async (request, reply) => {
+  const admin = await requireAdmin(request, reply); if (!admin) return;
+  try {
+    const layout = request.body?.layout ? requestedLayout(request.body.layout) : currentLayout();
+    if (!layout || !Array.isArray(request.body?.boundaries)) return reply.code(400).send({ error: "Layout and ordered boundaries are required." });
+    const boundaries = request.body.boundaries.map((value) => {
+      const boundary = value as Record<string, unknown>;
+      return { sectorNumber: Number(boundary.sectorNumber), startPct: Number(boundary.startPct) } satisfies SectorBoundary;
+    });
+    const draft = await trackConfiguration.saveSectorDraft({
+      layout, boundaries, mapCalibrationId: typeof request.body.mapCalibrationId === "string" ? request.body.mapCalibrationId : null,
+      author: admin.username, sessionId: store.snapshot().session?.id,
+    });
+    return reply.code(201).send(draft);
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.post<{ Params: { revision: string }; Body: { layout?: unknown } }>("/api/track-config/sectors/:revision/activate", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  try {
+    const session = store.snapshot().session;
+    const layout = request.body?.layout ? requestedLayout(request.body.layout) : currentLayout();
+    if (!layout) return reply.code(404).send({ error: "No active track layout is available." });
+    const result = await trackConfiguration.activateSectorRevision(request.params.revision, layout, session);
+    await refreshTrackConfiguration();
+    for (const [socket, role] of sockets) if (role === "telemetry") await sendActiveSectorIfChanged(socket);
+    return result;
+  } catch (error) { return sendConfigurationFailure(reply, error); }
+});
 app.get("/api/packages", async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;
   return registry.list();
@@ -228,6 +395,14 @@ function send(socket: WebSocket, message: ServerMessage): void {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 
+async function sendActiveSectorIfChanged(socket: WebSocket): Promise<void> {
+  const message = await activeSectorMessage();
+  const revision = message.payload?.revision ?? null;
+  if (sentSectorRevisions.get(socket) === revision) return;
+  sentSectorRevisions.set(socket, revision);
+  send(socket, message);
+}
+
 function broadcast(): void {
   const message: ServerMessage = { type: "state.snapshot", payload: store.snapshot() };
   broadcastStateSnapshot(sockets, message);
@@ -249,9 +424,13 @@ wss.on("connection", (socket, request) => {
       if (message.type === "hello" && role === "telemetry") {
         if (message.capabilities?.cameraControl) cameraSockets.add(socket);
         store.setCameraController(true, cameraSockets.size > 0);
+        await sendActiveSectorIfChanged(socket);
       }
       if (message.type === "telemetry.update" && role === "telemetry") {
+        await trackConfiguration.observeNativeDefinition(message.payload);
         const sequence = acceptTelemetry(message, store, history, intelligence);
+        await refreshTrackConfiguration();
+        await sendActiveSectorIfChanged(socket);
         if (sequence !== null) send(socket, { type: "telemetry.ack", sequence });
       }
       if (message.type === "lap.history.request" && role !== "telemetry") {
@@ -292,10 +471,12 @@ wss.on("connection", (socket, request) => {
 
   socket.on("error", (error) => {
     sockets.delete(socket);
+    sentSectorRevisions.delete(socket);
     app.log.warn({ err: error, role }, "WebSocket connection error");
   });
   socket.on("close", () => {
     sockets.delete(socket);
+    sentSectorRevisions.delete(socket);
     cameraSockets.delete(socket);
     if (role === "telemetry") {
       const telemetryConnected = [...sockets.values()].some((candidate) => candidate === "telemetry");
@@ -305,6 +486,8 @@ wss.on("connection", (socket, request) => {
 });
 
 const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store, (session) => {
+  void trackConfiguration.observeNativeDefinition(session).then(refreshTrackConfiguration)
+    .catch((error) => app.log.error({ err: error }, "Failed to refresh simulated track configuration"));
   history.ingest(session);
   intelligence.ingest(session);
   store.raceIntelligence(intelligence.snapshot());
@@ -323,6 +506,7 @@ async function shutdown(signal: string): Promise<void> {
   for (const socket of sockets.keys()) socket.close(1012, "Server restarting");
   await app.close();
   await history.close();
+  await trackConfiguration.close();
   await auth.close();
 }
 

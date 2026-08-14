@@ -38,6 +38,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
     private Task? runTask;
     private IReplayControl? replayControl;
     private ICameraController? cameraController;
+    private SectorDefinition? activeSectorDefinition;
     private TelemetryBridgeStatus status = new(false, false, false, false, "Not connected", null, null, null);
 
     public event Action<TelemetryBridgeStatus>? StatusChanged;
@@ -175,7 +176,7 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await using var source = new IracingSdkTelemetrySource(diagnostics);
+                await using var source = new IracingSdkTelemetrySource(diagnostics, CurrentSectorDefinition);
                 SetCameraController(source);
                 var activity = new SourceActivityWatchdog();
                 void OnConnectionChanged(bool connected, string label)
@@ -415,6 +416,11 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
         }
     }
 
+    private SectorDefinition? CurrentSectorDefinition()
+    {
+        lock (gate) return activeSectorDefinition;
+    }
+
     private static async Task SendAsync(ClientWebSocket socket, ReadOnlyMemory<byte> payload, SemaphoreSlim sendGate, CancellationToken cancellationToken)
     {
         await sendGate.WaitAsync(cancellationToken);
@@ -494,6 +500,22 @@ public sealed class TelemetryBridge(DiagnosticCapture diagnostics) : IAsyncDispo
                         message = resultMessage.Message
                     }, JsonOptions);
                     await SendAsync(socket, response, sendGate, cancellationToken);
+                    break;
+                case "sector.definition":
+                    SectorDefinition? configuredDefinition = null;
+                    if (root.TryGetProperty("payload", out var definitionElement) && definitionElement.ValueKind != JsonValueKind.Null)
+                        configuredDefinition = definitionElement.Deserialize<SectorDefinition>(JsonOptions)
+                            ?? throw new InvalidDataException("The server sent an invalid sector definition.");
+                    lock (gate) activeSectorDefinition = configuredDefinition;
+                    diagnostics.TryRecord("events.ndjson", new
+                    {
+                        type = "sector.definition",
+                        revision = configuredDefinition?.Revision,
+                        source = configuredDefinition?.Source
+                    });
+                    WriteLog(configuredDefinition is null
+                        ? "Using the native iRacing sector definition."
+                        : $"Sector definition received — {configuredDefinition.Revision}.");
                     break;
                 case "error":
                     var serverMessage = root.TryGetProperty("message", out var errorElement) && errorElement.ValueKind == JsonValueKind.String

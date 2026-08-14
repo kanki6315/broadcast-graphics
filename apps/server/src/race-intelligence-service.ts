@@ -20,6 +20,7 @@ const battleGapSeconds = 3;
 
 export class RaceIntelligenceService {
   private sessionId: string | null = null;
+  private sectorDefinitionRevision: string | null = null;
   private readonly histories = new Map<string, GapSample[]>();
   private readonly stints = new Map<number, StintState>();
   private readonly pitVisits = new Map<number, Map<number, PitCycleSummary>>();
@@ -32,7 +33,8 @@ export class RaceIntelligenceService {
   ) {}
 
   ingest(session: SessionState): void {
-    if (this.sessionId !== session.id) this.reset(session.id);
+    const revision = session.sectorDefinition?.revision ?? null;
+    if (this.sessionId !== session.id || this.sectorDefinitionRevision !== revision) this.reset(session.id, revision);
     const at = session.timeElapsed ?? this.clock() / 1_000;
     this.ingestStints(session, at);
     this.ingestPitCycles(session);
@@ -48,8 +50,9 @@ export class RaceIntelligenceService {
     return this.cached;
   }
 
-  private reset(sessionId: string): void {
+  private reset(sessionId: string, sectorDefinitionRevision: string | null): void {
     this.sessionId = sessionId;
+    this.sectorDefinitionRevision = sectorDefinitionRevision;
     this.histories.clear();
     this.stints.clear();
     this.pitVisits.clear();
@@ -167,6 +170,7 @@ export class RaceIntelligenceService {
     });
     return {
       sessionId: session.id,
+      sectorDefinitionRevision: session.sectorDefinition?.revision ?? null,
       generatedAt: now,
       battles: battles.sort((a, b) => (a.currentGap ?? Infinity) - (b.currentGap ?? Infinity)),
       gapTrends: trends,

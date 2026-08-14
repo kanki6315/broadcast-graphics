@@ -137,7 +137,9 @@ public sealed class SimulatedTelemetrySource(DiagnosticCapture diagnostics) : IT
     TelemetryVar.RelativeHumidity,
     TelemetryVar.Skies
 ])]
-public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : ITelemetrySource, ICameraController
+public sealed class IracingSdkTelemetrySource(
+    DiagnosticCapture diagnostics,
+    Func<SectorDefinition?>? sectorDefinitionOverride = null) : ITelemetrySource, ICameraController
 {
     private readonly object cameraGate = new();
     private ICameraCommands? cameraCommands;
@@ -216,7 +218,8 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
                         session,
                         trackTiming: trackTiming,
                         pitTiming: pitTiming,
-                        racePositions: racePositions);
+                        racePositions: racePositions,
+                        sectorDefinitionOverride: sectorDefinitionOverride?.Invoke());
                     diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
                     snapshots.Writer.TryWrite(snapshot);
                 }
@@ -304,7 +307,8 @@ internal static class TelemetrySnapshotMapper
         DateTimeOffset? capturedAt = null,
         TrackTimingTracker? trackTiming = null,
         PitTimingTracker? pitTiming = null,
-        RacePositionTracker? racePositions = null)
+        RacePositionTracker? racePositions = null,
+        SectorDefinition? sectorDefinitionOverride = null)
     {
         var sessionNumber = telemetry.SessionNum ?? info.SessionInfo?.CurrentSessionNum ?? 0;
         var session = info.SessionInfo?.Sessions?.FirstOrDefault(item => item.SessionNum == sessionNumber);
@@ -325,7 +329,12 @@ internal static class TelemetrySnapshotMapper
         var weekend = info.WeekendInfo;
         var trackName = weekend?.TrackDisplayName;
         if (string.IsNullOrWhiteSpace(trackName)) trackName = weekend?.TrackName;
-        var sectorDefinition = MapSectorDefinition(info, sessionId, weekend?.TrackID, trackName ?? "Unknown track");
+        var nativeSectorDefinition = MapSectorDefinition(info, sessionId, weekend?.TrackID, trackName ?? "Unknown track");
+        var sectorDefinition = sectorDefinitionOverride is not null &&
+            (sectorDefinitionOverride.TrackId is null || sectorDefinitionOverride.TrackId == weekend?.TrackID) &&
+            string.Equals(sectorDefinitionOverride.TrackName, trackName ?? "Unknown track", StringComparison.OrdinalIgnoreCase)
+                ? sectorDefinitionOverride with { SessionId = sessionId }
+                : nativeSectorDefinition;
         trackTiming?.Observe(sessionId, sessionTime, drivers, sectorDefinition);
         drivers = AddRaceTiming(drivers, sessionType, sessionTime, trackTiming)
             .Select(driver => driver with { Sectors = trackTiming?.GetSectorTiming(driver.CarIdx, driver.CurrentLap) })
