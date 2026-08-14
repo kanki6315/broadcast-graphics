@@ -8,3 +8,18 @@
 .track-ribbon-line button { position: absolute; top: 50%; translate: -50% -50%; z-index: 1; }
 .track-ribbon button.is-selected { outline: 3px solid var(--orange); outline-offset: 1px; z-index: 2; }
 .track-ribbon-pits > div { display: flex; gap: 4px; min-width: 110px; }
+.track-ribbon button.is-nearby { background: color-mix(in srgb, var(--class-color) 18%, var(--stock)); }
+.track-ribbon-unobserved { grid-column: 1 / -1; display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--paper-line); }
+.track-ribbon-unobserved > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.track-ribbon.variant-commentator { grid-template-columns: minmax(0, 1fr) minmax(170px, auto); gap: 8px 18px; padding: 8px 0; }
+.track-ribbon-header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.track-ribbon-header > strong { font: 700 13px var(--display); text-transform: uppercase; letter-spacing: .08em; }
+.track-ribbon-header > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 12px; color: var(--muted); font-size: 10px; }
+.track-ribbon-header span { display: inline-flex; align-items: center; gap: 5px; }
+.track-ribbon-header i { width: 9px; height: 9px; background: var(--class-color); }
+.track-ribbon.variant-commentator .track-ribbon-line { height: 30px; }
+.track-ribbon.variant-commentator button { height: 22px; min-width: 27px; font-size: 10px; }
+@media (max-width: 900px) {
+  .track-ribbon.variant-commentator { grid-template-columns: 1fr; }
+  .track-ribbon.variant-commentator .track-ribbon-pits { grid-column: 1; }
+}

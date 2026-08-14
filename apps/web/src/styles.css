@@ -216,7 +216,7 @@ kbd { margin-left: auto; border: 1px solid currentColor; padding: 2px 5px; font:
 .timing-masthead .flag-plate { min-width: 0; border: 0; }
 .timing-nav { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-content: center; gap: 4px 12px; }
 .timing-nav a, .timing-nav button { min-width: 0; display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 3px 0; color: var(--muted); background: transparent; font: 600 11px var(--display); text-transform: uppercase; letter-spacing: .05em; text-decoration: none; }
-.timing-nav a { grid-column: 1 / -1; color: var(--ink); font-size: 14px; }
+.timing-nav a { color: var(--ink); font-size: 14px; }
 .timing-nav a:hover, .timing-nav button:hover { color: var(--orange); }
 .timing-nav svg { width: 14px; height: 14px; }
 .timing-nav .account-error { position: absolute; inset: auto 0 0; padding: 2px 6px; background: #2b2523; color: #f2c5b8; }

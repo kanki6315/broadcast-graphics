@@ -76,6 +76,7 @@ export function TimingDirector({ onManageAccess, onLogout }: { onManageAccess: (
         </div>
         <div className={`flag-plate flag-${state.session?.flag ?? "green"}`}><Flag aria-hidden="true" /><strong>{state.session?.flag ?? "No flag"}</strong></div>
         <div className="timing-nav">
+          <a href="/timing">Commentator</a>
           <a href="/graphics"><Radio aria-hidden="true" />Graphics</a>
           <button onClick={onManageAccess}><KeyRound aria-hidden="true" />Access</button>
           <button onClick={() => void logout()} disabled={loggingOut}><LogOut aria-hidden="true" />{loggingOut ? "Signing out" : "Sign out"}</button>
