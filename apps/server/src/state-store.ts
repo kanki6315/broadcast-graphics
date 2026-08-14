@@ -5,6 +5,7 @@ import type {
   EventRecord,
   GraphicPackageManifest,
   LiveState,
+  RaceIntelligenceSnapshot,
   SessionState,
 } from "@racecontrol/protocol";
 import { RaceStateProjection } from "./race-state-projection.js";
@@ -42,6 +43,7 @@ export class StateStore {
         lastMessage: null,
       },
       events: [this.event("system", "Server ready — waiting for telemetry")],
+      intelligence: null,
     };
   }
 
@@ -77,6 +79,10 @@ export class StateStore {
     if (wasDisconnected) this.pushEvent("telemetry", `Telemetry connected — ${session.trackName}`);
     this.bump();
     this.armStaleTimer();
+  }
+
+  raceIntelligence(snapshot: RaceIntelligenceSnapshot | null): void {
+    this.state.intelligence = snapshot;
   }
 
   command(command: ControlCommand, packages: GraphicPackageManifest[]): CameraSwitchCommand | null {

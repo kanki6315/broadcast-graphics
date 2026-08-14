@@ -11,6 +11,7 @@ import { createAuthenticationStore } from "./auth-store.js";
 import { loadClientRelease, streamClientRelease } from "./client-release.js";
 import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
+import { RaceIntelligenceService } from "./race-intelligence-service.js";
 import { startSimulator } from "./simulator.js";
 import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
 import { canIssueControlCommands, helloMatchesAccess, parseSocketAccess } from "./socket-access.js";
@@ -56,6 +57,7 @@ const history = new RaceHistoryService(
   (lap) => broadcastStateSnapshot(sockets, { type: "lap.completed", payload: lap }),
   (error) => app.log.error({ err: error }, "Failed to persist completed lap"),
 );
+const intelligence = new RaceIntelligenceService();
 const loginAttempts = new Map<string, { count: number; resetsAt: number }>();
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -249,7 +251,7 @@ wss.on("connection", (socket, request) => {
         store.setCameraController(true, cameraSockets.size > 0);
       }
       if (message.type === "telemetry.update" && role === "telemetry") {
-        const sequence = acceptTelemetry(message, store, history);
+        const sequence = acceptTelemetry(message, store, history, intelligence);
         if (sequence !== null) send(socket, { type: "telemetry.ack", sequence });
       }
       if (message.type === "lap.history.request" && role !== "telemetry") {
@@ -302,7 +304,11 @@ wss.on("connection", (socket, request) => {
   });
 });
 
-const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store, (session) => history.ingest(session));
+const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store, (session) => {
+  history.ingest(session);
+  intelligence.ingest(session);
+  store.raceIntelligence(intelligence.snapshot());
+});
 
 const port = Number(process.env.PORT ?? 8787);
 await app.listen({ port, host: "0.0.0.0" });

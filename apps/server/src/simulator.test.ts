@@ -7,6 +7,7 @@ test("simulator includes multiclass baselines and both inferred and unknown pit 
   const inferredReturn = simulatedDrivers(10);
   const completedUnknown = simulatedDrivers(7);
 
+  assert.equal(missing.length, 41);
   assert.deepEqual(new Set(missing.map((driver) => driver.classId)), new Set([1, 2]));
   assert.equal(missing.every((driver) => driver.startingPosition != null), true);
 
@@ -21,4 +22,5 @@ test("simulator includes multiclass baselines and both inferred and unknown pit 
   const unknownCar = completedUnknown.find((driver) => driver.carIdx === 8)!;
   assert.equal(unknownCar.latestPitVisit?.inferredBoxTime, 0);
   assert.equal(unknownCar.latestPitVisit?.unknownTime, 4);
+  assert.equal(missing.some((driver) => driver.sectors?.previousLap?.some((sector) => sector.quality === "invalid")), true);
 });

@@ -1,7 +1,7 @@
 import type { DriverState, SessionState } from "@racecontrol/protocol";
 import type { StateStore } from "./state-store.js";
 
-const names = [
+const namedEntries: readonly [string, string, string][] = [
   ["23", "Maya Anderson", "Northline Racing"],
   ["17", "Jon Bell", "Bellworks Motorsport"],
   ["48", "Riley Patterson", "Signal Autosport"],
@@ -14,7 +14,14 @@ const names = [
   ["88", "Casey White", "Mesa Competition"],
   ["14", "Taylor Martinez", "Keystone Velocity"],
   ["3", "Morgan Harris", "Aperture Racing"],
-] as const;
+];
+const names: readonly [string, string, string][] = [
+  ...namedEntries,
+  ...Array.from({ length: 29 }, (_, offset): [string, string, string] => {
+    const index = offset + namedEntries.length;
+    return [String(100 + index), `Endurance Driver ${index + 1}`, `Fixture Racing ${Math.floor(index / 2) + 1}`];
+  }),
+];
 
 function inferredPitFixture(tick: number) {
   const phase = tick % 20;
@@ -67,19 +74,31 @@ export function simulatedDrivers(tick: number): DriverState[] {
   const battleSwapped = Math.floor(tick / 8) % 2 === 1;
   return names.map<DriverState>(([carNumber, name, team], index) => {
     const position = battleSwapped && index === 1 ? 3 : battleSwapped && index === 2 ? 2 : index + 1;
-    const classId = index < 8 ? 1 : 2;
-    const className = index < 8 ? "GT3" : "TCR";
-    const startingClassPosition = index < 8 ? index + 1 : index - 7;
+    const classId = index < 25 ? 1 : 2;
+    const className = index < 25 ? "GT3" : "TCR";
+    const startingClassPosition = index < 25 ? index + 1 : index - 24;
     const classPosition = battleSwapped && index === 1 ? 3 : battleSwapped && index === 2 ? 2 : startingClassPosition;
     const base = 81.42 + index * 0.23;
     const gap = position === 1 ? 0 : Number(((position - 1) * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3));
     const classGap = classPosition === 1 ? 0 : Number(((classPosition - 1) * 0.73 + Math.sin(tick / 9 + index) * 0.18).toFixed(3));
     const pit = index === 9 ? inferredPitFixture(tick) : index === 8 ? unknownPitFixture(tick) : null;
+    const currentName = index === 9 && tick % 20 >= 8 ? "Jordan Relay" : name;
+    const currentUserId = index === 9 && tick % 20 >= 8 ? 11_009 : 10_000 + index;
+    const sectorQuality = index === 5 ? "invalid" as const : "valid" as const;
+    const previousSectors = [1, 2, 3].map((sectorNumber) => ({
+      carIdx: index, lapNumber: completedLaps, sectorNumber, definitionRevision: "simulation-native-1",
+      source: "derived" as const, quality: sectorQuality,
+      value: sectorQuality === "valid" ? Number((base / 3 + sectorNumber * .04).toFixed(3)) : undefined,
+      reason: sectorQuality === "invalid" ? "telemetry-gap" as const : undefined,
+      completedAt: tick - (3 - sectorNumber) * 3,
+      driverId: String(currentUserId), driverName: currentName,
+      comparisons: sectorQuality === "valid" && index === 0 ? ["personal-best" as const, "class-fastest" as const, "overall-fastest" as const] : undefined,
+    }));
     return {
       carIdx: index,
       position,
       carNumber,
-      name,
+      name: currentName,
       team,
       className,
       interval: position === 1 ? null : gap,
@@ -117,8 +136,13 @@ export function simulatedDrivers(tick: number): DriverState[] {
         lastLap: { source: "iracing", quality: "valid" },
         bestLap: { source: "iracing", quality: "valid" },
       },
+      sectors: {
+        currentSectorNumber: Math.min(3, Math.floor(((tick / 90 + index / names.length) % 1) * 3) + 1),
+        currentLap: [],
+        previousLap: previousSectors,
+      },
       isConnected: pit?.pitState !== "unobserved",
-      userId: 10_000 + index,
+      userId: currentUserId,
       teamId: 20_000 + index,
       carId: 1,
       lastLapPosition: position,
@@ -154,8 +178,8 @@ export function startSimulator(store: StateStore, onTelemetry: (session: Session
       startState: "go",
       flags: tick % 180 > 160 ? ["caution"] : ["green"],
       classes: [
-        { id: 1, name: "GT3", color: "#ff4b2b", carCount: 8 },
-        { id: 2, name: "TCR", color: "#1976d2", carCount: 4 },
+        { id: 1, name: "GT3", color: "#ff4b2b", carCount: 25 },
+        { id: 2, name: "TCR", color: "#1976d2", carCount: 16 },
       ],
       source: "simulation",
       sourceMode: "simulation",
@@ -182,9 +206,14 @@ export function startSimulator(store: StateStore, onTelemetry: (session: Session
       activeCameraCarIdx: 0,
       activeCameraGroup: 1,
       activeCamera: 0,
+      sectorDefinition: {
+        revision: "simulation-native-1", source: "iracing", sessionId: "simulated-session",
+        trackId: null, trackName: "Virginia International Raceway — Full Course",
+        boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: 1 / 3 }, { sectorNumber: 3, startPct: 2 / 3 }],
+      },
     };
-    store.telemetry(session);
     onTelemetry(session);
+    store.telemetry(session);
   };
   emit();
   const timer = setInterval(emit, 1_000);

@@ -150,3 +150,32 @@ test("records a lapped car without inventing a seconds gap", async () => {
   assert.equal(lap?.lapsBehindLeader, 1);
   await history.close();
 });
+
+test("persists semantic sectors idempotently and isolates definition revisions", async () => {
+  const repository = new MemoryRaceHistoryRepository();
+  const history = new RaceHistoryService(repository);
+  const definition = {
+    revision: "iracing-a", source: "iracing" as const, sessionId: "87765685-2", trackId: 168,
+    trackName: "Long Beach", boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }],
+  };
+  const sector = {
+    carIdx: 7, lapNumber: 1, sectorNumber: 1, definitionRevision: definition.revision,
+    source: "derived" as const, quality: "valid" as const, value: 48.2, completedAt: 50,
+  };
+  const update = session(driver({ sectors: { currentSectorNumber: 2, currentLap: [], previousLap: [sector] } }), {
+    sectorDefinition: definition,
+  });
+
+  history.ingest(update);
+  history.ingest(update);
+  assert.deepEqual((await history.listSectors(update, 7)).map((result) => result.value), [48.2]);
+
+  const revised = { ...definition, revision: "iracing-b" };
+  const revisedSector = { ...sector, definitionRevision: revised.revision, value: 48.1 };
+  const revisedUpdate = session(driver({ sectors: { currentSectorNumber: 2, currentLap: [], previousLap: [revisedSector] } }), {
+    sectorDefinition: revised,
+  });
+  history.ingest(revisedUpdate);
+  assert.equal((await history.listSectors(revisedUpdate, 7)).length, 2);
+  await history.close();
+});

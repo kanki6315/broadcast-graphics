@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type { CompletedLap, DriverState, SessionState } from "@racecontrol/protocol";
+import type { CompletedLap, CompletedSector, DriverState, SectorDefinition, SessionState } from "@racecontrol/protocol";
 import { Pool, type PoolClient } from "pg";
 
 export interface RaceHistoryRepository {
   initialize(): Promise<void>;
   recordLap(session: SessionState, driver: DriverState, startingPosition?: number | null): Promise<CompletedLap | null>;
   listLaps(session: SessionState, carIdx: number, limit: number): Promise<CompletedLap[]>;
+  recordSectors(session: SessionState, driver: DriverState, definition: SectorDefinition, sectors: CompletedSector[]): Promise<CompletedSector[]>;
+  listSectors(session: SessionState, carIdx: number, limit: number): Promise<CompletedSector[]>;
   close(): Promise<void>;
 }
 
@@ -51,6 +53,8 @@ function lapRecord(id: string, session: SessionState, driver: DriverState): Comp
 
 export class MemoryRaceHistoryRepository implements RaceHistoryRepository {
   private readonly records = new Map<string, CompletedLap>();
+  private readonly sectors = new Map<string, { sessionKey: string; sector: CompletedSector }>();
+  private readonly definitions = new Map<string, SectorDefinition>();
 
   async initialize(): Promise<void> {}
 
@@ -69,6 +73,28 @@ export class MemoryRaceHistoryRepository implements RaceHistoryRepository {
       .slice(0, limit)
       .reverse()
       .map((lap) => structuredClone(lap));
+  }
+
+  async recordSectors(session: SessionState, _driver: DriverState, definition: SectorDefinition, sectors: CompletedSector[]): Promise<CompletedSector[]> {
+    this.definitions.set(`${session.source}:${session.sourceMode}:${session.id}:${definition.revision}`, structuredClone(definition));
+    const inserted: CompletedSector[] = [];
+    for (const sector of sectors) {
+      const key = `${session.source}:${session.sourceMode}:${session.id}:${sector.carIdx}:${sector.lapNumber}:${sector.sectorNumber}:${sector.definitionRevision}`;
+      if (this.sectors.has(key)) continue;
+      this.sectors.set(key, { sessionKey: `${session.source}:${session.sourceMode}:${session.id}`, sector: structuredClone(sector) });
+      inserted.push(structuredClone(sector));
+    }
+    return inserted;
+  }
+
+  async listSectors(session: SessionState, carIdx: number, limit: number): Promise<CompletedSector[]> {
+    const sessionKey = `${session.source}:${session.sourceMode}:${session.id}`;
+    return [...this.sectors.values()]
+      .filter((record) => record.sessionKey === sessionKey && record.sector.carIdx === carIdx)
+      .map((record) => record.sector)
+      .sort((left, right) => left.lapNumber - right.lapNumber || left.sectorNumber - right.sectorNumber)
+      .slice(-limit)
+      .map((sector) => structuredClone(sector));
   }
 
   async close(): Promise<void> {}
@@ -191,6 +217,43 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
         ON bg_completed_laps (entry_id, lap_number DESC);
       CREATE INDEX IF NOT EXISTS bg_completed_laps_session_lap_idx
         ON bg_completed_laps (session_id, lap_number DESC);
+
+      CREATE TABLE IF NOT EXISTS bg_sector_definitions (
+        id uuid PRIMARY KEY,
+        session_id uuid NOT NULL REFERENCES bg_broadcast_sessions(id) ON DELETE CASCADE,
+        revision text NOT NULL,
+        source text NOT NULL CHECK (source IN ('iracing')),
+        track_id integer,
+        track_name text NOT NULL,
+        observed_at timestamptz NOT NULL,
+        UNIQUE (session_id, revision)
+      );
+      CREATE TABLE IF NOT EXISTS bg_sector_definition_points (
+        definition_id uuid NOT NULL REFERENCES bg_sector_definitions(id) ON DELETE CASCADE,
+        ordinal integer NOT NULL,
+        sector_number integer NOT NULL,
+        start_pct double precision NOT NULL CHECK (start_pct >= 0 AND start_pct < 1),
+        PRIMARY KEY (definition_id, ordinal),
+        UNIQUE (definition_id, sector_number)
+      );
+      CREATE TABLE IF NOT EXISTS bg_completed_sectors (
+        id uuid PRIMARY KEY,
+        session_id uuid NOT NULL REFERENCES bg_broadcast_sessions(id) ON DELETE CASCADE,
+        entry_id uuid NOT NULL REFERENCES bg_session_entries(id) ON DELETE CASCADE,
+        driver_id uuid NOT NULL REFERENCES bg_session_drivers(id) ON DELETE RESTRICT,
+        definition_id uuid NOT NULL REFERENCES bg_sector_definitions(id) ON DELETE RESTRICT,
+        lap_number integer NOT NULL CHECK (lap_number > 0),
+        sector_number integer NOT NULL,
+        elapsed_ms integer,
+        timing_source text NOT NULL CHECK (timing_source IN ('iracing', 'derived')),
+        quality text NOT NULL CHECK (quality IN ('valid', 'inferred', 'incomplete', 'invalid')),
+        invalidity_reason text,
+        completion_session_time_ms bigint,
+        observed_at timestamptz NOT NULL,
+        UNIQUE (session_id, entry_id, lap_number, sector_number, definition_id)
+      );
+      CREATE INDEX IF NOT EXISTS bg_completed_sectors_entry_lap_idx
+        ON bg_completed_sectors (entry_id, lap_number DESC, sector_number);
     `);
   }
 
@@ -281,6 +344,66 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
     }));
   }
 
+  async recordSectors(session: SessionState, driver: DriverState, definition: SectorDefinition, sectors: CompletedSector[]): Promise<CompletedSector[]> {
+    if (sectors.length === 0) return [];
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const at = observedAt(session);
+      const sessionId = await this.upsertSession(client, session, at);
+      await this.upsertClass(client, sessionId, session, driver);
+      const entryId = await this.upsertEntry(client, sessionId, driver, at);
+      const driverId = await this.upsertDriver(client, entryId, driver, at);
+      const definitionId = await this.upsertSectorDefinition(client, sessionId, definition, at);
+      const inserted: CompletedSector[] = [];
+      for (const sector of sectors) {
+        const result = await client.query(`
+          INSERT INTO bg_completed_sectors (
+            id, session_id, entry_id, driver_id, definition_id, lap_number, sector_number,
+            elapsed_ms, timing_source, quality, invalidity_reason, completion_session_time_ms, observed_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          ON CONFLICT (session_id, entry_id, lap_number, sector_number, definition_id) DO NOTHING
+          RETURNING id
+        `, [randomUUID(), sessionId, entryId, driverId, definitionId, sector.lapNumber, sector.sectorNumber,
+          milliseconds(sector.value), sector.source, sector.quality, sector.reason ?? null,
+          milliseconds(sector.completedAt), at]);
+        if (result.rowCount === 1) inserted.push(structuredClone(sector));
+      }
+      await client.query("COMMIT");
+      return inserted;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listSectors(session: SessionState, carIdx: number, limit: number): Promise<CompletedSector[]> {
+    const result = await this.pool.query<{
+      car_idx: number; lap_number: number; sector_number: number; revision: string; timing_source: CompletedSector["source"];
+      quality: CompletedSector["quality"]; invalidity_reason: CompletedSector["reason"] | null; elapsed_ms: number | null;
+      completion_session_time_ms: number | string | null; driver_name: string;
+    }>(`
+      SELECT entry.car_idx, sector.lap_number, sector.sector_number, definition.revision,
+             sector.timing_source, sector.quality, sector.invalidity_reason, sector.elapsed_ms,
+             sector.completion_session_time_ms, driver.name AS driver_name
+      FROM bg_completed_sectors sector
+      JOIN bg_broadcast_sessions session ON session.id = sector.session_id
+      JOIN bg_session_entries entry ON entry.id = sector.entry_id
+      JOIN bg_session_drivers driver ON driver.id = sector.driver_id
+      JOIN bg_sector_definitions definition ON definition.id = sector.definition_id
+      WHERE session.source = $1 AND session.source_mode = $2 AND session.source_session_id = $3 AND entry.car_idx = $4
+      ORDER BY sector.lap_number DESC, sector.sector_number DESC LIMIT $5
+    `, [session.source, session.sourceMode, session.id, carIdx, limit]);
+    return result.rows.reverse().map((row) => ({
+      carIdx: row.car_idx, lapNumber: row.lap_number, sectorNumber: row.sector_number,
+      definitionRevision: row.revision, source: row.timing_source, quality: row.quality,
+      value: seconds(row.elapsed_ms) ?? undefined, reason: row.invalidity_reason ?? undefined,
+      completedAt: seconds(row.completion_session_time_ms) ?? undefined, driverName: row.driver_name,
+    }));
+  }
+
   async close(): Promise<void> {
     await this.pool.end();
   }
@@ -365,6 +488,24 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
     `, [id, entryId, driverKey, driver.userId > 0 ? driver.userId : null, driver.name, at]);
     return result.rows[0]!.id;
   }
+
+  private async upsertSectorDefinition(client: PoolClient, sessionId: string, definition: SectorDefinition, at: string): Promise<string> {
+    const result = await client.query<{ id: string }>(`
+      INSERT INTO bg_sector_definitions (id, session_id, revision, source, track_id, track_name, observed_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT (session_id, revision) DO UPDATE SET observed_at = EXCLUDED.observed_at
+      RETURNING id
+    `, [randomUUID(), sessionId, definition.revision, definition.source, definition.trackId, definition.trackName, at]);
+    const id = result.rows[0]!.id;
+    for (let ordinal = 0; ordinal < definition.boundaries.length; ordinal++) {
+      const boundary = definition.boundaries[ordinal]!;
+      await client.query(`
+        INSERT INTO bg_sector_definition_points (definition_id, ordinal, sector_number, start_pct)
+        VALUES ($1,$2,$3,$4) ON CONFLICT (definition_id, ordinal) DO NOTHING
+      `, [id, ordinal, boundary.sectorNumber, boundary.startPct]);
+    }
+    return id;
+  }
 }
 
 export function createRaceHistoryRepository(databaseUrl?: string): RaceHistoryRepository {
@@ -375,6 +516,7 @@ export class RaceHistoryService {
   private readonly persistedLap = new Map<string, number>();
   private readonly startingPositions = new Map<string, number>();
   private readonly pending = new Set<string>();
+  private readonly persistedSectors = new Set<string>();
   private queue: Promise<void> = Promise.resolve();
 
   constructor(
@@ -406,12 +548,19 @@ export class RaceHistoryService {
           this.pending.delete(pendingKey);
         }
       });
+
     }
+    for (const driver of session.drivers) this.queueSectors(session, driver, `${session.source}:${session.sourceMode}:${session.id}:${driver.carIdx}`);
   }
 
   async listLaps(session: SessionState, carIdx: number, limit = 20): Promise<CompletedLap[]> {
     await this.queue;
     return this.repository.listLaps(session, carIdx, Math.max(1, Math.min(limit, 200)));
+  }
+
+  async listSectors(session: SessionState, carIdx: number, limit = 60): Promise<CompletedSector[]> {
+    await this.queue;
+    return this.repository.listSectors(session, carIdx, Math.max(1, Math.min(limit, 600)));
   }
 
   async close(): Promise<void> {
@@ -428,5 +577,27 @@ export class RaceHistoryService {
     const hasOverallGap = driver.lastLapLapsBehindLeader > 0 || driver.lastLapGapToLeader != null;
     const hasClassGap = driver.lastLapLapsBehindClassLeader > 0 || driver.lastLapGapToClassLeader != null;
     return hasOverallGap && hasClassGap;
+  }
+
+  private queueSectors(session: SessionState, driver: DriverState, entryKey: string): void {
+    const definition = session.sectorDefinition;
+    if (!definition || !driver.sectors) return;
+    const candidates = [...(driver.sectors.previousLap ?? []), ...(driver.sectors.currentLap ?? [])]
+      .filter((sector) => sector.definitionRevision === definition.revision)
+      .filter((sector) => !this.pending.has(`${entryKey}:sector:${sector.lapNumber}:${sector.sectorNumber}:${sector.definitionRevision}`))
+      .filter((sector) => !this.persistedSectors.has(`${entryKey}:sector:${sector.lapNumber}:${sector.sectorNumber}:${sector.definitionRevision}`));
+    if (candidates.length === 0) return;
+    const keys = candidates.map((sector) => `${entryKey}:sector:${sector.lapNumber}:${sector.sectorNumber}:${sector.definitionRevision}`);
+    keys.forEach((key) => this.pending.add(key));
+    this.queue = this.queue.then(async () => {
+      try {
+        await this.repository.recordSectors(session, driver, definition, candidates);
+        keys.forEach((key) => this.persistedSectors.add(key));
+      } catch (error) {
+        this.onError(error);
+      } finally {
+        keys.forEach((key) => this.pending.delete(key));
+      }
+    });
   }
 }
