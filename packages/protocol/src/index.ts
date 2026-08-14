@@ -15,9 +15,54 @@ export type SessionFlag = "green" | "yellow" | "red" | "white" | "checkered";
 export type SessionPhase = "invalid" | "get-in-car" | "warmup" | "parade-laps" | "racing" | "checkered" | "cool-down";
 export type StartState = "hidden" | "ready" | "set" | "go";
 export type TrackStatus = "unknown" | "running" | "pit" | "off-track" | "not-in-world" | "retired";
+export type PitState = "not-in-pits" | "pit-lane" | "pit-stall" | "unobserved";
 export type TelemetrySource = "iracing" | "simulation";
 export type TelemetrySourceMode = "live" | "replay" | "simulation";
 export type AccessKeyKind = "ingestion" | "view";
+export type TimingWorkspaceMode = "operator" | "commentator";
+
+export type InvalidTimingReason =
+  | "telemetry-gap"
+  | "lap-number-jump"
+  | "position-reset"
+  | "implausible-movement"
+  | "tow-or-return-to-pits"
+  | "pit-transition"
+  | "sector-crossings-out-of-order"
+  | "session-transition"
+  | "insufficient-boundary-samples";
+
+export interface TimingValue {
+  value?: number;
+  source: "iracing" | "derived";
+  quality: "valid" | "inferred" | "incomplete" | "invalid";
+  reason?: InvalidTimingReason;
+}
+
+export type DriverTimingField =
+  | "lapDistPct"
+  | "gapToLeader"
+  | "intervalToAhead"
+  | "classGapToLeader"
+  | "classIntervalToAhead"
+  | "lastLap"
+  | "bestLap";
+
+export type TimingQualityMetadata = Omit<TimingValue, "value">;
+
+export interface PitVisitTiming {
+  pitEntryTime: number;
+  pitExitTime?: number;
+  pitLaneTime: number;
+  boxTime: number;
+  unknownTime: number;
+  observedBoxTime: number;
+  inferredBoxTime: number;
+  driverChange: boolean;
+  entryDriverId?: string;
+  exitDriverId?: string;
+  quality: "valid" | "contains-inference" | "incomplete";
+}
 
 export interface AccessKey {
   id: string;
@@ -61,6 +106,18 @@ export interface DriverState {
   bestLapNumber: number | null;
   lapDistPct: number | null;
   trackStatus: TrackStatus;
+  /** Detailed pit lifecycle state. Separate from the broader trackStatus location. */
+  pitState?: PitState;
+  /** The open pit visit, or the most recently completed visit when no visit is open. */
+  latestPitVisit?: PitVisitTiming | null;
+  /** Immutable race-start baselines. Null means a trustworthy baseline was unavailable. */
+  startingPosition?: number | null;
+  startingClassPosition?: number | null;
+  /** Positive values mean positions gained; negative values mean positions lost. */
+  positionChange?: number | null;
+  classPositionChange?: number | null;
+  /** Provenance and quality for timing fields without replacing legacy numeric values. */
+  timingQuality?: Partial<Record<DriverTimingField, TimingQualityMetadata>>;
   isConnected: boolean;
   userId: number;
   teamId: number;
@@ -247,7 +304,7 @@ export type ControlCommand =
   | { type: "graphics.config.set"; slot: GraphicSlot; key: string; value: string | number | boolean };
 
 export type ClientMessage =
-  | { type: "hello"; role: "telemetry" | "control" | "overlay"; clientId?: string; capabilities?: { cameraControl?: boolean } }
+  | { type: "hello"; role: "telemetry" | "control" | "overlay"; mode?: TimingWorkspaceMode; clientId?: string; capabilities?: { cameraControl?: boolean } }
   | { type: "telemetry.update"; sequence?: number; payload: SessionState }
   | { type: "camera.result"; commandId: string; status: "sent" | "rejected"; message: string }
   | { type: "lap.history.request"; carIdx: number; limit?: number }

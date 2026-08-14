@@ -1,6 +1,7 @@
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useMemo, useState } from "react";
 import { Camera, Flag, KeyRound, LogOut, Radio, Wifi, WifiOff } from "lucide-react";
-import { formatLapTime } from "@racecontrol/protocol";
+import { LinearTrackRibbon } from "./linear-track-ribbon";
+import { TimingTable } from "./timing-table";
 import { useLiveState } from "./use-live-state";
 
 export function TimingDirector({ onManageAccess, onLogout }: { onManageAccess: () => void; onLogout: () => Promise<void> }) {
@@ -58,12 +59,6 @@ export function TimingDirector({ onManageAccess, onLogout }: { onManageAccess: (
     command({ type: "focus.set", carIdx });
   }
 
-  function handleRowKeyDown(carIdx: number, event: ReactKeyboardEvent<HTMLTableRowElement>) {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    takeDriver(carIdx);
-  }
-
   return (
     <div className="control-shell timing-control-shell">
       <header className="timing-masthead">
@@ -101,47 +96,21 @@ export function TimingDirector({ onManageAccess, onLogout }: { onManageAccess: (
           </div>
         </div>
 
-        <div className="timing-table-wrap">
-          <table className="timing-table">
-            <thead><tr><th>Pos</th><th>No.</th><th>Driver / team</th><th>Gap</th><th>Interval</th><th>Last lap</th><th>Best lap</th><th>Laps</th><th>Status</th></tr></thead>
-            <tbody>
-              {state.session?.drivers.map((driver) => {
-                const selected = driver.carIdx === state.graphics.selectedDriverCarIdx;
-                const onCamera = driver.carIdx === state.camera.activeCarIdx;
-                const fastest = driver.carIdx === fastestCarIdx;
-                const unavailable = Boolean(state.camera.pendingCommandId);
-                const status = driver.trackStatus === "pit" ? "Pit"
-                  : driver.trackStatus === "off-track" ? "Off track"
-                    : driver.trackStatus === "not-in-world" ? "Out"
-                      : driver.trackStatus === "retired" ? "Retired"
-                        : !driver.isConnected ? "Disconnected"
-                          : "Running";
-                return (
-                  <tr
-                    key={driver.carIdx}
-                    className={`${selected ? "is-selected" : ""}${onCamera ? " is-on-camera" : ""}${unavailable ? " is-busy" : ""}`}
-                    onClick={() => takeDriver(driver.carIdx)}
-                    onKeyDown={(event) => handleRowKeyDown(driver.carIdx, event)}
-                    tabIndex={0}
-                    aria-label={`Take camera on ${driver.name}, position ${driver.position}`}
-                    aria-current={onCamera ? "true" : undefined}
-                  >
-                    <td><span className="position-stamp">{driver.position}</span></td>
-                    <td><span className="car-number">{driver.carNumber}</span></td>
-                    <td><span className="timing-driver"><strong>{driver.name}</strong><span>{driver.team}</span></span></td>
-                    <td className="numeric">{driver.position === 1 ? "Leader" : driver.lapsBehindLeader > 0 ? `+${driver.lapsBehindLeader}L` : driver.gapToLeader == null ? "—" : `+${driver.gapToLeader.toFixed(3)}`}</td>
-                    <td className="numeric">{driver.position === 1 ? "—" : driver.intervalToAhead == null ? "—" : `+${driver.intervalToAhead.toFixed(3)}`}</td>
-                    <td className="numeric">{formatLapTime(driver.lastLap)}</td>
-                    <td className={`numeric ${fastest ? "fastest" : ""}`}>{formatLapTime(driver.bestLap)}</td>
-                    <td className="numeric">{driver.lapsCompleted}</td>
-                    <td><span className={`status-tag ${driver.trackStatus === "pit" ? "pit" : "running"}`}>{status}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {!state.session?.drivers.length && <div className="timing-empty">Waiting for timing entries from iRacing.</div>}
-        </div>
+        <LinearTrackRibbon
+          drivers={state.session?.drivers ?? []}
+          selectedCarIdx={state.graphics.selectedDriverCarIdx}
+          onSelectCar={takeDriver}
+        />
+
+        <TimingTable
+          drivers={state.session?.drivers ?? []}
+          selectedCarIdx={state.graphics.selectedDriverCarIdx}
+          activeCameraCarIdx={state.camera.activeCarIdx}
+          fastestCarIdx={fastestCarIdx}
+          selectionPending={Boolean(state.camera.pendingCommandId)}
+          onSelectCar={takeDriver}
+          selectionLabel={(driver) => `Take camera on ${driver.name}, position ${driver.position}`}
+        />
 
         <section className={`camera-dock camera-${state.camera.controller}`} aria-label="Camera controls">
           <div className="camera-driver-readout">

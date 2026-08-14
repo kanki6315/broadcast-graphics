@@ -308,6 +308,17 @@ Implement and verify the work in this order:
 
 Protocol additions should be optional during rollout so existing diagnostic captures and older telemetry clients remain replay-compatible.
 
+### Frozen Increment 1 foundation contracts
+
+The serial foundation for Increment 1 lives in `packages/protocol/src/index.ts`. During parallel implementation, that file has a single owner; table and ribbon sessions consume its exported contracts without editing it.
+
+- `DriverState.pitState` carries `not-in-pits`, `pit-lane`, `pit-stall`, or `unobserved` independently of the legacy `trackStatus` field.
+- `DriverState.latestPitVisit` uses `PitVisitTiming`. An omitted field means the producer does not support pit summaries; `null` means it supports them but has no visit to report. `pitExitTime` distinguishes an open visit from a completed visit.
+- `startingPosition` and `startingClassPosition` are immutable once established. Their matching change fields are positive for positions gained, negative for positions lost, and `null` when the baseline is not trustworthy.
+- `timingQuality` adds source, quality, and an optional invalidity reason to named timing fields without replacing the legacy numeric values during rollout. The reusable `TimingValue` contract carries a value when later derived timing results need value and metadata together.
+- `TimingWorkspaceMode` identifies `operator` and read-only `commentator` behavior. It is optional on the socket hello message until the server enforces the permission boundary.
+- `apps/web/src/timing-table.tsx` owns the timing table. `apps/web/src/linear-track-ribbon.tsx` and its colocated stylesheet own the ribbon. Both are presentation components driven by `DriverState[]`, the selected car, and a local selection callback; neither owns socket commands or shared state.
+
 ## Verification and acceptance criteria
 
 ### Pit timing
@@ -340,4 +351,3 @@ Protocol additions should be optional during rollout so existing diagnostic capt
 - Class battles, pit-cycle offsets, driver changes, and dirty data can be distinguished without opening another page.
 - Commentator row interactions never send camera or graphics commands.
 - Replay fixtures cover reconnects, long pit stops, driver changes, missing cars, and cars reappearing at discontinuous track positions.
-

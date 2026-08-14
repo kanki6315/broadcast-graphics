@@ -1,0 +1,10 @@
+.track-ribbon { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; padding: 9px 0 12px; border-top: 1px solid var(--paper-line); font-variant-numeric: tabular-nums; }
+.track-ribbon-lane, .track-ribbon-pits { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; }
+.track-ribbon-label { color: var(--muted); font: 600 10px var(--display); text-transform: uppercase; letter-spacing: .08em; }
+.track-ribbon-line { position: relative; height: 32px; margin-inline: 14px; border-block: 2px solid var(--ink); background: rgba(184, 194, 189, .2); }
+.track-ribbon-line::after { content: ""; position: absolute; inset: -2px auto -2px 0; width: 3px; background: var(--orange); }
+.track-ribbon button { --class-color: var(--muted); min-width: 30px; height: 24px; border: 2px solid var(--class-color); border-radius: 0; padding: 0 4px; background: var(--stock); color: var(--ink); font: 700 11px var(--display); cursor: pointer; }
+.track-ribbon button:hover, .track-ribbon button:focus-visible { background: var(--inspection); }
+.track-ribbon-line button { position: absolute; top: 50%; translate: -50% -50%; z-index: 1; }
+.track-ribbon button.is-selected { outline: 3px solid var(--orange); outline-offset: 1px; z-index: 2; }
+.track-ribbon-pits > div { display: flex; gap: 4px; min-width: 110px; }
