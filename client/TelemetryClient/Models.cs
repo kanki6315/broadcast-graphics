@@ -5,7 +5,41 @@ namespace RaceControl.TelemetryClient;
 public sealed record TimingQualityMetadata(
     [property: JsonPropertyName("source")] string Source,
     [property: JsonPropertyName("quality")] string Quality,
-    [property: JsonPropertyName("reason")] string? Reason = null);
+    [property: JsonPropertyName("reason")] string? Reason = null,
+    [property: JsonPropertyName("observedAt")] double? ObservedAt = null,
+    [property: JsonPropertyName("completedAt")] double? CompletedAt = null);
+
+public sealed record SectorBoundary(
+    [property: JsonPropertyName("sectorNumber")] int SectorNumber,
+    [property: JsonPropertyName("startPct")] double StartPct);
+
+public sealed record SectorDefinition(
+    [property: JsonPropertyName("revision")] string Revision,
+    [property: JsonPropertyName("source")] string Source,
+    [property: JsonPropertyName("sessionId")] string SessionId,
+    [property: JsonPropertyName("trackId")] int? TrackId,
+    [property: JsonPropertyName("trackName")] string TrackName,
+    [property: JsonPropertyName("boundaries")] IReadOnlyList<SectorBoundary> Boundaries);
+
+public sealed record CompletedSector(
+    [property: JsonPropertyName("carIdx")] int CarIdx,
+    [property: JsonPropertyName("lapNumber")] int LapNumber,
+    [property: JsonPropertyName("sectorNumber")] int SectorNumber,
+    [property: JsonPropertyName("definitionRevision")] string DefinitionRevision,
+    [property: JsonPropertyName("source")] string Source,
+    [property: JsonPropertyName("quality")] string Quality,
+    [property: JsonPropertyName("value")] double? Value = null,
+    [property: JsonPropertyName("reason")] string? Reason = null,
+    [property: JsonPropertyName("observedAt")] double? ObservedAt = null,
+    [property: JsonPropertyName("completedAt")] double? CompletedAt = null,
+    [property: JsonPropertyName("driverId")] string? DriverId = null,
+    [property: JsonPropertyName("driverName")] string? DriverName = null,
+    [property: JsonPropertyName("comparisons")] IReadOnlyList<string>? Comparisons = null);
+
+public sealed record DriverSectorTiming(
+    [property: JsonPropertyName("currentSectorNumber")] int? CurrentSectorNumber,
+    [property: JsonPropertyName("currentLap")] IReadOnlyList<CompletedSector> CurrentLap,
+    [property: JsonPropertyName("previousLap")] IReadOnlyList<CompletedSector> PreviousLap);
 
 public sealed record PitVisitTiming(
     [property: JsonPropertyName("pitEntryTime")] double PitEntryTime,
@@ -63,7 +97,8 @@ public sealed record DriverState(
     [property: JsonPropertyName("startingClassPosition")] int? StartingClassPosition = null,
     [property: JsonPropertyName("positionChange")] int? PositionChange = null,
     [property: JsonPropertyName("classPositionChange")] int? ClassPositionChange = null,
-    [property: JsonPropertyName("timingQuality")] IReadOnlyDictionary<string, TimingQualityMetadata>? TimingQuality = null);
+    [property: JsonPropertyName("timingQuality")] IReadOnlyDictionary<string, TimingQualityMetadata>? TimingQuality = null,
+    [property: JsonPropertyName("sectors")] DriverSectorTiming? Sectors = null);
 
 public sealed record CarClassState(
     [property: JsonPropertyName("id")] int Id,
@@ -126,4 +161,5 @@ public sealed record SessionState(
     [property: JsonPropertyName("cameraGroups")] IReadOnlyList<CameraGroupDefinition>? CameraGroups = null,
     [property: JsonPropertyName("activeCameraCarIdx")] int? ActiveCameraCarIdx = null,
     [property: JsonPropertyName("activeCameraGroup")] int? ActiveCameraGroup = null,
-    [property: JsonPropertyName("activeCamera")] int? ActiveCamera = null);
+    [property: JsonPropertyName("activeCamera")] int? ActiveCamera = null,
+    [property: JsonPropertyName("sectorDefinition")] SectorDefinition? SectorDefinition = null);

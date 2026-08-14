@@ -176,7 +176,7 @@ public sealed class TelemetrySnapshotMapperTests
     [Fact]
     public void LiveTimingInterpolatesWhenCarsReachTheSameTrackPosition()
     {
-        var timing = new LiveTimingTracker();
+        var timing = new TrackTimingTracker();
         var info = SessionInfo("Race", [Driver(0), Driver(1)]);
 
         TelemetrySnapshotMapper.Map(Telemetry(
@@ -185,7 +185,7 @@ public sealed class TelemetrySnapshotMapperTests
             lapsCompleted: [4, 4],
             f2Times: [0, 5],
             lapDistances: [0.20f, 0.10f],
-            sessionTime: 100), info, liveTiming: timing);
+            sessionTime: 100), info, trackTiming: timing);
 
         var secondFrame = TelemetrySnapshotMapper.Map(Telemetry(
             positions: [1, 2],
@@ -193,7 +193,7 @@ public sealed class TelemetrySnapshotMapperTests
             lapsCompleted: [4, 4],
             f2Times: [0, 5],
             lapDistances: [0.30f, 0.20f],
-            sessionTime: 101), info, liveTiming: timing);
+            sessionTime: 101), info, trackTiming: timing);
         var second = secondFrame.Drivers.Single(driver => driver.Position == 2);
         AssertClose(1, second.GapToLeader);
         AssertClose(1, second.IntervalToAhead);
@@ -204,7 +204,7 @@ public sealed class TelemetrySnapshotMapperTests
             lapsCompleted: [4, 4],
             f2Times: [0, 5],
             lapDistances: [0.40f, 0.29f],
-            sessionTime: 102), info, liveTiming: timing);
+            sessionTime: 102), info, trackTiming: timing);
         var updatedSecond = thirdFrame.Drivers.Single(driver => driver.Position == 2);
         AssertClose(1.1, updatedSecond.GapToLeader);
     }
@@ -227,7 +227,7 @@ public sealed class TelemetrySnapshotMapperTests
     [Fact]
     public void LiveOrderAndGapFollowAnOvertakeBeforeScoringPositionUpdates()
     {
-        var timing = new LiveTimingTracker();
+        var timing = new TrackTimingTracker();
         var info = SessionInfo("Race", [Driver(0), Driver(1)]);
 
         TelemetrySnapshotMapper.Map(Telemetry(
@@ -236,7 +236,7 @@ public sealed class TelemetrySnapshotMapperTests
             lapsCompleted: [4, 4],
             f2Times: [0, 5],
             lapDistances: [0.20f, 0.10f],
-            sessionTime: 100), info, liveTiming: timing);
+            sessionTime: 100), info, trackTiming: timing);
 
         var state = TelemetrySnapshotMapper.Map(Telemetry(
             positions: [1, 2],
@@ -244,7 +244,7 @@ public sealed class TelemetrySnapshotMapperTests
             lapsCompleted: [4, 4],
             f2Times: [0, 5],
             lapDistances: [0.30f, 0.31f],
-            sessionTime: 101), info, liveTiming: timing);
+            sessionTime: 101), info, trackTiming: timing);
 
         Assert.Equal([1, 0], state.Drivers.Select(driver => driver.CarIdx));
         var newLeader = state.Drivers.Single(driver => driver.CarIdx == 1);

@@ -23,20 +23,26 @@ export type TimingWorkspaceMode = "operator" | "commentator";
 
 export type InvalidTimingReason =
   | "telemetry-gap"
-  | "lap-number-jump"
+  | "lap-jump"
   | "position-reset"
   | "implausible-movement"
-  | "tow-or-return-to-pits"
+  | "tow"
   | "pit-transition"
-  | "sector-crossings-out-of-order"
+  | "invalid-crossing-order"
   | "session-transition"
-  | "insufficient-boundary-samples";
+  | "insufficient-samples"
+  | "definition-mismatch";
+
+export type TimingQuality = "valid" | "inferred" | "incomplete" | "invalid";
+export type TimingSource = "iracing" | "derived";
 
 export interface TimingValue {
   value?: number;
-  source: "iracing" | "derived";
-  quality: "valid" | "inferred" | "incomplete" | "invalid";
+  source: TimingSource;
+  quality: TimingQuality;
   reason?: InvalidTimingReason;
+  observedAt?: number;
+  completedAt?: number;
 }
 
 export type DriverTimingField =
@@ -49,6 +55,38 @@ export type DriverTimingField =
   | "bestLap";
 
 export type TimingQualityMetadata = Omit<TimingValue, "value">;
+
+export interface SectorBoundary {
+  sectorNumber: number;
+  startPct: number;
+}
+
+export interface SectorDefinition {
+  revision: string;
+  source: "iracing";
+  sessionId: string;
+  trackId?: number | null;
+  trackName: string;
+  boundaries: SectorBoundary[];
+}
+
+export type SectorComparison = "personal-best" | "class-fastest" | "overall-fastest";
+
+export interface CompletedSector extends TimingValue {
+  carIdx: number;
+  driverId?: string;
+  driverName?: string;
+  lapNumber: number;
+  sectorNumber: number;
+  definitionRevision: string;
+  comparisons?: SectorComparison[];
+}
+
+export interface DriverSectorTiming {
+  currentSectorNumber?: number;
+  currentLap?: CompletedSector[];
+  previousLap?: CompletedSector[];
+}
 
 export interface PitVisitTiming {
   pitEntryTime: number;
@@ -118,6 +156,8 @@ export interface DriverState {
   classPositionChange?: number | null;
   /** Provenance and quality for timing fields without replacing legacy numeric values. */
   timingQuality?: Partial<Record<DriverTimingField, TimingQualityMetadata>>;
+  /** Locally derived sector timing. Omitted by older telemetry producers. */
+  sectors?: DriverSectorTiming;
   isConnected: boolean;
   userId: number;
   teamId: number;
@@ -187,6 +227,8 @@ export interface SessionState {
   activeCameraCarIdx?: number | null;
   activeCameraGroup?: number | null;
   activeCamera?: number | null;
+  /** Native iRacing sector boundaries, normalized and revisioned by the Windows client. */
+  sectorDefinition?: SectorDefinition | null;
 }
 
 export interface CompletedLap {
@@ -212,6 +254,106 @@ export interface CompletedLap {
   flag: SessionFlag;
   phase: SessionPhase;
   observedAt: string;
+}
+
+export type TrendDirection = "opening" | "closing" | "stable";
+export type TrendSuppressionReason =
+  | "telemetry-gap"
+  | "pit-transition"
+  | "tow"
+  | "position-reset"
+  | "insufficient-history"
+  | "lap-deficit"
+  | "session-transition"
+  | "caution";
+
+export interface GapTrend {
+  id: string;
+  referenceCarIdx: number;
+  chasingCarIdx: number;
+  classId: number;
+  currentGap?: number;
+  lapDeficit: number;
+  windowSeconds: number;
+  gapChange?: number;
+  rate?: number;
+  direction?: TrendDirection;
+  quality: TimingQuality;
+  suppressionReason?: TrendSuppressionReason;
+}
+
+export interface BattleSummary {
+  id: string;
+  classId: number;
+  className: string;
+  carIdxs: number[];
+  currentGap?: number;
+  lapDeficit: number;
+  windowSeconds: number;
+  direction?: TrendDirection;
+  rate?: number;
+  quality: TimingQuality;
+  suppressionReason?: TrendSuppressionReason;
+}
+
+export interface PitCycleSummary {
+  carIdx: number;
+  stopCount: number;
+  lastPitEntryTime?: number;
+  lastPitExitTime?: number;
+  totalPitLaneTime: number;
+  totalBoxTime: number;
+  totalUnknownTime: number;
+  quality: TimingQuality;
+}
+
+export type DriverChangeContext = "observed-box" | "inferred-box" | "unresolved" | "away-from-pits";
+
+export interface CompletedDriverStint {
+  driverId: string;
+  driverName: string;
+  startedAt: number;
+  endedAt: number;
+  duration: number;
+  lapCount: number;
+  changeContext: DriverChangeContext;
+  associatedPitEntryTime?: number;
+  quality: TimingQuality;
+}
+
+export interface DriverStintSummary {
+  carIdx: number;
+  currentDriverId: string;
+  currentDriverName: string;
+  previousDriverId?: string;
+  previousDriverName?: string;
+  startedAt: number;
+  duration: number;
+  lapCount: number;
+  recentCompleted?: CompletedDriverStint;
+  changeContext?: DriverChangeContext;
+  associatedPitEntryTime?: number;
+  quality: TimingQuality;
+}
+
+export interface TimingQualityWarning {
+  id: string;
+  carIdx?: number;
+  field: string;
+  quality: Exclude<TimingQuality, "valid">;
+  reason?: InvalidTimingReason | TrendSuppressionReason;
+  message: string;
+  observedAt: number;
+}
+
+export interface RaceIntelligenceSnapshot {
+  sessionId: string;
+  generatedAt: number;
+  battles: BattleSummary[];
+  gapTrends: GapTrend[];
+  pitCycles: PitCycleSummary[];
+  stints: DriverStintSummary[];
+  qualityWarnings: TimingQualityWarning[];
 }
 
 export type GraphicFieldType = "text" | "boolean" | "select" | "number";
@@ -288,6 +430,8 @@ export interface LiveState {
   graphics: GraphicsState;
   camera: CameraControlState;
   events: EventRecord[];
+  /** Shared session-scoped cache; absent until the server has normalized live evidence. */
+  intelligence?: RaceIntelligenceSnapshot | null;
 }
 
 export type ControlCommand =

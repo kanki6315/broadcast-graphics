@@ -158,7 +158,7 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
         lock (cameraGate) cameraCommands = client.SimControl.Camera;
 
         TelemetrySessionInfo? sessionInfo = null;
-        var liveTiming = new LiveTimingTracker();
+        var trackTiming = new TrackTimingTracker();
         var pitTiming = new PitTimingTracker(gap =>
         {
             if (gap.EndTime is null)
@@ -214,7 +214,7 @@ public sealed class IracingSdkTelemetrySource(DiagnosticCapture diagnostics) : I
                     var snapshot = TelemetrySnapshotMapper.Map(
                         telemetry,
                         session,
-                        liveTiming: liveTiming,
+                        trackTiming: trackTiming,
                         pitTiming: pitTiming,
                         racePositions: racePositions);
                     diagnostics.TryRecordSampled("normalized", "normalized.ndjson", snapshot);
@@ -302,7 +302,7 @@ internal static class TelemetrySnapshotMapper
         TelemetryData telemetry,
         TelemetrySessionInfo info,
         DateTimeOffset? capturedAt = null,
-        LiveTimingTracker? liveTiming = null,
+        TrackTimingTracker? trackTiming = null,
         PitTimingTracker? pitTiming = null,
         RacePositionTracker? racePositions = null)
     {
@@ -322,12 +322,15 @@ internal static class TelemetrySnapshotMapper
         var sessionTime = NormalizeTime(telemetry.SessionTime);
         if (pitTiming is not null) drivers = pitTiming.Apply(sessionId, sessionTime, drivers);
         if (racePositions is not null) drivers = racePositions.Apply(sessionId, sessionType, phase, drivers);
-        liveTiming?.Observe(sessionId, sessionTime, drivers);
-        drivers = AddRaceTiming(drivers, sessionType, sessionTime, liveTiming);
-
         var weekend = info.WeekendInfo;
         var trackName = weekend?.TrackDisplayName;
         if (string.IsNullOrWhiteSpace(trackName)) trackName = weekend?.TrackName;
+        var sectorDefinition = MapSectorDefinition(info, sessionId, weekend?.TrackID, trackName ?? "Unknown track");
+        trackTiming?.Observe(sessionId, sessionTime, drivers, sectorDefinition);
+        drivers = AddRaceTiming(drivers, sessionType, sessionTime, trackTiming)
+            .Select(driver => driver with { Sectors = trackTiming?.GetSectorTiming(driver.CarIdx, driver.CurrentLap) })
+            .ToArray();
+
         var leader = drivers.FirstOrDefault(driver => driver.Position == 1);
         var hasLiveLeader = telemetry.CarIdxPosition?.Contains(1) == true;
         var leaderLapsCompleted = Math.Max(leader?.LapsCompleted ?? session?.ResultsLapsComplete ?? 0, 0);
@@ -378,7 +381,8 @@ internal static class TelemetrySnapshotMapper
             cameraGroups,
             telemetry.CamCarIdx,
             telemetry.CamGroupNumber,
-            telemetry.CamCameraNumber);
+            telemetry.CamCameraNumber,
+            sectorDefinition);
     }
 
     private static SessionWeatherState? MapWeather(TelemetryData telemetry)
@@ -392,6 +396,29 @@ internal static class TelemetrySnapshotMapper
         if (airTemperature is null && trackTemperature is null && windSpeed is null &&
             windDirection is null && humidity is null && telemetry.Skies is null) return null;
         return new SessionWeatherState(condition, airTemperature, trackTemperature, windSpeed, windDirection, humidity);
+    }
+
+    private static SectorDefinition? MapSectorDefinition(
+        TelemetrySessionInfo info,
+        string sessionId,
+        int? trackId,
+        string trackName)
+    {
+        var boundaries = (info.SplitTimeInfo?.Sectors ?? [])
+            .Where(sector => sector.SectorNum >= 0 && sector.SectorStartPct is >= 0 and < 1 && double.IsFinite(sector.SectorStartPct))
+            .GroupBy(sector => sector.SectorNum)
+            .Select(group => group.First())
+            .OrderBy(sector => sector.SectorStartPct)
+            .Select(sector => new SectorBoundary(sector.SectorNum, sector.SectorStartPct))
+            .ToArray();
+        if (boundaries.Length < 2 || boundaries[0].StartPct > 0.001 ||
+            boundaries.Select(boundary => boundary.StartPct).Distinct().Count() != boundaries.Length)
+            return null;
+
+        var identity = $"{sessionId}|{trackId}|{trackName}|{string.Join(';', boundaries.Select(boundary => $"{boundary.SectorNumber}:{boundary.StartPct:F7}"))}";
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(identity));
+        var revision = $"iracing-{Convert.ToHexString(hash)[..12].ToLowerInvariant()}";
+        return new SectorDefinition(revision, "iracing", sessionId, trackId, trackName, boundaries);
     }
 
     private static string NormalizeSkies(int? skies) => skies switch
@@ -528,7 +555,7 @@ internal static class TelemetrySnapshotMapper
         DriverState[] drivers,
         string sessionType,
         double? sessionTime,
-        LiveTimingTracker? liveTiming)
+        TrackTimingTracker? trackTiming)
     {
         if (!string.Equals(sessionType, "race", StringComparison.Ordinal))
             return drivers.Select(driver => driver with { Interval = null }).ToArray();
@@ -554,7 +581,7 @@ internal static class TelemetrySnapshotMapper
             var derivedGap = driver.Position == leader.Position
                 ? 0d
                 : lapsBehind == 0
-                    ? liveTiming?.GapAtDriverPosition(leader.CarIdx, driver, sessionTime)
+                    ? trackTiming?.GetGapAtPosition(leader.CarIdx, driver, sessionTime)
                     : null;
             var fallbackGap = driver.Position == leader.Position
                 ? 0d
@@ -566,7 +593,7 @@ internal static class TelemetrySnapshotMapper
             var intervalSource = "iracing";
             if (byPosition.TryGetValue(driver.Position - 1, out var ahead) && CalculateLapsBehind(ahead, driver) == 0)
             {
-                var derivedInterval = liveTiming?.GapAtDriverPosition(ahead.CarIdx, driver, sessionTime);
+                var derivedInterval = trackTiming?.GetGapAtPosition(ahead.CarIdx, driver, sessionTime);
                 intervalToAhead = derivedInterval
                     ?? Difference(NormalizeGap(driver.Interval), ahead.Position == leader.Position ? 0d : NormalizeGap(ahead.Interval));
                 if (derivedInterval is not null) intervalSource = "derived";
@@ -577,7 +604,7 @@ internal static class TelemetrySnapshotMapper
             var derivedClassGap = classLeader is null || driver.CarIdx == classLeader.CarIdx
                 ? 0d
                 : classLapsBehind == 0
-                    ? liveTiming?.GapAtDriverPosition(classLeader.CarIdx, driver, sessionTime)
+                    ? trackTiming?.GetGapAtPosition(classLeader.CarIdx, driver, sessionTime)
                     : null;
             var fallbackClassGap = classLeader is null || driver.CarIdx == classLeader.CarIdx
                 ? 0d
@@ -590,7 +617,7 @@ internal static class TelemetrySnapshotMapper
             if (byClassPosition.TryGetValue((driver.ClassId, driver.ClassPosition - 1), out var classAhead) &&
                 CalculateLapsBehind(classAhead, driver) == 0)
             {
-                classInterval = liveTiming?.GapAtDriverPosition(classAhead.CarIdx, driver, sessionTime);
+                classInterval = trackTiming?.GetGapAtPosition(classAhead.CarIdx, driver, sessionTime);
                 if (classInterval is not null) classIntervalSource = "derived";
                 if (classInterval is null)
                 {
