@@ -12,6 +12,9 @@ Production race history is stored in PostgreSQL as semantic timing records. Raw 
 - `bg_sector_definitions`: one versioned native iRacing sector definition per session/revision.
 - `bg_sector_definition_points`: the ordered sector number and start percentage for a definition.
 - `bg_completed_sectors`: semantic per-entry, driver-at-completion sector results, including provenance and quality.
+- `bg_track_map_definitions`: immutable sanitized map definitions keyed by exact layout identity and source checksum.
+- `bg_track_map_calibrations`: versioned start/finish, direction, and rotation calibration payloads. A partial unique index permits one active calibration per layout.
+- `bg_track_sector_revisions`: immutable native/custom sector revisions, draft/active/locked state, author/effective metadata, calibration association, and ordered boundary payload. A partial unique index permits one active revision per layout.
 
 The server creates these tables at startup when `DATABASE_URL` is configured. Local development without a database uses an in-memory history repository.
 
@@ -37,6 +40,10 @@ Completed sectors persist asynchronously; raw distance/time samples do not. Each
 `UNIQUE (session_id, entry_id, lap_number, sector_number, definition_id)` makes repeated frames and reconnects idempotent. A definition revision is a foreign key, so different revisions cannot accidentally rank together. Invalid and incomplete results may have a null elapsed value; they remain useful diagnostic evidence and are never rewritten as zero. A valid complete lap must reconcile with the official lap within `max(0.5 seconds, 1% of lap time)` before its sectors can participate in fastest rankings.
 
 The in-memory repository implements the same keys for local development. Startup uses `CREATE TABLE IF NOT EXISTS`, so databases containing only the completed-lap tables can add sector storage safely.
+
+Map or calibration deactivation never deletes definitions. Completed sector rows keep their original `bg_sector_definitions` foreign key, and startup widens the existing source constraint safely from native-only to `iracing` or `custom`. Activation of map and sector revisions is transactional. Duplicate map imports for an exact layout return the existing checksum match instead of creating another asset.
+
+Native and custom sector revisions are immutable once observed/used. The active revision locks when race timing begins. During a race an administrator may save a valid custom draft, but activation returns a conflict and the current telemetry client and `RaceIntelligenceService` continue with their original revision. Before racing, activation resets in-memory comparison state; durable old results remain queryable and are never rewritten or ranked with the new revision.
 
 ## Cached race intelligence
 
@@ -70,8 +77,10 @@ When the representative capture arrives:
 2. In the Windows client, choose **Diagnostic replay**, select the ZIP, and verify the reported format, session sequence, track, 41-car field, and two classes.
 3. Select maximum speed for deterministic validation, connect it to a local server, and wait for replay completion.
 4. Run `dotnet test client/TelemetryClient.Tests/TelemetryClient.Tests.csproj --no-restore --nologo` and `npm test` before and after replay to preserve fixture baselines.
-5. Inspect `/timing` for sector revision, dirty-sector markers, same-class Battle Watch entries, driver changes, pit-cycle continuity, and quality warnings. Confirm commentator interactions issue no camera or graphics commands.
-6. Query `GET /api/history/laps?carIdx=<idx>&limit=20` only for explicit lap review. Sector validation currently uses repository/integration diagnostics; ordinary page refreshes must not cause database reads.
-7. Compare any capture-specific discontinuities with `TrackTimingTracker` results. Add a minimized deterministic regression fixture for every newly observed edge case rather than committing the capture.
+5. Activate only a map whose stored track/configuration identity matches the capture. Do not use telemetry points to redraw or tune the circuit shape.
+6. In `/timing`, verify travel direction, smooth start/finish wrap, class-density movement, the pit/unavailable docks, active boundary locations, sector revision, dirty-sector markers, same-class Battle Watch entries, driver changes, pit-cycle continuity, and quality warnings. Confirm commentator interactions issue no camera or graphics commands.
+7. Pause immediately before and after start/finish and each sector crossing. Confirm path progression and crossing order match the stored calibration; do not change calibration merely to make one capture look plausible when layout identity or native boundaries disagree.
+8. Query `GET /api/history/laps?carIdx=<idx>&limit=20` only for explicit lap review. Inspect completed-sector diagnostics to confirm every row retains the expected definition revision and no fastest/ranking set combines revisions. Ordinary page refreshes must not cause database reads.
+9. Compare any capture-specific discontinuities with `TrackTimingTracker` results. Add a minimized deterministic regression fixture for every newly observed edge case rather than committing the capture.
 
 Format-1 normalized captures without Increment 1 or Increment 2 optional fields continue to deserialize and replay. SDK captures are reconstructed through the current mapper, so native sector definitions are used when their recorded session YAML supplies `SplitTimeInfo`.

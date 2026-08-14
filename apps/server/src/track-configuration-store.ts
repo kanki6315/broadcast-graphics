@@ -184,14 +184,17 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
 
   async observeNativeDefinition(session: SessionState): Promise<void> {
     const definition = session.sectorDefinition;
-    if (!definition || this.sectors.has(definition.revision)) return;
-    const now = new Date().toISOString();
-    const reportedLayout = normalizeLayout(definition.layout ?? sessionLayout(session));
+    const reportedLayout = normalizeLayout(definition?.layout ?? sessionLayout(session));
     const matchingMaps = [...this.maps.values()].filter((map) =>
       map.layout.trackId === reportedLayout.trackId && map.layout.trackName.toLocaleLowerCase() === reportedLayout.trackName.toLocaleLowerCase());
     // Older clients do not report configuration identity. Reuse it only when a
     // single imported layout is an unambiguous match for this exact track ID.
     const layout = matchingMaps.length === 1 ? matchingMaps[0]!.layout : reportedLayout;
+    if (raceHasStarted(session)) {
+      for (const candidate of this.sectors.values()) if (candidate.active && layoutsMatch(candidate.layout!, layout)) candidate.locked = true;
+    }
+    if (!definition || this.sectors.has(definition.revision)) return;
+    const now = new Date().toISOString();
     const activeForLayout = [...this.sectors.values()].some((candidate) => candidate.active && layoutsMatch(candidate.layout!, layout));
     this.sectors.set(definition.revision, {
       ...structuredClone(definition), layout, boundaries: validateBoundaries(definition.boundaries), createdAt: definition.createdAt ?? now,
@@ -336,7 +339,12 @@ export class PostgresTrackConfigurationRepository extends MemoryTrackConfigurati
 
   override async observeNativeDefinition(session: SessionState): Promise<void> {
     await super.observeNativeDefinition(session);
-    if (session.sectorDefinition) await this.persistSector(this.sectors.get(session.sectorDefinition.revision)!);
+    const layout = sessionLayout(session);
+    for (const definition of this.sectors.values()) {
+      const sameReportedTrack = definition.layout?.trackId === layout.trackId
+        && definition.layout?.trackName.toLocaleLowerCase() === layout.trackName.toLocaleLowerCase();
+      if (definition.revision === session.sectorDefinition?.revision || (definition.active && sameReportedTrack)) await this.persistSector(definition);
+    }
   }
 
   override async saveSectorDraft(input: Parameters<MemoryTrackConfigurationRepository["saveSectorDraft"]>[0]): Promise<SectorDefinitionRevision> {

@@ -12,7 +12,7 @@ The Gantry identity combines a circular `G`, a timing beam, and an orange termin
 - `packages/protocol`: shared wire types and semantic graphic-slot definitions.
 - `graphic-packages`: runtime-loaded client presentation packages. Add or replace a package without rebuilding the control panel.
 
-The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, completed-lap metadata, and available camera groups before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics, the [race-history model](docs/race-history.md) for durable lap storage, and the [commentator timing plan](docs/commentator-timing-plan.md) for the planned read-only endurance timing workspace.
+The Windows client normalizes iRacing-specific values into explicit race laps, phases, flags, overall/class gaps, intervals, completed-lap metadata, and available camera groups before transmission. See the [telemetry contract](docs/telemetry-contract.md) for field semantics, the [race-history model](docs/race-history.md) for durable lap storage, and the [commentator timing plan](docs/commentator-timing-plan.md) for the implemented read-only endurance timing workspace and circuit-map configuration.
 
 ## Quick start
 
@@ -27,6 +27,21 @@ Open `http://localhost:5173/timing` for timing and camera direction, and `http:/
 ```text
 http://localhost:5173/overlay?package=pri-hoosier-500
 ```
+
+### Import and calibrate a circuit map
+
+Map configuration is an authenticated operator task; the commentator page remains read-only.
+
+1. Connect live, replay, or simulated telemetry so Gantry has the current exact track layout identity.
+2. Open `/control`, choose **Track config**, then select a local SVG under **Import and select centerline**. Supported sources are manually imported, bundled, or a documented official iRacing source if one is added later; Gantry does not scrape track assets.
+3. Review the sanitized path-only preview. Choose the closed path that represents the racing centerline and store it. If multiple paths validate, selection is always explicit; an automatic first choice is only a suggestion.
+4. Choose the stored map. Click the centerline at start/finish, select forward or reverse travel, optionally set display rotation, and save a new calibration revision.
+5. Review the 10% progression markers against known track direction or a replay. Activate the saved calibration for this layout.
+6. In **Sector definition editor**, start from the active native iRacing boundaries, drag handles on the centerline, use arrow keys for 0.5%-lap moves, add a boundary by arming **Add boundary** and clicking the path, or delete an optional boundary. S1/start-finish cannot move here.
+7. Save a custom draft. Before racing, activate it to start a new isolated comparison revision. After racing begins, activation is locked and the draft remains available for a future session.
+8. Open `/timing`. **Map** uses the calibrated circuit; **Ribbon** persists as a preference and is selected automatically as the fallback when geometry is unavailable or invalid.
+
+Imports are limited to 1 MB and inert SVG paths. Scripts, event handlers, embedded HTML/media, CSS/fonts/images, external URLs, excessive complexity, invalid coordinates, zero-length paths, and unusably open paths are rejected. Never assume a map for another configuration of the same circuit is compatible.
 
 ### Windows telemetry client
 

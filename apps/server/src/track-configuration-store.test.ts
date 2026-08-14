@@ -60,7 +60,10 @@ test("draft save is immutable, ordered, resettable to native facts, and activati
 
 test("race start locks activation while preserving a future draft", async () => {
   const { repository, calibration } = await configured();
+  await repository.observeNativeDefinition(session({ sectorDefinition: { revision: "native-lock", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] } }));
   const draft = await repository.saveSectorDraft({ layout, mapCalibrationId: calibration.id, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: 0.5 }] });
+  await repository.observeNativeDefinition(session({ phase: "racing", startState: "go", lapsCompleted: 1, sectorDefinition: { revision: "native-lock", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] } }));
+  assert.equal((await repository.snapshot(layout)).activeSectorDefinition?.locked, true);
   await assert.rejects(
     () => repository.activateSectorRevision(draft.revision, layout, session({ phase: "racing", startState: "go", lapsCompleted: 1 })),
     (error: unknown) => error instanceof TrackConfigurationError && error.code === "definition-locked",

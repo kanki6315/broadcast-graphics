@@ -329,6 +329,20 @@ The serial foundation for Increment 1 lives in `packages/protocol/src/index.ts`.
 - Stints and current pit cycles are reconstructed incrementally from normalized identity and Increment 1 pit-visit facts. This preserves pit-visit continuity and does not add database reads to live refresh.
 - The commentator ledger uses variable-length previous-lap sector detail plus an expandable intelligence view. At half-monitor width the fixed dense ledger scrolls horizontally inside its ruled region; canonical calculations remain server-owned.
 
+### Increment 3 implementation decisions
+
+- Increment 3 is complete. A circuit shape comes only from a verified imported/bundled SVG path; `CarIdxLapDistPct` remains a one-dimensional progress value and is never treated as geometry.
+- Track layouts use the complete available identity tuple: track ID, configuration ID, track/configuration names, and optional length. A configured map is never reused across different configuration identities. Older telemetry without a configuration ID may inherit one only when the stored track-ID/name match is unambiguous.
+- Imports are limited to 1 MB, 2,000 elements, 250 paths, 20,000 path commands, and coordinates within ±1,000,000. Scripts, event handlers, document entities, embedded HTML/media, CSS, fonts, images, `href`/`src`, and `url()` resources are rejected. Stored SVG is reconstructed as inert path-only markup.
+- Closed-path tolerance is the greater of one SVG unit or 1% of path length. Lines, cubic/quadratic Béziers, smooth variants, and SVG arcs are sampled once for validation/projection; browser rendering retains the sanitized selected path.
+- Calibration stores a versioned path-distance start/finish offset, forward/reverse travel direction, and display rotation. Forward conversion is `wrap(startFinishPathPct + lapDistPct)`; reverse conversion subtracts lap distance. Inverse projection first finds the nearest centerline distance in SVG view-box coordinates and then removes that calibrated offset/direction.
+- Sector boundaries include fixed S1/start-finish at 0%. Optional boundaries must stay at least 0.5% of a lap apart, including the final range back to start/finish. Saving creates an immutable `custom-…` checksum revision; it never edits native or historical definitions.
+- PostgreSQL activation uses partial unique indexes and a transaction so at most one calibration and one sector revision are active for an exact layout. Race-start activation is rejected with the draft retained for a future session.
+- The Windows client receives custom definitions on a low-frequency `sector.definition` message. `TrackTimingTracker` clears lifecycle/rankings when the revision changes; the server rejects activation once a race has begun, preventing a mid-lap change. `RaceIntelligenceService` also resets its session cache when the sector revision changes.
+- `LiveState.trackConfiguration` contains compact identifiers and active boundaries only. Sanitized map definitions and calibrations use authenticated HTTP with immutable private caching and do not ride telemetry frames.
+- The commentator page persists Map/Ribbon preference. Missing, mismatched, invalid, or failed geometry always produces the linear ribbon. Pit/stall cars use a dock, invalid/unobserved/retired cars use an unavailable dock, and inferred positions use dashed treatment rather than confident placement.
+- `/track-config` is an authenticated operator configuration surface. The read-only commentator socket still cannot issue control commands, and all map/calibration/sector mutation endpoints require an administrator session.
+
 ### Pit timing
 
 - A car that disappears from `InPitStall` and returns to `InPitStall` remains in one pit visit; the missing duration is included in `inferredBoxTime` and `boxTime`.
