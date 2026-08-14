@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { Camera, Flag, KeyRound, LogOut, Radio, Wifi, WifiOff } from "lucide-react";
+import { Camera, Flag, KeyRound, LogOut, MapPinned, Radio, Wifi, WifiOff } from "lucide-react";
 import { LinearTrackRibbon } from "./linear-track-ribbon";
 import { TimingTable } from "./timing-table";
 import { useLiveState } from "./use-live-state";
 
-export function TimingDirector({ onManageAccess, onLogout }: { onManageAccess: () => void; onLogout: () => Promise<void> }) {
+export function TimingDirector({ onManageAccess, onTrackConfig, onLogout }: { onManageAccess: () => void; onTrackConfig: () => void; onLogout: () => Promise<void> }) {
   const { state, socketConnected, command } = useLiveState("control");
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
@@ -78,6 +78,7 @@ export function TimingDirector({ onManageAccess, onLogout }: { onManageAccess: (
         <div className="timing-nav">
           <a href="/timing">Commentator</a>
           <a href="/graphics"><Radio aria-hidden="true" />Graphics</a>
+          <button onClick={onTrackConfig}><MapPinned aria-hidden="true" />Track config</button>
           <button onClick={onManageAccess}><KeyRound aria-hidden="true" />Access</button>
           <button onClick={() => void logout()} disabled={loggingOut}><LogOut aria-hidden="true" />{loggingOut ? "Signing out" : "Sign out"}</button>
           {logoutError && <span className="account-error" role="alert">{logoutError}</span>}

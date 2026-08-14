@@ -92,3 +92,17 @@ test("driver changes retain stint and pit-cycle context for observed, inferred, 
   assert.equal(service.snapshot()!.stints.find((stint) => stint.carIdx === 3)?.quality, "invalid");
   assert.equal(service.snapshot()!.pitCycles.find((cycle) => cycle.carIdx === 0)?.stopCount, 1);
 });
+
+test("a sector revision change resets the session cache instead of mixing comparisons", () => {
+  let now = 0;
+  const service = new RaceIntelligenceService(() => now, 0);
+  const first = session(10, [driver(1, 1, 1, 0), driver(2, 1, 2, 1)]);
+  first.sectorDefinition = { revision: "r1", source: "iracing", sessionId: first.id, trackName: first.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] };
+  for (const at of [10, 13, 16]) { first.timeElapsed = at; now = at * 1_000; service.ingest(first); }
+  assert.equal(service.snapshot()?.sectorDefinitionRevision, "r1");
+  const revised = structuredClone(first);
+  revised.sectorDefinition = { ...first.sectorDefinition, revision: "r2", source: "custom" };
+  now = 17_000; revised.timeElapsed = 17; service.ingest(revised);
+  assert.equal(service.snapshot()?.sectorDefinitionRevision, "r2");
+  assert.ok(service.snapshot()?.gapTrends.every((trend) => trend.quality === "incomplete"));
+});

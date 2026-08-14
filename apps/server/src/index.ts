@@ -252,6 +252,14 @@ app.get<{ Params: { id: string } }>("/api/track-config/maps/:id", async (request
   return map;
 });
 
+app.get<{ Params: { id: string } }>("/api/track-config/calibrations/:id", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  const calibration = await trackConfiguration.getCalibration(request.params.id);
+  if (!calibration) return reply.code(404).send({ error: "Track-map calibration not found." });
+  reply.header("Cache-Control", "private, max-age=3600, immutable");
+  return calibration;
+});
+
 app.post<{ Body: { svg?: unknown } }>("/api/track-config/import-preview", { bodyLimit: 1_050_000 }, async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;
   try {

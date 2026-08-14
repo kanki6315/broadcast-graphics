@@ -8,6 +8,10 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD;
 if (!adminPassword) throw new Error("E2E_ADMIN_PASSWORD is required.");
 const health = await fetch(`${baseUrl}/api/health`).then((response) => response.json()) as { ok: boolean };
 if (!health.ok) throw new Error("Health endpoint did not report ready.");
+const unauthorizedTrackMutation = await fetch(`${baseUrl}/api/track-config/import-preview`, {
+  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ svg: "<svg/>" }),
+});
+assert.equal(unauthorizedTrackMutation.status, 401, "Track configuration mutation must require an administrator session.");
 const clientReleaseResponse = await fetch(`${baseUrl}/api/client/latest`);
 if (process.env.E2E_REQUIRE_CLIENT_RELEASE === "1" && !clientReleaseResponse.ok)
   throw new Error(`Client release endpoint failed with status ${clientReleaseResponse.status}.`);
@@ -74,6 +78,40 @@ commentator.socket.send(JSON.stringify({ type: "hello", role: "control", mode: "
 const initialMessage = await waitForMessage(operator, (message): message is Extract<ServerMessage, { type: "state.snapshot" }> =>
   message.type === "state.snapshot" && message.payload.session != null && message.payload.camera.controller === "ready");
 const initial = initialMessage.payload;
+const fixtureSvg = '<svg viewBox="0 0 200 120"><path id="centerline" d="M20 20 C80 0 160 10 180 55 C190 100 110 118 45 100 C5 85 0 40 20 20 Z"/></svg>';
+const layout = { trackId: initial.session!.trackId, trackName: initial.session!.trackName };
+const importPreview = await fetch(`${baseUrl}/api/track-config/import-preview`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ svg: fixtureSvg }),
+});
+assert.equal(importPreview.status, 200);
+const preview = await importPreview.json() as { candidates: { id: string }[] };
+assert.equal(preview.candidates[0]?.id, "centerline");
+const importedMapResponse = await fetch(`${baseUrl}/api/track-config/maps`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+  body: JSON.stringify({ svg: fixtureSvg, layout, selectedPathId: "centerline", source: "bundled", originalFilename: "e2e-fixture.svg" }),
+});
+assert.equal(importedMapResponse.status, 201);
+const importedMap = await importedMapResponse.json() as { id: string };
+const calibrationResponse = await fetch(`${baseUrl}/api/track-config/calibrations`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+  body: JSON.stringify({ mapDefinitionId: importedMap.id, startFinishPathPct: .1, direction: "forward" }),
+});
+assert.equal(calibrationResponse.status, 201);
+const calibration = await calibrationResponse.json() as { id: string; revision: number };
+const calibrationActivation = await fetch(`${baseUrl}/api/track-config/calibrations/${calibration.id}/activate`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ layout }),
+});
+assert.equal(calibrationActivation.status, 200);
+const draftResponse = await fetch(`${baseUrl}/api/track-config/sectors`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+  body: JSON.stringify({ layout, mapCalibrationId: calibration.id, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .4 }, { sectorNumber: 3, startPct: .7 }] }),
+});
+assert.equal(draftResponse.status, 201);
+const draft = await draftResponse.json() as { revision: string };
+const lockedActivation = await fetch(`${baseUrl}/api/track-config/sectors/${draft.revision}/activate`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ layout }),
+});
+assert.equal(lockedActivation.status, 409, "An active race must reject sector revision activation.");
 const target = initial.session!.drivers[2]!;
 const cameraGroup = initial.session!.cameraGroups?.find((group) => !group.isScenic && group.cameras.length > 0);
 assert.ok(cameraGroup, "Simulator fixture must expose an operable camera group.");
@@ -146,6 +184,9 @@ console.log(JSON.stringify({
   health: "ok",
   windowsClientVersion: clientRelease?.version ?? "release package not configured",
   commentatorReadOnly: "verified",
+  trackConfigurationAuthorization: "verified",
+  mapCalibration: `revision ${calibration.revision}`,
+  raceSectorLock: "verified",
   cameraControl: cameraDelivered.payload.camera.lastMessage,
   focusedDriver: target.name,
   pitTrackerProjection: projectedInferred.latestPitVisit,

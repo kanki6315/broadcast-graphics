@@ -4,6 +4,7 @@ import type { AccessKey, AccessKeyKind, CreatedAccessKey } from "@racecontrol/pr
 import { TimingDirector } from "./control-panel";
 import { CommentatorTiming } from "./commentator-timing";
 import { GraphicsDirector } from "./graphics-director";
+import { TrackMapEditor } from "./track-map-editor";
 
 interface AdminIdentity {
   username: string;
@@ -252,5 +253,6 @@ export function AdminApp() {
   const directorProps = { onManageAccess: () => { window.location.href = "/access"; }, onLogout: logout };
   if (window.location.pathname === "/graphics") return <GraphicsDirector {...directorProps} />;
   if (window.location.pathname === "/timing" || window.location.pathname === "/timing/") return <CommentatorTiming onLogout={logout} />;
-  return <TimingDirector {...directorProps} />;
+  if (window.location.pathname === "/track-config" || window.location.pathname === "/track-config/") return <TrackMapEditor />;
+  return <TimingDirector {...directorProps} onTrackConfig={() => { window.location.href = "/track-config"; }} />;
 }

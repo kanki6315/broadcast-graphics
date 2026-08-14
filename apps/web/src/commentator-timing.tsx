@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Columns3, Flag, LogOut, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
+import { Columns3, Flag, GitCommitHorizontal, LogOut, Map as MapIcon, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import type { DriverState } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
@@ -10,6 +10,8 @@ import {
 import { LinearTrackRibbon } from "./linear-track-ribbon";
 import { BattleWatch } from "./battle-watch";
 import { useLiveState } from "./use-live-state";
+import { CircuitMap } from "./circuit-map";
+import { useTrackMap } from "./use-track-map";
 import "./commentator-timing.css";
 
 const preferencesKey = "gantry.commentator-timing.v1";
@@ -19,6 +21,7 @@ interface CommentatorPreferences {
   selectedCarIdx: number | null;
   expandedCarIdxs: number[];
   visibleColumns: CommentatorColumn[];
+  positionView: "map" | "ribbon";
 }
 
 const defaultPreferences: CommentatorPreferences = {
@@ -26,6 +29,7 @@ const defaultPreferences: CommentatorPreferences = {
   selectedCarIdx: null,
   expandedCarIdxs: [],
   visibleColumns: [...defaultCommentatorColumns],
+  positionView: "map",
 };
 
 function loadPreferences(): CommentatorPreferences {
@@ -40,6 +44,7 @@ function loadPreferences(): CommentatorPreferences {
         ? stored.expandedCarIdxs.filter((carIdx): carIdx is number => typeof carIdx === "number")
         : [],
       visibleColumns: validColumns.length > 0 ? validColumns : [...defaultCommentatorColumns],
+      positionView: stored.positionView === "ribbon" ? "ribbon" : "map",
     };
   } catch {
     return defaultPreferences;
@@ -58,6 +63,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const [preferences, setPreferences] = useState<CommentatorPreferences>(loadPreferences);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const mapResource = useTrackMap(state?.trackConfiguration?.activeMap);
 
   useEffect(() => {
     window.localStorage.setItem(preferencesKey, JSON.stringify(preferences));
@@ -197,6 +203,10 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
               ))}
             </fieldset>
           </details>
+          <div className="position-view-toggle" role="group" aria-label="Track position view">
+            <button className={preferences.positionView === "map" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "map" }))}><MapIcon aria-hidden="true" />Map</button>
+            <button className={preferences.positionView === "ribbon" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "ribbon" }))}><GitCommitHorizontal aria-hidden="true" />Ribbon</button>
+          </div>
         </section>
 
         <section className="commentator-intelligence" aria-label="Live race intelligence">
@@ -207,13 +217,31 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           </div>
         </section>
 
-        <LinearTrackRibbon
-          drivers={filteredDrivers}
-          selectedCarIdx={preferences.selectedCarIdx}
-          nearbyCarIdxs={nearbyClassCarIdxs}
-          onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
-          variant="commentator"
-        />
+        <div className="commentator-position-instrument">
+          {preferences.positionView === "map" && mapResource.definition && mapResource.calibration ? (
+            <CircuitMap
+              definition={mapResource.definition}
+              calibration={mapResource.calibration}
+              drivers={filteredDrivers}
+              selectedCarIdx={preferences.selectedCarIdx}
+              nearbyCarIdxs={nearbyClassCarIdxs}
+              sectorBoundaries={state.trackConfiguration?.activeSectorDefinition?.boundaries}
+              onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
+              fallback={<LinearTrackRibbon drivers={filteredDrivers} selectedCarIdx={preferences.selectedCarIdx} nearbyCarIdxs={nearbyClassCarIdxs} onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))} variant="commentator" />}
+            />
+          ) : (
+            <>
+              {preferences.positionView === "map" && <p className="map-fallback-status" role="status">{mapResource.loading ? "Loading calibrated circuit map…" : mapResource.error ? `${mapResource.error} Showing linear track.` : "No verified map is active for this layout. Showing linear track."}</p>}
+              <LinearTrackRibbon
+                drivers={filteredDrivers}
+                selectedCarIdx={preferences.selectedCarIdx}
+                nearbyCarIdxs={nearbyClassCarIdxs}
+                onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
+                variant="commentator"
+              />
+            </>
+          )}
+        </div>
 
         <CommentatorTimingTable
           drivers={filteredDrivers}

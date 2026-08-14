@@ -35,6 +35,7 @@ export interface TrackConfigurationRepository {
   importMap(input: { svg: string; layout: TrackLayoutIdentity; selectedPathId: string; source?: TrackMapSource; sourceVersion?: string; originalFilename?: string; author?: string }): Promise<TrackMapDefinition>;
   listMaps(layout: TrackLayoutIdentity): Promise<TrackMapDefinition[]>;
   getMap(id: string): Promise<TrackMapDefinition | null>;
+  getCalibration(id: string): Promise<TrackMapCalibration | null>;
   saveCalibration(input: { mapDefinitionId: string; startFinishPathPct: number; direction: "forward" | "reverse"; rotationDegrees?: number; author?: string }): Promise<TrackMapCalibration>;
   activateCalibration(calibrationId: string, layout: TrackLayoutIdentity): Promise<TrackMapCalibration>;
   listCalibrations(mapDefinitionId: string): Promise<TrackMapCalibration[]>;
@@ -144,6 +145,7 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
   }
 
   async getMap(id: string): Promise<TrackMapDefinition | null> { return structuredClone(this.maps.get(id) ?? null); }
+  async getCalibration(id: string): Promise<TrackMapCalibration | null> { return structuredClone(this.calibrations.get(id) ?? null); }
 
   async saveCalibration(input: { mapDefinitionId: string; startFinishPathPct: number; direction: "forward" | "reverse"; rotationDegrees?: number; author?: string }): Promise<TrackMapCalibration> {
     const map = this.maps.get(input.mapDefinitionId);
