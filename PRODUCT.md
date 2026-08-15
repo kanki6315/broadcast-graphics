@@ -46,7 +46,7 @@ One live race-state model powers both the on-air graphics and the operator contr
 - Camera commands must expose disconnected, unavailable, pending, sent, and rejected states. Simulation and diagnostic replay remain read-only, and SDK delivery must not be described as verified shot execution.
 - The telemetry client must tolerate reconnects and avoid disrupting iRacing.
 - The telemetry client can validate and replay its own diagnostic ZIPs for troubleshooting and broadcast rehearsal, with explicit replay states, remote-server confirmation, and no automatic looping.
-- Authentication uses one administrator account, browser sessions for control, independently revocable ingestion keys for telemetry clients, and revocable view-only keys for browser overlays.
+- Authentication uses one administrator account, browser sessions for control, independently revocable ingestion keys for telemetry clients, revocable view-only keys for browser overlays, and revocable commentator keys for the read-only timing workspace.
 - Exact deployment target and data-retention window remain open decisions.
 
 ## Evidence on Hand

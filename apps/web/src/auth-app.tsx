@@ -56,7 +56,7 @@ function LoginScreen({ onLogin }: { onLogin: (identity: AdminIdentity) => void }
           {error && <p className="auth-error" role="alert">{error}</p>}
           <button className="auth-primary" disabled={submitting}><LogIn aria-hidden="true" />{submitting ? "Checking credentials…" : "Enter control desk"}</button>
         </form>
-        <footer><Radio aria-hidden="true" /><span>Telemetry and overlay access use separate revocable keys.</span></footer>
+        <footer><Radio aria-hidden="true" /><span>Telemetry, overlay, and commentator access use separate revocable keys.</span></footer>
       </section>
     </main>
   );
@@ -67,9 +67,12 @@ function SecretReceipt({ created, onDone }: { created: CreatedAccessKey; onDone:
   const [copyError, setCopyError] = useState("");
   const receiptRef = useRef<HTMLElement>(null);
   const isView = created.key.kind === "view";
+  const isCommentator = created.key.kind === "commentator";
   const value = isView
     ? `${window.location.origin}/overlay#token=${created.secret}`
-    : created.secret;
+    : isCommentator
+      ? `${window.location.origin}/timing#token=${created.secret}`
+      : created.secret;
 
   useEffect(() => receiptRef.current?.focus(), []);
 
@@ -87,13 +90,13 @@ function SecretReceipt({ created, onDone }: { created: CreatedAccessKey; onDone:
   return (
     <section className="secret-receipt" aria-live="polite" ref={receiptRef} tabIndex={-1}>
       <div><ShieldCheck aria-hidden="true" /><div><h2>Key created</h2><p>Copy it now. The complete value cannot be shown again.</p></div></div>
-      <label><span>{isView ? "Overlay URL" : "Ingestion key"}</span><textarea readOnly value={value} rows={isView ? 3 : 2} /></label>
+      <label><span>{isView ? "Overlay URL" : isCommentator ? "Commentator URL" : "Ingestion key"}</span><textarea readOnly value={value} rows={isView || isCommentator ? 3 : 2} /></label>
       <div className="receipt-actions">
-        <button className="auth-primary" onClick={copy}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied ? "Copied" : isView ? "Copy overlay URL" : "Copy key"}</button>
+        <button className="auth-primary" onClick={copy}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied ? "Copied" : isView ? "Copy overlay URL" : isCommentator ? "Copy commentator URL" : "Copy key"}</button>
         <button className="auth-secondary" onClick={onDone}>Done</button>
       </div>
       {copyError && <p className="receipt-error" role="alert">{copyError}</p>}
-      {!isView && <code>$env:BROADCAST_GRAPHICS_INGESTION_KEY=&quot;{created.secret}&quot;</code>}
+      {!isView && !isCommentator && <code>$env:BROADCAST_GRAPHICS_INGESTION_KEY=&quot;{created.secret}&quot;</code>}
     </section>
   );
 }
@@ -190,7 +193,7 @@ function AccessManager({ identity, onLogout }: { identity: AdminIdentity; onLogo
       </header>
       <main className="access-grid">
         <section className="key-issue" aria-labelledby="issue-title">
-          <div className="access-heading"><KeyRound aria-hidden="true" /><div><h1 id="issue-title">Issue a new key</h1><p>Give each telemetry PC and browser-source group its own key so access can be revoked independently.</p></div></div>
+          <div className="access-heading"><KeyRound aria-hidden="true" /><div><h1 id="issue-title">Issue a new key</h1><p>Give each telemetry client and shared browser surface its own key so access can be revoked independently.</p></div></div>
           <div className="client-download">
             <div className="client-download-copy"><MonitorDown aria-hidden="true" /><div><strong>Windows telemetry client</strong><span>Current win-x64 release · future updates install automatically</span></div></div>
             <a href="/api/client/download" download="BroadcastGraphicsClient.exe"><Download aria-hidden="true" />Download client</a>
@@ -200,9 +203,10 @@ function AccessManager({ identity, onLogout }: { identity: AdminIdentity; onLogo
               <fieldset><legend>Access type</legend>
                 <label className={kind === "ingestion" ? "is-selected" : ""}><input type="radio" name="kind" value="ingestion" checked={kind === "ingestion"} onChange={() => setKind("ingestion")} /><span><strong>Telemetry ingestion</strong><small>Sends race data from one iRacing PC.</small></span></label>
                 <label className={kind === "view" ? "is-selected" : ""}><input type="radio" name="kind" value="view" checked={kind === "view"} onChange={() => setKind("view")} /><span><strong>Overlay viewer</strong><small>Reads graphics state in vMix or OBS.</small></span></label>
+                <label className={kind === "commentator" ? "is-selected" : ""}><input type="radio" name="kind" value="commentator" checked={kind === "commentator"} onChange={() => setKind("commentator")} /><span><strong>Commentator</strong><small>Reads the timing workspace without control access.</small></span></label>
               </fieldset>
-              <label className="auth-field"><span>Key label</span><input value={label} maxLength={80} onChange={(event) => setLabel(event.target.value)} placeholder={kind === "ingestion" ? "Racing PC" : "vMix production PC"} required /></label>
-              <button className="auth-primary" disabled={creating}><Plus aria-hidden="true" />{creating ? "Creating key…" : `Create ${kind === "ingestion" ? "ingestion" : "view"} key`}</button>
+              <label className="auth-field"><span>Key label</span><input value={label} maxLength={80} onChange={(event) => setLabel(event.target.value)} placeholder={kind === "ingestion" ? "Racing PC" : kind === "commentator" ? "Commentary booth" : "vMix production PC"} required /></label>
+              <button className="auth-primary" disabled={creating}><Plus aria-hidden="true" />{creating ? "Creating key…" : `Create ${kind} key`}</button>
             </form>
           )}
           {error && <p className="auth-error" role="alert">{error}</p>}
@@ -214,7 +218,7 @@ function AccessManager({ identity, onLogout }: { identity: AdminIdentity; onLogo
           {loading ? <p className="register-empty">Reading key register…</p> : loadError ? <div className="register-load-error" role="alert"><p>{loadError}</p><button className="auth-secondary" onClick={() => { setLoading(true); void loadKeys(); }}>Retry key register</button></div> : keys.length === 0 ? <p className="register-empty">No keys issued yet. Create one for the iRacing telemetry client first.</p> : (
             <div className="key-table-wrap"><table className="key-table"><thead><tr><th>Label</th><th>Scope</th><th>Identifier</th><th>Issued</th><th>Status</th><th>Actions</th></tr></thead><tbody>
               {keys.map((key) => [<tr key={key.id} className={key.revokedAt ? "is-revoked" : ""}>
-                <td data-label="Label"><strong>{key.label}</strong></td><td data-label="Scope">{key.kind === "ingestion" ? "Telemetry" : "View only"}</td><td data-label="Identifier"><code>{key.prefix}…</code></td><td data-label="Issued">{new Date(key.createdAt).toLocaleDateString()}</td><td data-label="Status"><span className="key-status">{key.revokedAt ? "Revoked" : "Active"}</span></td>
+                <td data-label="Label"><strong>{key.label}</strong></td><td data-label="Scope">{key.kind === "ingestion" ? "Telemetry" : key.kind === "commentator" ? "Commentator" : "Overlay view"}</td><td data-label="Identifier"><code>{key.prefix}…</code></td><td data-label="Issued">{new Date(key.createdAt).toLocaleDateString()}</td><td data-label="Status"><span className="key-status">{key.revokedAt ? "Revoked" : "Active"}</span></td>
                 <td data-label="Actions"><button disabled={Boolean(key.revokedAt) || revokingId === key.id} className={confirmRevoke === key.id ? "is-confirming" : ""} onClick={() => void revoke(key.id)}><Trash2 aria-hidden="true" />{revokingId === key.id ? "Revoking…" : confirmRevoke === key.id ? "Confirm revoke" : "Revoke"}</button></td>
               </tr>, revokeError?.id === key.id && <tr className="key-row-error" key={`${key.id}-error`}><td colSpan={6} role="alert">{revokeError.message}</td></tr>])}
             </tbody></table></div>

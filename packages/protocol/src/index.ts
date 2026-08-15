@@ -18,7 +18,7 @@ export type TrackStatus = "unknown" | "running" | "pit" | "off-track" | "not-in-
 export type PitState = "not-in-pits" | "pit-lane" | "pit-stall" | "unobserved";
 export type TelemetrySource = "iracing" | "simulation";
 export type TelemetrySourceMode = "live" | "replay" | "simulation";
-export type AccessKeyKind = "ingestion" | "view";
+export type AccessKeyKind = "ingestion" | "view" | "commentator";
 export type TimingWorkspaceMode = "operator" | "commentator";
 
 export type InvalidTimingReason =

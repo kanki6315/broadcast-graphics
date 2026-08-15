@@ -28,8 +28,11 @@ test("access keys are only valid for their scope until revoked", async () => {
     const store = new AuthStore(path, "admin", "password");
     await store.initialize();
     const created = await store.createKey("ingestion", "Race PC");
+    const commentator = await store.createKey("commentator", "Commentary booth");
     assert.equal(await store.validateAccessKey("ingestion", created.secret), true);
     assert.equal(await store.validateAccessKey("view", created.secret), false);
+    assert.equal(await store.validateAccessKey("commentator", commentator.secret), true);
+    assert.equal(await store.validateAccessKey("view", commentator.secret), false);
     const keys = await store.listKeys();
     assert.equal(keys[0]?.prefix, created.key.prefix);
     assert.equal("secret" in keys[0]!, false);

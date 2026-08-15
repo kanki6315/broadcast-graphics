@@ -62,7 +62,7 @@ function constantTimeEqual(left: Buffer, right: Buffer): boolean {
 }
 
 function accessKey(kind: AccessKeyKind, label: string): { stored: StoredAccessKey; created: CreatedAccessKey } {
-  const marker = kind === "ingestion" ? "ing" : "view";
+  const marker = kind === "ingestion" ? "ing" : kind === "commentator" ? "comms" : "view";
   const secret = `bg_${marker}_${randomBytes(32).toString("base64url")}`;
   const stored: StoredAccessKey = {
     id: randomUUID(),
@@ -197,7 +197,7 @@ export class PostgresAuthStore extends AdminCredentials implements Authenticatio
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS bg_access_keys (
         id uuid PRIMARY KEY,
-        kind text NOT NULL CHECK (kind IN ('ingestion', 'view')),
+        kind text NOT NULL CHECK (kind IN ('ingestion', 'view', 'commentator')),
         label text NOT NULL,
         prefix text NOT NULL,
         secret_hash char(64) NOT NULL UNIQUE,
@@ -213,6 +213,9 @@ export class PostgresAuthStore extends AdminCredentials implements Authenticatio
       );
       CREATE INDEX IF NOT EXISTS bg_admin_sessions_expires_at_idx
         ON bg_admin_sessions (expires_at);
+      ALTER TABLE bg_access_keys DROP CONSTRAINT IF EXISTS bg_access_keys_kind_check;
+      ALTER TABLE bg_access_keys ADD CONSTRAINT bg_access_keys_kind_check
+        CHECK (kind IN ('ingestion', 'view', 'commentator'));
     `);
   }
 
