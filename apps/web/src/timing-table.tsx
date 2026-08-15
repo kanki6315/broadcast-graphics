@@ -201,6 +201,10 @@ function lapTimeValue(driver: DriverState, field: "lastLap" | "bestLap") {
   return qualityValue(driver[field], timingQuality(driver, field), formatLapTime);
 }
 
+function totalPitVisitTime(visit: Pick<PitStopSummary, "pitLaneTime" | "boxTime" | "unknownTime">): number {
+  return visit.pitLaneTime + visit.boxTime + visit.unknownTime;
+}
+
 function pitVisitSummary(driver: DriverState, pitStop: PitStopSummary | undefined) {
   const visit = driver.latestPitVisit;
   if (!Object.hasOwn(driver, "latestPitVisit")) return <span className="pit-summary is-empty" title="This producer does not report pit summaries">--</span>;
@@ -211,7 +215,7 @@ function pitVisitSummary(driver: DriverState, pitStop: PitStopSummary | undefine
         <span><small>Lane</small>{formatSeconds(visit.pitLaneTime)}</span>
         <span className={visit.inferredBoxTime > 0 ? "contains-inference" : ""}><small>Box</small>{visit.inferredBoxTime > 0 ? "~" : ""}{formatSeconds(visit.boxTime)}</span>
         <span><small>Lap</small>{pitStop ? `L${pitStop.pitLap}` : "--"}</span>
-        <span className={visit.unknownTime > 0 ? "contains-unknown" : ""}><small>Unknown</small>{formatSeconds(visit.unknownTime)}</span>
+        <span className={visit.unknownTime > 0 ? "contains-unknown" : ""} title={visit.unknownTime > 0 ? `${formatSeconds(visit.unknownTime)} unresolved time included` : undefined}><small>Total</small>{formatSeconds(totalPitVisitTime(visit))}</span>
         {visit.driverChange && <span className="pit-driver-change" title="Driver change"><RefreshCw aria-label="Driver change" /></span>}
       </span>
     </span>
@@ -335,7 +339,7 @@ export function CommentatorTimingTable({
           {visibleColumns.has("lapTimes") && <th className="lap-times-column">Lap times <small>last / best</small></th>}
           {visibleColumns.has("sectors") && <th className="sectors-column">Sectors <small>current / previous / best</small></th>}
           {visibleColumns.has("stint") && <th className="stint-column">Stint <small>time / laps</small></th>}
-          {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / lap / unknown</small></th>}
+          {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / lap / total</small></th>}
           {visibleColumns.has("status") && <th className="status-column">Status</th>}
         </tr></thead>
         <tbody>

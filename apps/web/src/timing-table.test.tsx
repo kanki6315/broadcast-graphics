@@ -119,7 +119,8 @@ test("pit summary preserves tracker totals and marks only inferred box time", ()
   assert.match(markup, /Lane<\/small>9\.000s/);
   assert.match(markup, /contains-inference[^>]*><small>Box<\/small>~19\.000s/);
   assert.match(markup, /Lap<\/small>L5/);
-  assert.match(markup, /Unknown<\/small>0\.000s/);
+  assert.match(markup, /Total<\/small>28\.000s/);
+  assert.match(markup, /lane \/ box \/ lap \/ total/);
   assert.match(markup, /pit-driver-change/);
   assert.match(markup, /aria-label="Driver change"/);
   assert.doesNotMatch(markup, /<small>Lane<\/small>~/);
@@ -128,6 +129,19 @@ test("pit summary preserves tracker totals and marks only inferred box time", ()
   assert.match(markup, /Driver Two/);
   assert.match(markup, /from Driver One/);
   assert.match(markup, /L2/);
+});
+
+test("pit summary total includes unresolved time so commentators do not need to add it", () => {
+  const markup = render(driver({
+    latestPitVisit: {
+      pitEntryTime: 100, pitExitTime: 128, pitLaneTime: 9, boxTime: 15, unknownTime: 4,
+      observedBoxTime: 15, inferredBoxTime: 0, driverChange: false,
+      entryDriverId: "41", exitDriverId: "41", quality: "incomplete",
+    },
+  }));
+  assert.match(markup, /Total<\/small>28\.000s/);
+  assert.match(markup, /4\.000s unresolved time included/);
+  assert.doesNotMatch(markup, /<small>Unknown<\/small>/);
 });
 
 test("dirty and inferred sectors never receive fastest styling", () => {
