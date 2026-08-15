@@ -80,7 +80,7 @@ test("class gaps replace overall gaps and disappear for single-class races", () 
   assert.doesNotMatch(singleClassMarkup, /Class gap|Class interval/);
 });
 
-test("current, previous, and best sectors share the timing row", () => {
+test("each sector has its own current, previous, and best column", () => {
   const sector = (lapNumber: number, sectorNumber: number, value: number) => ({
     carIdx: 7, lapNumber, sectorNumber, value, definitionRevision: "r1", source: "derived" as const, quality: "valid" as const,
   });
@@ -92,12 +92,16 @@ test("current, previous, and best sectors share the timing row", () => {
       bestSectors: [sector(2, 1, 29.9), sector(3, 2, 31.1)],
     },
   }));
+  assert.match(markup, /Sector 1/);
+  assert.match(markup, /Sector 2/);
   assert.match(markup, /Current/);
-  assert.match(markup, /Previous/);
+  assert.match(markup, /Prev/);
   assert.match(markup, /Best/);
   assert.match(markup, /30\.100/);
   assert.match(markup, /31\.400/);
   assert.match(markup, /29\.900/);
+  assert.match(markup, /sector-column-summary/);
+  assert.equal((markup.match(/class="sector-column"/g) ?? []).length, 2);
 });
 
 test("commentator lap times distinguish personal and overall best laps", () => {
@@ -217,8 +221,8 @@ test("dirty and inferred sectors never receive fastest styling", () => {
       ],
     },
   }));
-  assert.match(markup, /telemetry gap[^>]*><small>S1<\/small>--/);
-  assert.match(markup, /inferred[^>]*><small>S2<\/small>~31\.200/);
+  assert.match(markup, /telemetry gap[^>]*>--/);
+  assert.match(markup, /inferred[^>]*>~31\.200/);
   assert.doesNotMatch(markup, /is-overall-fastest/);
 });
 
