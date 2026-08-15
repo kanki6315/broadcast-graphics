@@ -10,6 +10,7 @@ import type {
   TrackConfigurationSnapshot,
 } from "@racecontrol/protocol";
 import { RaceStateProjection } from "./race-state-projection.js";
+import type { RaceStateCheckpoint } from "./race-state-projection.js";
 
 type Listener = (state: LiveState) => void;
 
@@ -56,6 +57,14 @@ export class StateStore {
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  raceStateCheckpoint(): RaceStateCheckpoint | null {
+    return this.raceState.checkpoint();
+  }
+
+  restoreRaceState(checkpoint: RaceStateCheckpoint): void {
+    this.raceState.restore(checkpoint);
   }
 
   telemetry(session: SessionState): void {

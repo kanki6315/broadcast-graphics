@@ -12,6 +12,7 @@ import { loadClientRelease, streamClientRelease } from "./client-release.js";
 import { IracingTrackMapClient, IracingTrackMapError, iracingCredentialsFromEnvironment } from "./iracing-track-map.js";
 import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
+import { createRaceIntelligenceCheckpointRepository, RaceIntelligencePersistence } from "./race-intelligence-persistence.js";
 import { RaceIntelligenceService } from "./race-intelligence-service.js";
 import { startSimulator } from "./simulator.js";
 import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
@@ -52,6 +53,8 @@ const historyRepository = createRaceHistoryRepository(process.env.DATABASE_URL);
 await historyRepository.initialize();
 const trackConfiguration = createTrackConfigurationRepository(process.env.DATABASE_URL);
 await trackConfiguration.initialize();
+const intelligenceCheckpointRepository = createRaceIntelligenceCheckpointRepository(process.env.DATABASE_URL);
+await intelligenceCheckpointRepository.initialize();
 const iracingCredentials = iracingCredentialsFromEnvironment(process.env);
 const iracingTrackMaps = iracingCredentials ? new IracingTrackMapClient(iracingCredentials) : null;
 const registry = new PackageRegistry(packageRoot);
@@ -70,6 +73,12 @@ const history = new RaceHistoryService(
   (error) => app.log.error({ err: error }, "Failed to persist completed lap"),
 );
 const intelligence = new RaceIntelligenceService();
+const intelligencePersistence = new RaceIntelligencePersistence(
+  intelligenceCheckpointRepository,
+  intelligence,
+  store,
+  (error) => app.log.error({ err: error }, "Failed to persist race intelligence checkpoint"),
+);
 const loginAttempts = new Map<string, { count: number; resetsAt: number }>();
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -480,7 +489,9 @@ wss.on("connection", (socket, request) => {
       }
       if (message.type === "telemetry.update" && role === "telemetry") {
         await trackConfiguration.observeNativeDefinition(message.payload);
+        await intelligencePersistence.hydrate(message.payload);
         const sequence = acceptTelemetry(message, store, history, intelligence);
+        intelligencePersistence.observe(message.payload);
         await refreshTrackConfiguration();
         await sendActiveSectorIfChanged(socket);
         if (sequence !== null) send(socket, { type: "telemetry.ack", sequence });
@@ -558,6 +569,7 @@ async function shutdown(signal: string): Promise<void> {
   for (const socket of sockets.keys()) socket.close(1012, "Server restarting");
   await app.close();
   await history.close();
+  await intelligencePersistence.close();
   await trackConfiguration.close();
   await auth.close();
 }
