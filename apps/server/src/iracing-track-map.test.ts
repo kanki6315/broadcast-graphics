@@ -63,6 +63,26 @@ test("downloads an active layer from iRacing's core-sites asset host", async () 
   assert.equal(result.sourceUrl, activeUrl);
 });
 
+test("rejects a track-map layer from a lookalike domain", async () => {
+  const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
+    const url = input.toString();
+    if (url.includes("/oauth2/token")) return Response.json({ access_token: "access", expires_in: 600 });
+    if (url.endsWith("/data/track/assets")) return Response.json({
+      "509": {
+        track_id: 509,
+        track_map: "https://images-static.iracing.com/tracks/algarve/track-map.svg",
+        track_map_layers: { active: "https://images-static.iracing.com.attacker.test/active.svg" },
+      },
+    });
+    return new Response(svg);
+  };
+  const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
+  await assert.rejects(
+    client.getTrackMap({ trackId: 509, trackName: "Algarve" }),
+    (error: unknown) => error instanceof Error && "code" in error && error.code === "invalid-asset-url",
+  );
+});
+
 test("reuses an unexpired access token", async () => {
   let tokenCalls = 0;
   const fakeFetch = async (input: string | URL | Request): Promise<Response> => {

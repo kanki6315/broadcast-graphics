@@ -4,7 +4,6 @@ import type { TrackLayoutIdentity } from "@racecontrol/protocol";
 const TOKEN_URL = "https://oauth.iracing.com/oauth2/token";
 const TRACK_ASSETS_URL = "https://members-ng.iracing.com/data/track/assets";
 const IMAGE_ROOT = "https://images-static.iracing.com/";
-const OFFICIAL_IMAGE_HOSTS = new Set(["images-static.iracing.com", "ir-core-sites.iracing.com"]);
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_SVG_BYTES = 1_000_000;
 
@@ -101,7 +100,8 @@ function mapUrl(asset: TrackAsset): URL | null {
 }
 
 function validateOfficialImageUrl(url: URL): URL {
-  if (url.protocol !== "https:" || !OFFICIAL_IMAGE_HOSTS.has(url.hostname)) {
+  const officialHost = url.hostname === "iracing.com" || url.hostname.endsWith(".iracing.com");
+  if (url.protocol !== "https:" || !officialHost) {
     throw new IracingTrackMapError("iRacing returned an invalid track-map asset URL.", "invalid-asset-url");
   }
   return url;
