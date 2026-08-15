@@ -239,36 +239,36 @@ function pitVisitSummary(driver: DriverState, pitStop: PitStopSummary | undefine
   );
 }
 
-function sectorValue(sector: CompletedSector) {
+function sectorValue(sector: CompletedSector | undefined) {
+  if (!sector) return <span className="sector-time is-empty">--</span>;
   const unavailable = sector.value == null || sector.quality === "invalid" || sector.quality === "incomplete";
   const marker = sector.quality === "inferred" ? "~" : "";
   const fastest = sector.quality === "valid" && sector.comparisons?.includes("overall-fastest");
   const personal = sector.quality === "valid" && sector.comparisons?.includes("personal-best");
   const title = `${sector.source} · ${sector.quality}${sector.reason ? ` · ${sector.reason.replaceAll("-", " ")}` : ""} · ${sector.definitionRevision}`;
-  return <span key={`${sector.lapNumber}-${sector.sectorNumber}`} className={`sector-time${fastest ? " is-overall-fastest" : personal ? " is-personal-best" : ""}`} title={title}><small>S{sector.sectorNumber}</small>{unavailable ? "--" : `${marker}${sector.value!.toFixed(3)}`}</span>;
+  return <span className={`sector-time${fastest ? " is-overall-fastest" : personal ? " is-personal-best" : ""}`} title={title}>{unavailable ? "--" : `${marker}${sector.value!.toFixed(3)}`}</span>;
 }
 
-function sectorSet(label: string, sectors: CompletedSector[], sectorNumbers: number[]) {
-  const byNumber = new Map(sectors.map((sector) => [sector.sectorNumber, sector]));
+function sectorColumnSummary(driver: DriverState, sectorNumber: number) {
+  const supported = Object.hasOwn(driver, "sectors");
+  const current = driver.sectors?.currentLap?.find((sector) => sector.sectorNumber === sectorNumber);
+  const previous = driver.sectors?.previousLap?.find((sector) => sector.sectorNumber === sectorNumber);
+  const best = driver.sectors?.bestSectors?.find((sector) => sector.sectorNumber === sectorNumber);
   return (
-    <span className="sector-set">
-      <small>{label}</small>
-      <span>{sectorNumbers.map((sectorNumber) => {
-        const sector = byNumber.get(sectorNumber);
-        return sector ? sectorValue(sector) : <span className="sector-time is-empty" key={sectorNumber}><small>S{sectorNumber}</small>--</span>;
-      })}</span>
+    <span className="sector-column-summary" title={supported ? undefined : "This producer does not report derived sectors"}>
+      <span><small>Current</small>{sectorValue(current)}</span>
+      <span><small>Prev</small>{sectorValue(previous)}</span>
+      <span><small>Best</small>{sectorValue(best)}</span>
     </span>
   );
 }
 
-function sectorSummary(driver: DriverState) {
-  if (!Object.hasOwn(driver, "sectors")) return <span className="sector-empty" title="This producer does not report derived sectors">--</span>;
-  const current = driver.sectors?.currentLap ?? [];
-  const previous = driver.sectors?.previousLap ?? [];
-  const best = driver.sectors?.bestSectors ?? [];
-  const sectorNumbers = [...new Set([...current, ...previous, ...best].map((sector) => sector.sectorNumber))].sort((left, right) => left - right);
-  if (sectorNumbers.length === 0) return <span className="sector-empty">--</span>;
-  return <span className="sector-summary">{sectorSet("Current", current, sectorNumbers)}{sectorSet("Previous", previous, sectorNumbers)}{sectorSet("Best", best, sectorNumbers)}</span>;
+function sectorNumbersForDrivers(drivers: DriverState[]): number[] {
+  return [...new Set(drivers.flatMap((driver) => [
+    ...(driver.sectors?.currentLap ?? []),
+    ...(driver.sectors?.previousLap ?? []),
+    ...(driver.sectors?.bestSectors ?? []),
+  ].map((sector) => sector.sectorNumber)))].sort((left, right) => left - right);
 }
 
 function formatDuration(seconds: number): string {
@@ -380,10 +380,13 @@ export function CommentatorTimingTable({
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
   let previousClassId: number | null = null;
-  const columnCount = 2 + [...visibleColumns].filter((column) => showClassGaps || (column !== "gap" && column !== "interval")).length;
+  const sectorNumbers = sectorNumbersForDrivers(drivers);
+  const visibleSectorNumbers = sectorNumbers.length > 0 ? sectorNumbers : [1];
+  const baseColumnCount = [...visibleColumns].filter((column) => column !== "sectors" && (showClassGaps || (column !== "gap" && column !== "interval"))).length;
+  const columnCount = 2 + baseColumnCount + (visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0);
 
   return (
-    <div className="commentator-table-wrap">
+    <div className="commentator-table-wrap" style={{ "--sector-count": visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0 } as CSSProperties}>
       <table className="commentator-table">
         <thead><tr>
           <th className="position-column">Position</th>
@@ -393,7 +396,7 @@ export function CommentatorTimingTable({
           {showClassGaps && visibleColumns.has("gap") && <th className="gap-column">Class gap <small>to class leader</small></th>}
           {showClassGaps && visibleColumns.has("interval") && <th className="interval-column">Class interval <small>to car ahead</small></th>}
           {visibleColumns.has("lapTimes") && <th className="lap-times-column">Lap times <small>last / best</small></th>}
-          {visibleColumns.has("sectors") && <th className="sectors-column">Sectors <small>current / previous / best</small></th>}
+          {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <th className="sector-column" key={sectorNumber}>Sector {sectorNumber}<small>current / prev / best</small></th>)}
           {visibleColumns.has("stint") && <th className="stint-column">Stint <small>time / laps</small></th>}
           {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / lap / total</small></th>}
           {visibleColumns.has("status") && <th className="status-column">Status</th>}
@@ -428,7 +431,7 @@ export function CommentatorTimingTable({
                 {showClassGaps && visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, true)}<small>{trend?.direction ?? "class"}</small></span></td>}
                 {showClassGaps && visibleColumns.has("interval") && <td className="single-value"><span>{intervalValue(driver, true)}<small>class</small></span></td>}
                 {visibleColumns.has("lapTimes") && <td className="paired-value lap-time-pair"><span className={lastLapState.className} title={lastLapState.title}>{lapTimeValue(driver, "lastLap")}<small>{lastLapState.label}</small></span><span className={bestLapState.className} title={bestLapState.title}>{lapTimeValue(driver, "bestLap")}<small>{bestLapState.label}</small></span></td>}
-                {visibleColumns.has("sectors") && <td className="sectors-cell">{sectorSummary(driver)}</td>}
+                {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <td className="sector-cell" key={sectorNumber}>{sectorColumnSummary(driver, sectorNumber)}</td>)}
                 {visibleColumns.has("stint") && <td className="stint-cell">{stintSummary(stint)}</td>}
                 {visibleColumns.has("pit") && <td className="pit-cell">{pitVisitSummary(driver, latestPitStop)}</td>}
                 {visibleColumns.has("status") && <td><span className={`commentator-status status-${driver.pitState ?? driver.trackStatus}`}>{status}</span></td>}
