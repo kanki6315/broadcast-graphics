@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IracingTrackMapClient, maskIracingSecret, pathOnlyOfficialSvg } from "./iracing-track-map.js";
+import { IracingTrackMapClient, maskIracingSecret, pathOnlyOfficialSvg, startFinishOnlyOfficialSvg } from "./iracing-track-map.js";
 
 const credentials = { clientId: "Gantry", clientSecret: "secret", username: "Driver@Example.com", password: "password" };
 const svg = `<svg viewBox="0 0 100 100"><path id="active" d="M0 0 L100 0 L100 100 L0 100 Z"/></svg>`;
@@ -12,6 +12,19 @@ test("masks iRacing OAuth secrets with a normalized identifier", () => {
 test("reduces an official SVG layer to inert path-only markup", () => {
   const result = pathOnlyOfficialSvg(`<svg viewBox="0 0 10 10"><style>path{stroke:red}</style><script>alert(1)</script><path id="route" class="active" d="M0 0L10 0L10 10Z"/></svg>`);
   assert.equal(result, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path id="iracing-path-1" d="M0 0L10 0L10 10Z"/></svg>`);
+});
+
+test("reduces transformed iRacing symbol artwork to an inert S/F line", () => {
+  const result = startFinishOnlyOfficialSvg(`<svg viewBox="0 0 100 100"><defs><symbol id="line"><rect x="-2" y="-10" width="4" height="20"/></symbol></defs><use href="#line" x="5" transform="translate(40 0)"/></svg>`);
+  assert.equal(result, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path id="iracing-start-finish-line" d="M45,-10L45,10"/></svg>`);
+});
+
+test("rejects active content in an iRacing S/F layer", () => {
+  assert.throws(() => startFinishOnlyOfficialSvg(`<svg viewBox="0 0 10 10"><script>alert(1)</script><line x2="10"/></svg>`), /unsupported active content/);
+});
+
+test("rejects external references in an iRacing S/F layer", () => {
+  assert.throws(() => startFinishOnlyOfficialSvg(`<svg viewBox="0 0 10 10"><use href="https://example.test/line"/></svg>`), /no supported line geometry/);
 });
 
 test("authenticates, resolves the Data API link, and downloads the active SVG layer", async () => {
@@ -28,7 +41,7 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
       },
     });
     if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg") return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
-    if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/start-finish.svg") return new Response(`<svg viewBox="0 0 100 100"><path d="M45 -10L45 10"/></svg>`);
+    if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/start-finish.svg") return new Response(`<svg viewBox="0 0 100 100"><defs><symbol id="line"><rect x="-2" y="-10" width="4" height="20"/></symbol></defs><use href="#line" transform="translate(45 0)"/></svg>`);
     return new Response("not found", { status: 404 });
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
@@ -36,7 +49,7 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
   assert.match(result.svg, /<path id="iracing-path-1"/);
   assert.doesNotMatch(result.svg, /Content-Type/);
   assert.equal(result.sourceUrl, "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg");
-  assert.match(result.startFinishSvg ?? "", /M45 -10L45 10/);
+  assert.match(result.startFinishSvg ?? "", /M45,-10L45,10/);
   assert.match(result.originalFilename, /^iRacing-509-/);
   const tokenBody = requests[0]?.init?.body as URLSearchParams;
   assert.equal(tokenBody.get("grant_type"), "password_limited");

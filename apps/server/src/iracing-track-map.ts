@@ -140,6 +140,99 @@ export function pathOnlyOfficialSvg(input: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" ${dimensions}>${paths.join("")}</svg>`;
 }
 
+type Matrix = [number, number, number, number, number, number];
+
+function transformMatrix(value: string | undefined): Matrix {
+  let result: Matrix = [1, 0, 0, 1, 0, 0];
+  const multiply = (left: Matrix, right: Matrix): Matrix => [
+    left[0] * right[0] + left[2] * right[1], left[1] * right[0] + left[3] * right[1],
+    left[0] * right[2] + left[2] * right[3], left[1] * right[2] + left[3] * right[3],
+    left[0] * right[4] + left[2] * right[5] + left[4], left[1] * right[4] + left[3] * right[5] + left[5],
+  ];
+  for (const match of value?.matchAll(/(matrix|translate|scale|rotate)\(([^)]+)\)/g) ?? []) {
+    const args = match[2]!.trim().split(/[\s,]+/).map(Number);
+    if (!args.length || args.some((item) => !Number.isFinite(item))) continue;
+    let next: Matrix;
+    if (match[1] === "matrix" && args.length === 6) next = args as Matrix;
+    else if (match[1] === "translate") next = [1, 0, 0, 1, args[0]!, args[1] ?? 0];
+    else if (match[1] === "scale") next = [args[0]!, 0, 0, args[1] ?? args[0]!, 0, 0];
+    else if (match[1] === "rotate") {
+      const radians = args[0]! * Math.PI / 180, cosine = Math.cos(radians), sine = Math.sin(radians);
+      const centerX = args[1] ?? 0, centerY = args[2] ?? 0;
+      next = [cosine, sine, -sine, cosine, centerX * (1 - cosine) + centerY * sine, centerY * (1 - cosine) - centerX * sine];
+    } else continue;
+    result = multiply(result, next);
+  }
+  return result;
+}
+
+function transformedPoint(matrix: Matrix, x: number, y: number): { x: number; y: number } {
+  return { x: matrix[0] * x + matrix[2] * y + matrix[4], y: matrix[1] * x + matrix[3] * y + matrix[5] };
+}
+
+function finiteAttribute(tag: string, name: string): number {
+  const value = Number(attribute(tag, name) ?? 0);
+  if (!Number.isFinite(value) || Math.abs(value) > 1_000_000) throw new IracingTrackMapError("The iRacing S/F layer contains invalid coordinates.", "invalid-svg", 400);
+  return value;
+}
+
+function lineFromTag(tag: string, parentTransform?: string): string {
+  const matrix = transformMatrix(`${parentTransform ?? ""} ${attribute(tag, "transform") ?? ""}`);
+  const start = transformedPoint(matrix, finiteAttribute(tag, "x1"), finiteAttribute(tag, "y1"));
+  const end = transformedPoint(matrix, finiteAttribute(tag, "x2"), finiteAttribute(tag, "y2"));
+  return `M${start.x},${start.y}L${end.x},${end.y}`;
+}
+
+function centerlineFromRect(tag: string, parentTransform?: string): string {
+  const x = finiteAttribute(tag, "x"), y = finiteAttribute(tag, "y");
+  const width = finiteAttribute(tag, "width"), height = finiteAttribute(tag, "height");
+  if (width <= 0 || height <= 0) throw new IracingTrackMapError("The iRacing S/F layer contains an invalid rectangle.", "invalid-svg", 400);
+  const horizontal = width > height;
+  const rawStart = horizontal ? { x, y: y + height / 2 } : { x: x + width / 2, y };
+  const rawEnd = horizontal ? { x: x + width, y: y + height / 2 } : { x: x + width / 2, y: y + height };
+  const matrix = transformMatrix(`${parentTransform ?? ""} ${attribute(tag, "transform") ?? ""}`);
+  const start = transformedPoint(matrix, rawStart.x, rawStart.y), end = transformedPoint(matrix, rawEnd.x, rawEnd.y);
+  return `M${start.x},${start.y}L${end.x},${end.y}`;
+}
+
+function useTransform(useTag: string): string {
+  const x = finiteAttribute(useTag, "x");
+  const y = finiteAttribute(useTag, "y");
+  return `${attribute(useTag, "transform") ?? ""} translate(${x} ${y})`;
+}
+
+/** Converts iRacing's heterogeneous S/F artwork to one inert line path. */
+export function startFinishOnlyOfficialSvg(input: string): string {
+  if (/<!DOCTYPE|<!ENTITY|<script\b|<foreignObject\b|\son[a-z]+\s*=/i.test(input))
+    throw new IracingTrackMapError("The iRacing S/F layer contains unsupported active content.", "unsafe-svg", 400);
+  const svgTag = /<svg\b[^>]*>/i.exec(input)?.[0];
+  if (!svgTag) throw new IracingTrackMapError("The iRacing S/F layer is not an SVG document.", "invalid-svg", 400);
+  const viewBox = attribute(svgTag, "viewBox");
+  const width = attribute(svgTag, "width"), height = attribute(svgTag, "height");
+  const dimensions = viewBox ? `viewBox="${escaped(viewBox)}"` : `width="${escaped(width ?? "")}" height="${escaped(height ?? "")}"`;
+  let linePath: string | undefined;
+  for (const useTag of input.match(/<use\b[^>]*>/gi) ?? []) {
+    const reference = attribute(useTag, "href") ?? attribute(useTag, "xlink:href");
+    if (!reference?.startsWith("#")) continue;
+    const symbolId = reference.slice(1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const symbol = new RegExp(`<symbol\\b[^>]*\\bid\\s*=\\s*(?:"${symbolId}"|'${symbolId}')[^>]*>([\\s\\S]*?)<\\/symbol>`, "i").exec(input)?.[1];
+    if (!symbol) continue;
+    const rect = /<rect\b[^>]*>/i.exec(symbol)?.[0];
+    const line = /<line\b[^>]*>/i.exec(symbol)?.[0];
+    if (rect) { linePath = centerlineFromRect(rect, useTransform(useTag)); break; }
+    if (line) { linePath = lineFromTag(line, useTransform(useTag)); break; }
+  }
+  const directContent = input
+    .replace(/<defs\b[^>]*>[\s\S]*?<\/defs>/gi, "")
+    .replace(/<symbol\b[^>]*>[\s\S]*?<\/symbol>/gi, "");
+  const directLine = /<line\b[^>]*>/i.exec(directContent)?.[0];
+  const directRect = /<rect\b[^>]*>/i.exec(directContent)?.[0];
+  const directPath = /<path\b[^>]*>/i.exec(directContent)?.[0];
+  linePath ??= directLine ? lineFromTag(directLine) : directRect ? centerlineFromRect(directRect) : directPath ? attribute(directPath, "d") : undefined;
+  if (!linePath) throw new IracingTrackMapError("The iRacing S/F layer contains no supported line geometry.", "no-paths", 400);
+  return `<svg xmlns="http://www.w3.org/2000/svg" ${dimensions}><path id="iracing-start-finish-line" d="${escaped(linePath)}"/></svg>`;
+}
+
 export class IracingTrackMapClient {
   private tokens: StoredTokens | null = null;
   private tokenRequest: Promise<string> | null = null;
@@ -260,7 +353,7 @@ export class IracingTrackMapClient {
         if (markerResponse.ok && (!Number.isFinite(declaredMarkerLength) || declaredMarkerLength <= MAX_SVG_BYTES)) {
           const markerSvg = await markerResponse.text();
           if (Buffer.byteLength(markerSvg, "utf8") <= MAX_SVG_BYTES) {
-            try { startFinishSvg = pathOnlyOfficialSvg(markerSvg); }
+            try { startFinishSvg = startFinishOnlyOfficialSvg(markerSvg); }
             catch { startFinishSvg = undefined; }
           }
         }
