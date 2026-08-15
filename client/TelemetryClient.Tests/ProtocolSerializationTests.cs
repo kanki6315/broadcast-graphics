@@ -39,7 +39,7 @@ public sealed class ProtocolSerializationTests
         var sector = new CompletedSector(7, 4, 2, "iracing-a1", "derived", "invalid", null, "telemetry-gap", 100, 99.5, "41", "Driver");
         var driver = new DriverState(7, 2, "23", "Driver", "Team", "GT3", 1.2, 82, 81, 4, false, 0)
         {
-            Sectors = new DriverSectorTiming(3, [], [sector])
+            Sectors = new DriverSectorTiming(3, [], [sector], [sector with { Quality = "valid", Value = 31.2 }])
         };
 
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(driver, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
@@ -50,5 +50,6 @@ public sealed class ProtocolSerializationTests
         Assert.Equal("invalid", result.GetProperty("quality").GetString());
         Assert.Equal("telemetry-gap", result.GetProperty("reason").GetString());
         Assert.Equal(JsonValueKind.Null, result.GetProperty("value").ValueKind);
+        Assert.Equal(31.2, document.RootElement.GetProperty("sectors").GetProperty("bestSectors")[0].GetProperty("value").GetDouble());
     }
 }

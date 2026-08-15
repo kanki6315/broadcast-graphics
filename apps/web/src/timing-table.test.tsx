@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DriverState, RaceIntelligenceSnapshot } from "@racecontrol/protocol";
-import { CommentatorTimingTable, defaultCommentatorColumns, sortByClassPosition } from "./timing-table";
+import { CommentatorTimingTable, defaultCommentatorColumns, sortByClassPosition, sortByOverallPosition, type CommentatorColumn } from "./timing-table";
 import { BattleWatch } from "./battle-watch";
 
 function driver(overrides: Partial<DriverState> = {}): DriverState {
@@ -41,7 +41,7 @@ test("missing optional commentator timing renders as double hyphens", () => {
   assert.doesNotMatch(markup, />—</);
 });
 
-test("all-class timing orders cars by class position, then overall position", () => {
+test("all-class timing orders cars by overall position", () => {
   const drivers = [
     driver({ carIdx: 1, className: "Ford GT", classPosition: 2, position: 21 }),
     driver({ carIdx: 2, className: "GT1", classPosition: 1, position: 13 }),
@@ -50,8 +50,54 @@ test("all-class timing orders cars by class position, then overall position", ()
     driver({ carIdx: 5, className: "Ford GT", classPosition: 1, position: 20 }),
   ];
 
+  assert.deepEqual(sortByOverallPosition(drivers).map((candidate) => candidate.carIdx), [4, 3, 2, 5, 1]);
   assert.deepEqual(sortByClassPosition(drivers).map((candidate) => candidate.carIdx), [4, 2, 5, 3, 1]);
   assert.deepEqual(drivers.map((candidate) => candidate.carIdx), [1, 2, 3, 4, 5]);
+});
+
+test("class gaps replace overall gaps and disappear for single-class races", () => {
+  const current = driver({
+    classGapToLeader: 1.25,
+    classIntervalToAhead: .5,
+    timingQuality: {
+      classGapToLeader: { source: "derived", quality: "valid" },
+      classIntervalToAhead: { source: "derived", quality: "valid" },
+    },
+  });
+  const columns = new Set<CommentatorColumn>(["gap", "interval"]);
+  const multiClassMarkup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set()}
+    visibleColumns={columns} groupByClass={false} showClassGaps onSelectCar={() => {}} onToggleExpanded={() => {}}
+  />);
+  assert.match(multiClassMarkup, /Class gap/);
+  assert.match(multiClassMarkup, /Class interval/);
+  assert.doesNotMatch(multiClassMarkup, /overall/i);
+
+  const singleClassMarkup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set()}
+    visibleColumns={columns} groupByClass={false} showClassGaps={false} onSelectCar={() => {}} onToggleExpanded={() => {}}
+  />);
+  assert.doesNotMatch(singleClassMarkup, /Class gap|Class interval/);
+});
+
+test("current, previous, and best sectors share the timing row", () => {
+  const sector = (lapNumber: number, sectorNumber: number, value: number) => ({
+    carIdx: 7, lapNumber, sectorNumber, value, definitionRevision: "r1", source: "derived" as const, quality: "valid" as const,
+  });
+  const markup = render(driver({
+    sectors: {
+      currentSectorNumber: 2,
+      currentLap: [sector(5, 1, 30.1)],
+      previousLap: [sector(4, 1, 30.3), sector(4, 2, 31.4)],
+      bestSectors: [sector(2, 1, 29.9), sector(3, 2, 31.1)],
+    },
+  }));
+  assert.match(markup, /Current/);
+  assert.match(markup, /Previous/);
+  assert.match(markup, /Best/);
+  assert.match(markup, /30\.100/);
+  assert.match(markup, /31\.400/);
+  assert.match(markup, /29\.900/);
 });
 
 test("pit summary preserves tracker totals and marks only inferred box time", () => {

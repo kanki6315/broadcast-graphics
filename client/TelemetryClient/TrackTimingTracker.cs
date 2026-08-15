@@ -127,7 +127,13 @@ internal sealed class TrackTimingTracker
         if (definition is null || !cars.TryGetValue(carIdx, out var history)) return null;
         var current = history.Completed.Where(result => result.LapNumber == currentLap).OrderBy(result => result.SectorNumber).ToArray();
         var previous = history.Completed.Where(result => result.LapNumber == currentLap - 1).OrderBy(result => result.SectorNumber).ToArray();
-        return new DriverSectorTiming(CurrentSector(history), current, previous);
+        var best = history.Completed
+            .Where(result => result.DefinitionRevision == definition.Revision && result.Quality == "valid" && result.Value is not null)
+            .GroupBy(result => result.SectorNumber)
+            .Select(group => group.MinBy(result => result.Value)!)
+            .OrderBy(result => result.SectorNumber)
+            .ToArray();
+        return new DriverSectorTiming(CurrentSector(history), current, previous, best);
     }
 
     private static string? DiscontinuityReason(CarHistory history, DriverState driver, double distance, double time)

@@ -163,6 +163,8 @@ export interface DriverSectorTiming {
   currentSectorNumber?: number;
   currentLap?: CompletedSector[];
   previousLap?: CompletedSector[];
+  /** Fastest valid completed sector for this car, independently selected per sector. */
+  bestSectors?: CompletedSector[];
 }
 
 export interface PitVisitTiming {

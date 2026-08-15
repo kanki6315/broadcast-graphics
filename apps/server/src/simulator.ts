@@ -140,6 +140,13 @@ export function simulatedDrivers(tick: number): DriverState[] {
         currentSectorNumber: Math.min(3, Math.floor(((tick / 90 + index / names.length) % 1) * 3) + 1),
         currentLap: [],
         previousLap: previousSectors,
+        bestSectors: previousSectors.map((sector) => ({
+          ...sector,
+          lapNumber: 12,
+          value: sector.value == null ? undefined : Number((sector.value - .18).toFixed(3)),
+          quality: sector.quality === "valid" ? "valid" as const : sector.quality,
+          comparisons: sector.quality === "valid" ? ["personal-best" as const] : undefined,
+        })),
       },
       isConnected: pit?.pitState !== "unobserved",
       userId: currentUserId,
