@@ -38,6 +38,8 @@ test("missing optional commentator timing renders as double hyphens", () => {
   assert.match(markup, /Quality not reported[^>]*>--</);
   assert.match(markup, /position-change is-unknown[^>]*>--</);
   assert.match(markup, /producer does not report pit summaries[^>]*>--</);
+  assert.match(markup, /class="position-cell" aria-expanded="false" title="Show timing detail"/);
+  assert.doesNotMatch(markup, /expand-control/);
   assert.doesNotMatch(markup, />—</);
 });
 
@@ -111,7 +113,8 @@ test("pit summary preserves tracker totals and marks only inferred box time", ()
   assert.match(markup, /Lane<\/small>9\.000s/);
   assert.match(markup, /contains-inference[^>]*><small>Box<\/small>~19\.000s/);
   assert.match(markup, /Unknown<\/small>0\.000s/);
-  assert.match(markup, /Driver change/);
+  assert.match(markup, /pit-driver-change/);
+  assert.match(markup, /aria-label="Driver change"/);
   assert.doesNotMatch(markup, /<small>Lane<\/small>~/);
 });
 
@@ -139,7 +142,8 @@ test("stint context is presented from the canonical intelligence snapshot", () =
     stints={[{ carIdx: 7, currentDriverId: "41", currentDriverName: "Driver", previousDriverName: "Previous Driver", startedAt: 100, duration: 372, lapCount: 5, changeContext: "inferred-box", quality: "inferred" }]}
   />);
   assert.match(markup, /~6:12/);
-  assert.match(markup, /from Previous Driver/);
+  assert.match(markup, /title="5 laps · from Previous Driver/);
+  assert.match(markup, /<small>5 laps<\/small>/);
   assert.match(markup, /inferred-box · inferred/);
 });
 
