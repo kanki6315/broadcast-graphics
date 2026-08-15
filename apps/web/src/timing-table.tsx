@@ -114,6 +114,18 @@ export const defaultCommentatorColumns: readonly CommentatorColumn[] = [
   "status",
 ];
 
+function sortablePosition(position: number): number {
+  return position > 0 ? position : Number.MAX_SAFE_INTEGER;
+}
+
+export function sortByClassPosition(drivers: DriverState[]): DriverState[] {
+  return [...drivers].sort((left, right) =>
+    sortablePosition(left.classPosition) - sortablePosition(right.classPosition)
+      || sortablePosition(left.position) - sortablePosition(right.position)
+      || left.className.localeCompare(right.className)
+      || left.carIdx - right.carIdx);
+}
+
 export interface CommentatorTimingTableProps {
   drivers: DriverState[];
   selectedCarIdx: number | null;

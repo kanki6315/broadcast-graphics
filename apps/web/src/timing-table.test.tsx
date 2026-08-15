@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DriverState, RaceIntelligenceSnapshot } from "@racecontrol/protocol";
-import { CommentatorTimingTable, defaultCommentatorColumns } from "./timing-table";
+import { CommentatorTimingTable, defaultCommentatorColumns, sortByClassPosition } from "./timing-table";
 import { BattleWatch } from "./battle-watch";
 
 function driver(overrides: Partial<DriverState> = {}): DriverState {
@@ -39,6 +39,19 @@ test("missing optional commentator timing renders as double hyphens", () => {
   assert.match(markup, /position-change is-unknown[^>]*>--</);
   assert.match(markup, /producer does not report pit summaries[^>]*>--</);
   assert.doesNotMatch(markup, />—</);
+});
+
+test("all-class timing orders cars by class position, then overall position", () => {
+  const drivers = [
+    driver({ carIdx: 1, className: "Ford GT", classPosition: 2, position: 21 }),
+    driver({ carIdx: 2, className: "GT1", classPosition: 1, position: 13 }),
+    driver({ carIdx: 3, className: "HPD", classPosition: 2, position: 2 }),
+    driver({ carIdx: 4, className: "HPD", classPosition: 1, position: 1 }),
+    driver({ carIdx: 5, className: "Ford GT", classPosition: 1, position: 20 }),
+  ];
+
+  assert.deepEqual(sortByClassPosition(drivers).map((candidate) => candidate.carIdx), [4, 2, 5, 3, 1]);
+  assert.deepEqual(drivers.map((candidate) => candidate.carIdx), [1, 2, 3, 4, 5]);
 });
 
 test("pit summary preserves tracker totals and marks only inferred box time", () => {

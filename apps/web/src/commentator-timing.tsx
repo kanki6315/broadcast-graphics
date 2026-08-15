@@ -5,6 +5,7 @@ import {
   commentatorColumnLabels,
   defaultCommentatorColumns,
   CommentatorTimingTable,
+  sortByClassPosition,
   type CommentatorColumn,
 } from "./timing-table";
 import { LinearTrackRibbon } from "./linear-track-ribbon";
@@ -51,13 +52,6 @@ function loadPreferences(): CommentatorPreferences {
   }
 }
 
-function sortClassFirst(drivers: DriverState[]): DriverState[] {
-  return [...drivers].sort((left, right) =>
-    left.className.localeCompare(right.className)
-      || left.classPosition - right.classPosition
-      || left.position - right.position);
-}
-
 export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> }) {
   const { state, socketConnected } = useLiveState("control", "commentator");
   const [preferences, setPreferences] = useState<CommentatorPreferences>(loadPreferences);
@@ -72,7 +66,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const classes = state?.session?.classes ?? [];
   const filteredDrivers = useMemo(() => {
     const drivers = state?.session?.drivers ?? [];
-    return sortClassFirst(preferences.classId === "all"
+    return sortByClassPosition(preferences.classId === "all"
       ? drivers
       : drivers.filter((driver) => driver.classId === preferences.classId));
   }, [preferences.classId, state?.session?.drivers]);
@@ -249,7 +243,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           nearbyCarIdxs={nearbyClassCarIdxs}
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}
-          groupByClass={preferences.classId === "all"}
+          groupByClass={false}
           stints={intelligence?.stints}
           gapTrends={intelligence?.gapTrends}
           pitCycles={intelligence?.pitCycles}
