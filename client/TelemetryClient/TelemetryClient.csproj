@@ -10,7 +10,7 @@
     <AssemblyName>BroadcastGraphicsClient</AssemblyName>
     <Product>Gantry Telemetry Client</Product>
     <ApplicationIcon>Resources\Brand\gantry.ico</ApplicationIcon>
-    <Version>0.6.6</Version>
+    <Version>0.6.7</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="2.2.0" />
