@@ -97,8 +97,8 @@ function bearerToken(header: string | undefined): string | undefined {
   return header?.startsWith("Bearer ") ? header.slice(7).trim() : undefined;
 }
 
-function viewToken(header: string | undefined): string | undefined {
-  return header?.split(",").map((value) => value.trim()).find((value) => value.startsWith("bg_view_"));
+function accessToken(header: string | undefined, prefix: "bg_view_" | "bg_comms_"): string | undefined {
+  return header?.split(",").map((value) => value.trim()).find((value) => value.startsWith(prefix));
 }
 
 function setSessionCookie(reply: { header(name: string, value: string): unknown }, token: string, maxAge = 43_200): void {
@@ -110,6 +110,16 @@ async function requireAdmin(request: { headers: { cookie?: string } }, reply: { 
   const admin = await auth.validateSession(sessionToken(request.headers.cookie));
   if (!admin) reply.code(401).send({ error: "Authentication required." });
   return admin;
+}
+
+async function requireTimingReader(
+  request: { headers: { cookie?: string; authorization?: string } },
+  reply: { code(status: number): { send(body: unknown): unknown } },
+): Promise<boolean> {
+  if (await auth.validateSession(sessionToken(request.headers.cookie))) return true;
+  if (await auth.validateAccessKey("commentator", bearerToken(request.headers.authorization))) return true;
+  reply.code(401).send({ error: "Timing access is required." });
+  return false;
 }
 
 function currentLayout(): TrackLayoutIdentity | null {
@@ -223,7 +233,7 @@ app.post<{ Body: { kind?: unknown; label?: unknown } }>("/api/auth/keys", async 
   if (!await requireAdmin(request, reply)) return;
   const kind = request.body?.kind;
   const label = typeof request.body?.label === "string" ? request.body.label.trim().slice(0, 80) : "";
-  if ((kind !== "ingestion" && kind !== "view") || !label) {
+  if ((kind !== "ingestion" && kind !== "view" && kind !== "commentator") || !label) {
     return reply.code(400).send({ error: "Choose a key type and provide a label." });
   }
   return reply.code(201).send(await auth.createKey(kind, label));
@@ -250,7 +260,7 @@ app.get<{ Querystring: { carIdx?: string; limit?: string } }>("/api/history/laps
   return history.listLaps(session, carIdx, limit);
 });
 app.get<{ Querystring: { classId?: string; after?: string } }>("/api/history/class-gaps", async (request, reply) => {
-  if (!await requireAdmin(request, reply)) return;
+  if (!await requireTimingReader(request, reply)) return;
   const session = store.snapshot().session;
   const classId = Number(request.query.classId);
   if (!session || !Number.isInteger(classId) || !session.classes.some((candidate) => candidate.id === classId)) {
@@ -296,7 +306,7 @@ app.get("/api/track-config/active", async (request, reply) => {
 });
 
 app.get<{ Params: { id: string } }>("/api/track-config/maps/:id", async (request, reply) => {
-  if (!await requireAdmin(request, reply)) return;
+  if (!await requireTimingReader(request, reply)) return;
   const map = await trackConfiguration.getMap(request.params.id);
   if (!map) return reply.code(404).send({ error: "Track map not found." });
   reply.header("Cache-Control", "private, max-age=3600, immutable");
@@ -304,7 +314,7 @@ app.get<{ Params: { id: string } }>("/api/track-config/maps/:id", async (request
 });
 
 app.get<{ Params: { id: string } }>("/api/track-config/calibrations/:id", async (request, reply) => {
-  if (!await requireAdmin(request, reply)) return;
+  if (!await requireTimingReader(request, reply)) return;
   const calibration = await trackConfiguration.getCalibration(request.params.id);
   if (!calibration) return reply.code(404).send({ error: "Track-map calibration not found." });
   reply.header("Cache-Control", "private, max-age=3600, immutable");
@@ -468,11 +478,15 @@ if (existsSync(webRoot)) {
 async function authorizeSocket(req: IncomingMessage): Promise<boolean> {
   const access = parseSocketAccess(req.url);
   if (!access) return false;
-  if (access.role === "control" || access.role === "commentator") {
+  if (access.role === "control") {
     return await auth.validateSession(sessionToken(req.headers.cookie)) !== null;
   }
+  if (access.role === "commentator") {
+    return await auth.validateSession(sessionToken(req.headers.cookie)) !== null
+      || await auth.validateAccessKey("commentator", accessToken(req.headers["sec-websocket-protocol"], "bg_comms_"));
+  }
   if (access.role === "telemetry") return auth.validateAccessKey("ingestion", bearerToken(req.headers.authorization));
-  if (access.role === "overlay") return auth.validateAccessKey("view", viewToken(req.headers["sec-websocket-protocol"]));
+  if (access.role === "overlay") return auth.validateAccessKey("view", accessToken(req.headers["sec-websocket-protocol"], "bg_view_"));
   return false;
 }
 

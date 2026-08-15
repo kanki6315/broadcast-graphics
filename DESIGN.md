@@ -426,7 +426,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 ### Access Management and Key Register
 
-- Keep key issuance and the register visually distinct but adjacent. Access type is a two-option radio ledger: the selected option receives an inspection fill and `4px` inset orange leading rule, while its title and explanation remain visible.
+- Keep key issuance and the register visually distinct but adjacent. Access type is a three-option radio ledger for telemetry, overlay, and commentator credentials: the selected option receives an inspection fill and `4px` inset orange leading rule, while its title and explanation remain visible.
 - The register preserves label, scope, shortened identifier, issue date, written status, and row action. Active count is a bordered text plate; revoked records use muted ink, strikethrough, the literal `REVOKED` status, and a disabled action.
 - Revocation is a two-step inline action. The first press changes the same button to orange `CONFIRM REVOKE`; the pending request changes it to `REVOKING…`. Put a failed revoke directly beneath its record so the error remains attached to the affected key.
 - Loading uses `READING KEY REGISTER…` and `CHECKING`; load failure replaces the register with explicit error copy plus a `RETRY KEY REGISTER` action; empty state explains that no keys exist and names the useful first action. Key creation and revocation also announce completion through a nonvisual `role="status"` region.

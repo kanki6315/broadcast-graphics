@@ -18,6 +18,9 @@ export function useLiveState(role: "control" | "overlay", mode: TimingWorkspaceM
       if (role === "overlay") {
         const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
         if (token) socketProtocols = ["bg-view", token];
+      } else if (mode === "commentator") {
+        const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
+        if (token?.startsWith("bg_comms_")) socketProtocols = ["bg-commentator", token];
       }
       const socket = new WebSocket(`${protocol}//${window.location.host}/socket?${query}`, socketProtocols);
       socketRef.current = socket;
