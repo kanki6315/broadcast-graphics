@@ -23,12 +23,9 @@ function driver(overrides: Partial<DriverState> = {}): DriverState {
 function render(current: DriverState): string {
   return renderToStaticMarkup(<CommentatorTimingTable
     drivers={[current]}
-    selectedCarIdx={current.carIdx}
-    nearbyCarIdxs={new Set()}
     expandedCarIdxs={new Set()}
     visibleColumns={new Set([...defaultCommentatorColumns, "lap"])}
     groupByClass={false}
-    onSelectCar={() => {}}
     onToggleExpanded={() => {}}
   />);
 }
@@ -40,6 +37,7 @@ test("missing optional commentator timing renders as double hyphens", () => {
   assert.match(markup, /producer does not report pit summaries[^>]*>--</);
   assert.match(markup, /class="position-cell" aria-expanded="false" title="Show timing detail"/);
   assert.doesNotMatch(markup, /expand-control/);
+  assert.doesNotMatch(markup, /is-selected|aria-current|Follow Driver/);
   assert.doesNotMatch(markup, />—</);
 });
 
@@ -68,16 +66,16 @@ test("class gaps replace overall gaps and disappear for single-class races", () 
   });
   const columns = new Set<CommentatorColumn>(["gap", "interval"]);
   const multiClassMarkup = renderToStaticMarkup(<CommentatorTimingTable
-    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set()}
-    visibleColumns={columns} groupByClass={false} showClassGaps onSelectCar={() => {}} onToggleExpanded={() => {}}
+    drivers={[current]} expandedCarIdxs={new Set()}
+    visibleColumns={columns} groupByClass={false} showClassGaps onToggleExpanded={() => {}}
   />);
   assert.match(multiClassMarkup, /Class gap/);
   assert.match(multiClassMarkup, /Class interval/);
   assert.doesNotMatch(multiClassMarkup, /overall/i);
 
   const singleClassMarkup = renderToStaticMarkup(<CommentatorTimingTable
-    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set()}
-    visibleColumns={columns} groupByClass={false} showClassGaps={false} onSelectCar={() => {}} onToggleExpanded={() => {}}
+    drivers={[current]} expandedCarIdxs={new Set()}
+    visibleColumns={columns} groupByClass={false} showClassGaps={false} onToggleExpanded={() => {}}
   />);
   assert.doesNotMatch(singleClassMarkup, /Class gap|Class interval/);
 });
@@ -137,8 +135,8 @@ test("dirty and inferred sectors never receive fastest styling", () => {
 test("stint context is presented from the canonical intelligence snapshot", () => {
   const current = driver();
   const markup = renderToStaticMarkup(<CommentatorTimingTable
-    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set([7])}
-    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onSelectCar={() => {}} onToggleExpanded={() => {}}
+    drivers={[current]} expandedCarIdxs={new Set([7])}
+    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onToggleExpanded={() => {}}
     stints={[{ carIdx: 7, currentDriverId: "41", currentDriverName: "Driver", previousDriverName: "Previous Driver", startedAt: 100, duration: 372, lapCount: 5, changeContext: "inferred-box", quality: "inferred" }]}
   />);
   assert.match(markup, /~6:12/);
@@ -159,8 +157,8 @@ test("expanded confidence omits positionally unavailable leader timing", () => {
     },
   });
   const markup = renderToStaticMarkup(<CommentatorTimingTable
-    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set([7])}
-    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onSelectCar={() => {}} onToggleExpanded={() => {}}
+    drivers={[current]} expandedCarIdxs={new Set([7])}
+    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onToggleExpanded={() => {}}
   />);
 
   assert.doesNotMatch(markup, /gapToLeader: incomplete/);
@@ -181,5 +179,6 @@ test("Battle Watch filters shared candidates by class and contains no control co
   assert.match(markup, /#3/);
   assert.match(markup, /#4/);
   assert.doesNotMatch(markup, /#1/);
+  assert.doesNotMatch(markup, /<button|is-selected/);
   assert.doesNotMatch(markup, /camera\.command|control\.command|graphics\./);
 });

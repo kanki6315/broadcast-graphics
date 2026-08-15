@@ -12,13 +12,13 @@ export function BattleWatch({
   intelligence,
   drivers,
   classId,
-  selectedCarIdx,
-  onSelectCar = () => {},
+  selectedCarIdx = null,
+  onSelectCar,
 }: {
   intelligence: RaceIntelligenceSnapshot | null | undefined;
   drivers: DriverState[];
   classId: number | "all";
-  selectedCarIdx: number | null;
+  selectedCarIdx?: number | null;
   onSelectCar?: (carIdx: number) => void;
 }) {
   const byCar = new Map(drivers.map((driver) => [driver.carIdx, driver]));
@@ -32,11 +32,12 @@ export function BattleWatch({
       <div>
         {battles.map((battle: BattleSummary) => {
           const [ahead, chasing] = battle.carIdxs.map((carIdx) => byCar.get(carIdx));
-          return <button type="button" key={battle.id} className={battle.carIdxs.includes(selectedCarIdx ?? -1) ? "is-selected" : ""} disabled={!ahead || !chasing} onClick={() => chasing && onSelectCar(chasing.carIdx)} title={`${battle.quality} · ${battle.windowSeconds.toFixed(1)} second window`}>
+          const Tag = onSelectCar ? "button" : "div";
+          return <Tag type={onSelectCar ? "button" : undefined} key={battle.id} className={`battle-watch-item${onSelectCar && battle.carIdxs.includes(selectedCarIdx ?? -1) ? " is-selected" : ""}`} disabled={onSelectCar ? !ahead || !chasing : undefined} onClick={onSelectCar ? () => chasing && onSelectCar(chasing.carIdx) : undefined} title={`${battle.quality} · ${battle.windowSeconds.toFixed(1)} second window`}>
             <span><b>#{ahead?.carNumber ?? "--"}</b><i /> <b>#{chasing?.carNumber ?? "--"}</b></span>
             <strong>{battle.currentGap == null ? "--" : `${battle.currentGap.toFixed(3)}s`}</strong>
             <small>{trendIcon(battle.direction)}{battle.direction ?? battle.quality}</small>
-          </button>;
+          </Tag>;
         })}
         {battles.length === 0 && <p>Waiting for a stable same-class gap window.</p>}
       </div>

@@ -3,9 +3,10 @@
 .track-ribbon-label { color: var(--muted); font: 600 12px var(--display); text-transform: uppercase; letter-spacing: .065em; }
 .track-ribbon-line { position: relative; height: 32px; margin-inline: 14px; border-block: 2px solid var(--ink); background: rgba(184, 194, 189, .2); }
 .track-ribbon-line::after { content: ""; position: absolute; inset: -2px auto -2px 0; width: 3px; background: var(--orange); }
-.track-ribbon button { --class-color: var(--muted); min-width: 34px; height: 28px; border: 2px solid var(--class-color); border-radius: 0; padding: 0 5px; background: var(--stock); color: var(--ink); font: 700 13px var(--display); cursor: pointer; }
+.track-ribbon button, .track-ribbon-car { --class-color: var(--muted); min-width: 34px; height: 28px; display: inline-grid; place-items: center; border: 2px solid var(--class-color); border-radius: 0; padding: 0 5px; background: var(--stock); color: var(--ink); font: 700 13px var(--display); }
+.track-ribbon button { cursor: pointer; }
 .track-ribbon button:hover, .track-ribbon button:focus-visible { background: var(--inspection); }
-.track-ribbon-line button { position: absolute; top: 50%; translate: -50% -50%; z-index: 1; }
+.track-ribbon-line button, .track-ribbon-line .track-ribbon-car { position: absolute; top: 50%; translate: -50% -50%; z-index: 1; }
 .track-ribbon button.is-selected { outline: 3px solid var(--orange); outline-offset: 1px; z-index: 2; }
 .track-ribbon-pits > div { display: flex; gap: 4px; min-width: 110px; }
 .track-ribbon button.is-nearby { background: color-mix(in srgb, var(--class-color) 18%, var(--stock)); }
@@ -19,7 +20,7 @@
 .track-ribbon-header span { display: inline-flex; align-items: center; gap: 5px; }
 .track-ribbon-header i { width: 9px; height: 9px; background: var(--class-color); }
 .track-ribbon.variant-commentator .track-ribbon-line { height: 36px; }
-.track-ribbon.variant-commentator button { height: 28px; min-width: 32px; font-size: 12px; }
+.track-ribbon.variant-commentator button, .track-ribbon.variant-commentator .track-ribbon-car { height: 28px; min-width: 32px; font-size: 12px; }
 @media (max-width: 900px) {
   .track-ribbon.variant-commentator { grid-template-columns: 1fr; }
   .track-ribbon.variant-commentator .track-ribbon-pits { grid-column: 1; }

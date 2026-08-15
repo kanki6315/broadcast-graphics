@@ -136,8 +136,6 @@ export function sortByOverallPosition(drivers: DriverState[]): DriverState[] {
 
 export interface CommentatorTimingTableProps {
   drivers: DriverState[];
-  selectedCarIdx: number | null;
-  nearbyCarIdxs: ReadonlySet<number>;
   expandedCarIdxs: ReadonlySet<number>;
   visibleColumns: ReadonlySet<CommentatorColumn>;
   groupByClass: boolean;
@@ -145,7 +143,6 @@ export interface CommentatorTimingTableProps {
   stints?: DriverStintSummary[];
   gapTrends?: GapTrend[];
   pitCycles?: PitCycleSummary[];
-  onSelectCar: (carIdx: number) => void;
   onToggleExpanded: (carIdx: number) => void;
 }
 
@@ -301,8 +298,6 @@ function PitVisitDetail({ driver }: { driver: DriverState }) {
 
 export function CommentatorTimingTable({
   drivers,
-  selectedCarIdx,
-  nearbyCarIdxs,
   expandedCarIdxs,
   visibleColumns,
   groupByClass,
@@ -310,7 +305,6 @@ export function CommentatorTimingTable({
   stints = [],
   gapTrends = [],
   pitCycles = [],
-  onSelectCar,
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
   let previousClassId: number | null = null;
@@ -336,8 +330,6 @@ export function CommentatorTimingTable({
           {drivers.map((driver) => {
             const showClassHeader = groupByClass && driver.classId !== previousClassId;
             previousClassId = driver.classId;
-            const selected = driver.carIdx === selectedCarIdx;
-            const nearby = nearbyCarIdxs.has(driver.carIdx);
             const expanded = expandedCarIdxs.has(driver.carIdx);
             const status = driverStatus(driver);
             const stint = stints.find((candidate) => candidate.carIdx === driver.carIdx);
@@ -351,18 +343,8 @@ export function CommentatorTimingTable({
               ) : null,
               <tr
                 key={driver.carIdx}
-                className={`${selected ? "is-selected" : ""}${nearby ? " is-nearby" : ""}`}
-                onClick={() => onSelectCar(driver.carIdx)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  onSelectCar(driver.carIdx);
-                }}
-                tabIndex={0}
-                aria-label={`Follow ${driver.name}, class position ${driver.classPosition}`}
-                aria-current={selected ? "true" : undefined}
               >
-                <td className="position-cell" aria-expanded={expanded} title={`${expanded ? "Hide" : "Show"} timing detail`} onClick={(event) => { event.stopPropagation(); onToggleExpanded(driver.carIdx); }}><span><strong>{driver.position}</strong><small className="class-position" style={{ "--class-color": driver.classColor } as CSSProperties}>C{driver.classPosition}</small></span></td>
+                <td className="position-cell" aria-expanded={expanded} title={`${expanded ? "Hide" : "Show"} timing detail`} onClick={() => onToggleExpanded(driver.carIdx)}><span><strong>{driver.position}</strong><small className="class-position" style={{ "--class-color": driver.classColor } as CSSProperties}>C{driver.classPosition}</small></span></td>
                 <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small><span className="team-name">{driver.team}</span><span className="driver-class-name">{driver.className}</span></small></span></td>
                 {visibleColumns.has("change") && <td className="change-cell"><span>{positionDelta(driver.positionChange)}<small>overall</small></span><span>{positionDelta(driver.classPositionChange)}<small>class</small></span></td>}
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
