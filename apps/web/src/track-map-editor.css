@@ -70,8 +70,16 @@
 .calibration-bed { stroke: var(--stock); stroke-width: 11; }
 .calibration-line { stroke: var(--ink); stroke-width: 4; }
 .start-finish-reference { fill: none; stroke: var(--orange); stroke-width: 3; stroke-linecap: square; vector-effect: non-scaling-stroke; pointer-events: none; }
-.percentage-marker circle { fill: var(--stock); stroke: var(--muted); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.percentage-marker text { fill: var(--muted); font: 700 7px var(--display); text-anchor: middle; paint-order: stroke; stroke: var(--stock); stroke-width: 2px; }
+.direction-marker { pointer-events: none; }
+.direction-marker path { fill: var(--orange); stroke: var(--ink); stroke-width: .28; stroke-linejoin: round; }
+.percentage-marker { pointer-events: none; }
+.percentage-marker line { stroke: var(--ink); stroke-width: .3; }
+.percentage-marker circle { fill: var(--orange); stroke: var(--ink); stroke-width: .28; }
+.percentage-marker rect { fill: var(--ink); stroke: var(--stock); stroke-width: .18; }
+.percentage-marker text { fill: var(--stock); font: 700 1.45px var(--display); text-anchor: middle; letter-spacing: .04em; }
+.percentage-marker.is-start circle { fill: var(--stock); stroke: var(--orange); stroke-width: .42; }
+.percentage-marker.is-start rect { fill: var(--orange); stroke: var(--ink); }
+.percentage-marker.is-start text { fill: var(--ink); }
 .start-finish-status { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border-bottom: 1px solid var(--ink); padding: 7px 0; }
 .start-finish-status > div { min-width: 0; }
 .start-finish-status strong, .start-finish-status span { display: block; }
@@ -90,10 +98,12 @@
 .calibration-controls { display: grid; grid-template-columns: .7fr 1fr .7fr; gap: 8px; margin-top: 8px; }
 .calibration-controls > label:first-child { border-block: 1px solid var(--ink); padding: 5px; }
 .calibration-controls output { display: block; margin-top: 2px; font: 700 13px var(--display); }
-.calibration-controls fieldset { display: flex; align-items: center; gap: 8px; margin: 0; border: 1px solid var(--ink); padding: 4px 7px; }
+.calibration-controls fieldset { display: flex; align-items: center; gap: 5px; margin: 0; border: 1px solid var(--ink); padding: 4px 7px; }
 .calibration-controls legend { padding: 0 3px; color: var(--muted); font: 700 8px var(--display); text-transform: uppercase; }
-.calibration-controls fieldset label { font-size: 10px; }
-.calibration-controls input[type="radio"] { accent-color: var(--orange); }
+.direction-choice label { min-height: 27px; display: grid; place-items: center; flex: 1; border: 1px solid var(--paper-line); font: 700 9px var(--display); text-transform: uppercase; cursor: pointer; }
+.direction-choice label:has(input:checked) { border-color: var(--ink); background: var(--orange); }
+.direction-choice label:focus-within { outline: 2px solid var(--orange); outline-offset: 1px; }
+.direction-choice input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .config-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .config-actions button, .config-primary, .sector-toolbar button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--ink); border-radius: 0; padding: 5px 9px; background: var(--stock); color: var(--ink); font: 700 10px var(--display); text-transform: uppercase; }
 .config-actions button svg, .config-primary svg, .sector-toolbar button svg { width: 14px; height: 14px; }
