@@ -78,7 +78,7 @@ test("telemetry retains the latest results snapshot for each session type", () =
 
 test("live state projects immutable race-start positions and deltas", () => {
   const store = new StateStore();
-  const starting = { ...session, drivers: [{ ...session.drivers[0], position: 4, classPosition: 3, lapsCompleted: 0, currentLap: 1 }] };
+  const starting = { ...session, phase: "parade-laps" as const, drivers: [{ ...session.drivers[0], position: 4, classPosition: 3, lapsCompleted: 0, currentLap: 1 }] };
   const moved = { ...session, drivers: [{ ...session.drivers[0], position: 2, classPosition: 1, lapsCompleted: 2, currentLap: 3, userId: 999 }] };
 
   store.telemetry(starting);

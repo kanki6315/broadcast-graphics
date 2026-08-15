@@ -68,7 +68,7 @@ Rows should emphasize nearby class competitors and active battles. Selecting a r
 
 ### Position change
 
-- Capture each entry's starting position and starting class position once the race start is established.
+- Track each entry's latest valid gridding/pre-race overall and class position, then freeze that baseline before racing begins.
 - Derive overall and class positions gained or lost from those immutable starting values.
 - Do not reset the baseline during a reconnect or driver change.
 - Mark the value unavailable if the server joined too late to establish a trustworthy baseline.
