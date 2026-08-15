@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { lapPctToPathPct, pathPctToLapPct, pointForLapPct, projectToPath, type PathLengthReader } from "./track-map-geometry";
+import { lapPctToPathPct, pathPctToLapPct, pointAndHeadingForLapPct, pointForLapPct, projectToPath, type PathLengthReader } from "./track-map-geometry";
 
 const forward = { startFinishPathPct: 0.25, direction: "forward" as const };
 const reverse = { startFinishPathPct: 0.25, direction: "reverse" as const };
@@ -14,6 +14,11 @@ test("browser geometry applies start offset, direction and inverse mapping", () 
   assert.ok(Math.abs(lapPctToPathPct(.1, reverse) - .15) < 1e-12);
   assert.ok(Math.abs(pathPctToLapPct(.15, reverse) - .1) < 1e-12);
   assert.deepEqual(pointForLapPct(line, .25, forward), { x: 50, y: 0 });
+});
+
+test("browser geometry exposes the selected travel heading", () => {
+  assert.equal(pointAndHeadingForLapPct(line, .5, { startFinishPathPct: 0, direction: "forward" }).angleDegrees, 0);
+  assert.equal(pointAndHeadingForLapPct(line, .5, { startFinishPathPct: 0, direction: "reverse" }).angleDegrees, 180);
 });
 
 test("browser geometry projects view-box points back to calibrated lap percentage", () => {

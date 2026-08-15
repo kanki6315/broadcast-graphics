@@ -24,6 +24,13 @@ export function pointForLapPct(path: PathLengthReader, lapPct: number, calibrati
   return path.getPointAtLength(lapPctToPathPct(lapPct, calibration) * length);
 }
 
+export function pointAndHeadingForLapPct(path: PathLengthReader, lapPct: number, calibration: Pick<TrackMapCalibration, "startFinishPathPct" | "direction">): MapPoint & { angleDegrees: number } {
+  const point = pointForLapPct(path, lapPct, calibration);
+  const before = pointForLapPct(path, wrapPct(lapPct - 0.0025), calibration);
+  const after = pointForLapPct(path, wrapPct(lapPct + 0.0025), calibration);
+  return { ...point, angleDegrees: Math.atan2(after.y - before.y, after.x - before.x) * 180 / Math.PI };
+}
+
 /** Bounded nearest-point projection in SVG view-box coordinates. */
 export function projectToPath(path: PathLengthReader, target: MapPoint, calibration: Pick<TrackMapCalibration, "startFinishPathPct" | "direction">): { point: MapPoint; pathPct: number; lapPct: number } {
   const length = path.getTotalLength();
