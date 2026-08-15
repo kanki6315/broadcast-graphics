@@ -28,11 +28,18 @@ function session(currentDriver: DriverState): SessionState {
   };
 }
 
-test("captures and preserves immutable starting positions for older clients", () => {
+test("captures the latest pre-race grid and freezes it before the rolling start", () => {
   const projection = new RaceStateProjection();
-  const start = projection.apply(session(driver()));
+  const warmup = session(driver({ position: 5, classPosition: 4 }));
+  warmup.phase = "warmup";
+  const parade = session(driver());
+  parade.phase = "parade-laps";
+  projection.apply(warmup);
+  const grid = projection.apply(parade);
+  const start = projection.apply(session(driver({ position: 3, classPosition: 2 })));
   const moved = projection.apply(session(driver({ position: 2, classPosition: 1, lapsCompleted: 2, currentLap: 3, userId: 99 })));
 
+  assert.equal(grid.drivers[0]?.startingPosition, 4);
   assert.equal(start.drivers[0]?.startingPosition, 4);
   assert.equal(moved.drivers[0]?.startingPosition, 4);
   assert.equal(moved.drivers[0]?.startingClassPosition, 3);
@@ -42,6 +49,9 @@ test("captures and preserves immutable starting positions for older clients", ()
 
 test("position change survives a disconnect, reconnect, and driver change", () => {
   const projection = new RaceStateProjection();
+  const grid = session(driver());
+  grid.phase = "parade-laps";
+  projection.apply(grid);
   const start = projection.apply(session(driver()));
   const missing = projection.apply(session(driver({
     position: 3,
@@ -70,7 +80,9 @@ test("position change survives a disconnect, reconnect, and driver change", () =
 
 test("position baseline survives a projection restart", () => {
   const before = new RaceStateProjection();
-  before.apply(session(driver()));
+  const grid = session(driver());
+  grid.phase = "parade-laps";
+  before.apply(grid);
   const checkpoint = before.checkpoint()!;
   const after = new RaceStateProjection();
   after.restore(checkpoint);

@@ -18,17 +18,21 @@ internal sealed class RacePositionTracker
         }
 
         if (!string.Equals(sessionType, "race", StringComparison.Ordinal)) return drivers.ToArray();
-        var classified = drivers.Where(driver => driver.Position > 0).ToArray();
-        var trustworthyStart = string.Equals(phase, "racing", StringComparison.Ordinal) &&
-            classified.Length > 0 && classified.All(driver => driver.LapsCompleted == 0 && driver.CurrentLap <= 1);
+        var isPreRace = phase is "get-in-car" or "warmup" or "parade-laps";
 
         return drivers.Select(driver =>
         {
+            if (isPreRace && driver.Position > 0)
+            {
+                var gridPosition = new PositionBaseline(
+                    driver.Position,
+                    driver.ClassPosition > 0 ? driver.ClassPosition : null);
+                baselines[driver.CarIdx] = gridPosition;
+            }
+
             if (!baselines.TryGetValue(driver.CarIdx, out var baseline))
             {
-                baseline = trustworthyStart && driver.Position > 0
-                    ? new PositionBaseline(driver.Position, driver.ClassPosition > 0 ? driver.ClassPosition : null)
-                    : new PositionBaseline(null, null);
+                baseline = new PositionBaseline(null, null);
                 baselines[driver.CarIdx] = baseline;
             }
 

@@ -5,14 +5,18 @@ namespace RaceControl.TelemetryClient;
 public sealed class RacePositionTrackerTests
 {
     [Fact]
-    public void CapturesRaceStartOnceAndDerivesPositiveGains()
+    public void CapturesLatestPreRaceGridAndFreezesItBeforeTheRollingStart()
     {
         var tracker = new RacePositionTracker();
-        var start = tracker.Apply("race", "race", "racing", [Driver(4, 3, 0)]);
+        tracker.Apply("race", "race", "warmup", [Driver(5, 4, 0)]);
+        var grid = tracker.Apply("race", "race", "parade-laps", [Driver(4, 3, 0)]);
+        var start = tracker.Apply("race", "race", "racing", [Driver(3, 2, 0)]);
         var moved = tracker.Apply("race", "race", "racing", [Driver(2, 1, 2)]);
 
+        Assert.Equal(4, grid[0].StartingPosition);
         Assert.Equal(4, start[0].StartingPosition);
         Assert.Equal(3, start[0].StartingClassPosition);
+        Assert.Equal(1, start[0].PositionChange);
         Assert.Equal(2, moved[0].PositionChange);
         Assert.Equal(2, moved[0].ClassPositionChange);
     }

@@ -31,27 +31,27 @@ export class RaceStateProjection {
     }
 
     if (session.type !== "race") return session;
-    const classified = session.drivers.filter((driver) => driver.position > 0);
-    const trustworthyStart = session.phase === "racing"
-      && classified.length > 0
-      && classified.every((driver) => driver.lapsCompleted === 0 && driver.currentLap <= 1);
+    const isPreRace = ["get-in-car", "warmup", "parade-laps"].includes(session.phase);
 
     return {
       ...session,
-      drivers: session.drivers.map((driver) => this.projectDriver(driver, trustworthyStart)),
+      drivers: session.drivers.map((driver) => this.projectDriver(driver, isPreRace)),
     };
   }
 
-  private projectDriver(driver: DriverState, trustworthyStart: boolean): DriverState {
+  private projectDriver(driver: DriverState, isPreRace: boolean): DriverState {
     let baseline = this.baselines.get(driver.carIdx);
+    if (isPreRace && driver.position > 0) {
+      baseline = {
+        overall: driver.position,
+        class: driver.classPosition > 0 ? driver.classPosition : null,
+      };
+      this.baselines.set(driver.carIdx, baseline);
+    }
     if (!baseline) {
       baseline = {
-        overall: Object.hasOwn(driver, "startingPosition")
-          ? driver.startingPosition ?? null
-          : trustworthyStart && driver.position > 0 ? driver.position : null,
-        class: Object.hasOwn(driver, "startingClassPosition")
-          ? driver.startingClassPosition ?? null
-          : trustworthyStart && driver.classPosition > 0 ? driver.classPosition : null,
+        overall: driver.startingPosition ?? null,
+        class: driver.startingClassPosition ?? null,
       };
       this.baselines.set(driver.carIdx, baseline);
     }
