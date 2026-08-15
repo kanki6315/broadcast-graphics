@@ -25,6 +25,7 @@ internal sealed class TrackTimingTracker
     private string? definitionRevision;
     private double lastSessionTime = double.NegativeInfinity;
     private SectorDefinition? definition;
+    private bool comparisonsDirty;
 
     public void Observe(
         string currentSessionId,
@@ -40,6 +41,7 @@ internal sealed class TrackTimingTracker
         {
             cars.Clear();
             sessionId = currentSessionId;
+            comparisonsDirty = false;
         }
 
         definition = sectorDefinition;
@@ -194,7 +196,7 @@ internal sealed class TrackTimingTracker
                 }
 
                 var lapNumber = (int)Math.Floor(start.AbsoluteDistance) + 1;
-                Upsert(history.Completed, new CompletedSector(
+                comparisonsDirty |= Upsert(history.Completed, new CompletedSector(
                     driver.CarIdx,
                     lapNumber,
                     start.SectorNumber,
@@ -239,17 +241,32 @@ internal sealed class TrackTimingTracker
         {
             var result = history.Completed[index];
             if (result.LapNumber == lap && result.DefinitionRevision == definition.Revision)
+            {
                 history.Completed[index] = result with { Value = null, Quality = "invalid", Reason = "definition-mismatch", Comparisons = null };
+                comparisonsDirty = true;
+            }
         }
     }
 
     private void RefreshComparisons(IReadOnlyList<DriverState> drivers)
     {
-        if (definition is null) return;
+        if (definition is null || !comparisonsDirty) return;
         var classByCar = drivers.ToDictionary(driver => driver.CarIdx, driver => driver.ClassId);
         var all = cars.Values.SelectMany(history => history.Completed)
             .Where(result => result.DefinitionRevision == definition.Revision && result.Quality == "valid" && result.Value is not null)
             .ToArray();
+        var personalBest = new Dictionary<(int CarIdx, int SectorNumber), double>();
+        var classBest = new Dictionary<(int ClassId, int SectorNumber), double>();
+        var overallBest = new Dictionary<int, double>();
+        foreach (var result in all)
+        {
+            var value = result.Value!.Value;
+            UpdateMinimum(personalBest, (result.CarIdx, result.SectorNumber), value);
+            if (classByCar.TryGetValue(result.CarIdx, out var classId))
+                UpdateMinimum(classBest, (classId, result.SectorNumber), value);
+            UpdateMinimum(overallBest, result.SectorNumber, value);
+        }
+
         foreach (var history in cars.Values)
         {
             for (var index = 0; index < history.Completed.Count; index++)
@@ -257,21 +274,23 @@ internal sealed class TrackTimingTracker
                 var result = history.Completed[index];
                 if (result.Quality != "valid" || result.Value is null || result.DefinitionRevision != definition.Revision) continue;
                 var comparisons = new List<string>();
-                if (IsFastest(result, all.Where(candidate => candidate.CarIdx == result.CarIdx))) comparisons.Add("personal-best");
+                if (MatchesMinimum(personalBest, (result.CarIdx, result.SectorNumber), result.Value.Value)) comparisons.Add("personal-best");
                 if (classByCar.TryGetValue(result.CarIdx, out var classId) &&
-                    IsFastest(result, all.Where(candidate => classByCar.GetValueOrDefault(candidate.CarIdx) == classId))) comparisons.Add("class-fastest");
-                if (IsFastest(result, all)) comparisons.Add("overall-fastest");
+                    MatchesMinimum(classBest, (classId, result.SectorNumber), result.Value.Value)) comparisons.Add("class-fastest");
+                if (MatchesMinimum(overallBest, result.SectorNumber, result.Value.Value)) comparisons.Add("overall-fastest");
                 history.Completed[index] = result with { Comparisons = comparisons };
             }
         }
+        comparisonsDirty = false;
     }
 
-    private static bool IsFastest(CompletedSector result, IEnumerable<CompletedSector> candidates)
+    private static void UpdateMinimum<TKey>(Dictionary<TKey, double> minima, TKey key, double value) where TKey : notnull
     {
-        var fastest = candidates.Where(candidate => candidate.SectorNumber == result.SectorNumber)
-            .MinBy(candidate => candidate.Value);
-        return fastest?.Value is not null && Math.Abs(fastest.Value.Value - result.Value!.Value) < 0.000_5;
+        if (!minima.TryGetValue(key, out var current) || value < current) minima[key] = value;
     }
+
+    private static bool MatchesMinimum<TKey>(Dictionary<TKey, double> minima, TKey key, double value) where TKey : notnull =>
+        minima.TryGetValue(key, out var minimum) && Math.Abs(minimum - value) < 0.000_5;
 
     private static IEnumerable<BoundaryCrossing> BoundariesBetween(double before, double after, IReadOnlyList<SectorBoundary> boundaries)
     {
@@ -324,13 +343,18 @@ internal sealed class TrackTimingTracker
         if (removeCount > 0) samples.RemoveRange(0, removeCount);
     }
 
-    private static void Upsert(List<CompletedSector> results, CompletedSector result)
+    private static bool Upsert(List<CompletedSector> results, CompletedSector result)
     {
         var index = results.FindIndex(existing => existing.LapNumber == result.LapNumber &&
             existing.SectorNumber == result.SectorNumber && existing.DefinitionRevision == result.DefinitionRevision);
-        if (index >= 0) results[index] = result;
+        if (index >= 0)
+        {
+            if (results[index] == result) return false;
+            results[index] = result;
+        }
         else results.Add(result);
         if (results.Count > 128) results.RemoveRange(0, results.Count - 128);
+        return true;
     }
 
     private static double? RaceDistance(DriverState driver) =>

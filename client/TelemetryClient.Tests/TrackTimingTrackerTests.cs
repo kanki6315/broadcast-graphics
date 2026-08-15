@@ -39,6 +39,49 @@ public sealed class TrackTimingTrackerTests
         Assert.All(timing.BestSectors!, sector => Assert.Contains("personal-best", sector.Comparisons!));
     }
 
+    [Fact]
+    public void IndexesPersonalClassAndOverallFastestSectorsOnlyWhenResultsChange()
+    {
+        var tracker = new TrackTimingTracker();
+        var drivers = new[]
+        {
+            Driver(0, 1, .95) with { ClassId = 1 },
+            Driver(1, 1, .95) with { ClassId = 1 },
+            Driver(2, 1, .95) with { ClassId = 2 }
+        };
+        tracker.Observe("race", 0, drivers, ThreeSectors);
+        tracker.Observe("race", 1,
+        [
+            drivers[0] with { CurrentLap = 2, LapDistPct = .05 },
+            drivers[1] with { CurrentLap = 2, LapDistPct = .02 },
+            drivers[2] with { CurrentLap = 2, LapDistPct = .01 }
+        ], ThreeSectors);
+        tracker.Observe("race", 2.5,
+        [
+            drivers[0] with { CurrentLap = 2, LapDistPct = .35 },
+            drivers[1] with { CurrentLap = 2, LapDistPct = .35 },
+            drivers[2] with { CurrentLap = 2, LapDistPct = .35 }
+        ], ThreeSectors);
+
+        var car0 = Assert.Single(tracker.GetCompletedSectorTimes(0));
+        var car1 = Assert.Single(tracker.GetCompletedSectorTimes(1));
+        var car2 = Assert.Single(tracker.GetCompletedSectorTimes(2));
+        Assert.Equal(["personal-best"], car0.Comparisons);
+        Assert.Equal(["personal-best", "class-fastest"], car1.Comparisons);
+        Assert.Equal(["personal-best", "class-fastest", "overall-fastest"], car2.Comparisons);
+
+        tracker.Observe("race", 2.6,
+        [
+            drivers[0] with { CurrentLap = 2, LapDistPct = .36 },
+            drivers[1] with { CurrentLap = 2, LapDistPct = .36 },
+            drivers[2] with { CurrentLap = 2, LapDistPct = .36 }
+        ], ThreeSectors);
+
+        Assert.Same(car0, Assert.Single(tracker.GetCompletedSectorTimes(0)));
+        Assert.Same(car1, Assert.Single(tracker.GetCompletedSectorTimes(1)));
+        Assert.Same(car2, Assert.Single(tracker.GetCompletedSectorTimes(2)));
+    }
+
     [Theory]
     [InlineData("missing")]
     [InlineData("lap-jump")]
