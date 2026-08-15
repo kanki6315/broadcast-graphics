@@ -203,7 +203,7 @@ test("Battle Watch filters shared candidates by class and contains no control co
       { id: "tcr", classId: 2, className: "TCR", carIdxs: [3, 4], currentGap: .8, lapDeficit: 0, windowSeconds: 12, direction: "opening", quality: "valid" },
     ], gapTrends: [], pitCycles: [], pitStops: [], stints: [], qualityWarnings: [],
   };
-  const markup = renderToStaticMarkup(<BattleWatch intelligence={intelligence} drivers={drivers} classId={2} selectedCarIdx={3} />);
+  const markup = renderToStaticMarkup(<BattleWatch intelligence={intelligence} drivers={drivers} classId={2} />);
   assert.match(markup, /#3/);
   assert.match(markup, /#4/);
   assert.doesNotMatch(markup, /#1/);
