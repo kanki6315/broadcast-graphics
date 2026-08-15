@@ -22,6 +22,21 @@ public sealed class RacePositionTrackerTests
     }
 
     [Fact]
+    public void FallsBackToFirstTrustworthyLapZeroOrderWhenPreRacePositionsWereUnavailable()
+    {
+        var tracker = new RacePositionTracker();
+        tracker.Apply("race", "race", "parade-laps", [Driver(0, 0, 0) with { CurrentLap = 0 }]);
+
+        var start = tracker.Apply("race", "race", "racing", [Driver(4, 3, 0)]);
+        var moved = tracker.Apply("race", "race", "racing", [Driver(2, 1, 2)]);
+
+        Assert.Equal(4, start[0].StartingPosition);
+        Assert.Equal(3, start[0].StartingClassPosition);
+        Assert.Equal(2, moved[0].PositionChange);
+        Assert.Equal(2, moved[0].ClassPositionChange);
+    }
+
+    [Fact]
     public void LateJoinBaselineRemainsUnavailableAcrossReconnectAndDriverChange()
     {
         var tracker = new RacePositionTracker();

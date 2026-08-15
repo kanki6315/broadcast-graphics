@@ -47,6 +47,21 @@ test("captures the latest pre-race grid and freezes it before the rolling start"
   assert.equal(moved.drivers[0]?.classPositionChange, 2);
 });
 
+test("falls back to the first trustworthy lap-zero order when pre-race positions were unavailable", () => {
+  const projection = new RaceStateProjection();
+  const preRace = session(driver({ position: 0, classPosition: 0, lapsCompleted: 0, currentLap: 0 }));
+  preRace.phase = "parade-laps";
+  projection.apply(preRace);
+
+  const start = projection.apply(session(driver({ position: 4, classPosition: 3, lapsCompleted: 0, currentLap: 1 })));
+  const moved = projection.apply(session(driver({ position: 2, classPosition: 1, lapsCompleted: 2, currentLap: 3 })));
+
+  assert.equal(start.drivers[0]?.startingPosition, 4);
+  assert.equal(start.drivers[0]?.startingClassPosition, 3);
+  assert.equal(moved.drivers[0]?.positionChange, 2);
+  assert.equal(moved.drivers[0]?.classPositionChange, 2);
+});
+
 test("position change survives a disconnect, reconnect, and driver change", () => {
   const projection = new RaceStateProjection();
   const grid = session(driver());
