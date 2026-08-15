@@ -194,7 +194,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   }, undefined)?.carIdx;
   const isSimulated = session?.sourceMode === "simulation";
   const showClassGaps = classes.length > 1 || new Set(session?.drivers.map((driver) => driver.classId)).size > 1;
-  const displayedColumnCount = 2 + [...visibleColumns].filter((column) => showClassGaps || (column !== "gap" && column !== "interval")).length;
+  const displayedColumnCount = 2 + visibleColumns.size;
   const intelligence = state.intelligence;
   const warningCarIdxs = new Set(filteredDrivers.map((driver) => driver.carIdx));
   const driversByCarIdx = new Map(filteredDrivers.map((driver) => [driver.carIdx, driver]));
@@ -262,9 +262,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
               <summary><Columns3 aria-hidden="true" />Columns <span>{displayedColumnCount}</span></summary>
               <fieldset>
                 <legend>Visible timing groups</legend>
-                {(Object.keys(commentatorColumnLabels) as CommentatorColumn[])
-                  .filter((column) => showClassGaps || (column !== "gap" && column !== "interval"))
-                  .map((column) => (
+                {(Object.keys(commentatorColumnLabels) as CommentatorColumn[]).map((column) => (
                   <label key={column}><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => toggleColumn(column)} />{commentatorColumnLabels[column]}</label>
                 ))}
               </fieldset>

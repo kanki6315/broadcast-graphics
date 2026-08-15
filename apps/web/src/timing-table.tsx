@@ -382,7 +382,7 @@ export function CommentatorTimingTable({
   let previousClassId: number | null = null;
   const sectorNumbers = sectorNumbersForDrivers(drivers);
   const visibleSectorNumbers = sectorNumbers.length > 0 ? sectorNumbers : [1];
-  const baseColumnCount = [...visibleColumns].filter((column) => column !== "sectors" && (showClassGaps || (column !== "gap" && column !== "interval"))).length;
+  const baseColumnCount = [...visibleColumns].filter((column) => column !== "sectors").length;
   const columnCount = 2 + baseColumnCount + (visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0);
 
   return (
@@ -393,8 +393,8 @@ export function CommentatorTimingTable({
           <th className="driver-column">Driver / team</th>
           {visibleColumns.has("change") && <th className="change-column">Change</th>}
           {visibleColumns.has("lap") && <th className="lap-column">Lap</th>}
-          {showClassGaps && visibleColumns.has("gap") && <th className="gap-column">Class gap <small>to class leader</small></th>}
-          {showClassGaps && visibleColumns.has("interval") && <th className="interval-column">Class interval <small>to car ahead</small></th>}
+          {visibleColumns.has("gap") && <th className="gap-column">{showClassGaps ? "Class gap" : "Gap"} <small>to {showClassGaps ? "class " : ""}leader</small></th>}
+          {visibleColumns.has("interval") && <th className="interval-column">{showClassGaps ? "Class interval" : "Interval"} <small>to car ahead</small></th>}
           {visibleColumns.has("lapTimes") && <th className="lap-times-column">Lap times <small>last / best</small></th>}
           {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <th className="sector-column" key={sectorNumber}>Sector {sectorNumber}<small className="sector-column-head"><span>Current</span><span>Prev</span><span>Best</span></small></th>)}
           {visibleColumns.has("stint") && <th className="stint-column">Stint <small>time / laps</small></th>}
@@ -428,8 +428,8 @@ export function CommentatorTimingTable({
                 <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small><span className="team-name">{driver.team}</span><span className="driver-class-name">{driver.className}</span></small></span></td>
                 {visibleColumns.has("change") && <td className="change-cell"><span>{positionDelta(driver.positionChange)}<small>overall</small></span><span>{positionDelta(driver.classPositionChange)}<small>class</small></span></td>}
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
-                {showClassGaps && visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, true)}<small>{trend?.direction ?? "class"}</small></span></td>}
-                {showClassGaps && visibleColumns.has("interval") && <td className="single-value"><span>{intervalValue(driver, true)}<small>class</small></span></td>}
+                {visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, showClassGaps)}<small>{trend?.direction ?? (showClassGaps ? "class" : "overall")}</small></span></td>}
+                {visibleColumns.has("interval") && <td className="single-value"><span>{intervalValue(driver, showClassGaps)}<small>{showClassGaps ? "class" : "overall"}</small></span></td>}
                 {visibleColumns.has("lapTimes") && <td className="paired-value lap-time-pair"><span className={lastLapState.className} title={lastLapState.title}>{lapTimeValue(driver, "lastLap")}<small>{lastLapState.label}</small></span><span className={bestLapState.className} title={bestLapState.title}>{lapTimeValue(driver, "bestLap")}<small>{bestLapState.label}</small></span></td>}
                 {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <td className="sector-cell" key={sectorNumber}>{sectorColumnSummary(driver, sectorNumber)}</td>)}
                 {visibleColumns.has("stint") && <td className="stint-cell">{stintSummary(stint)}</td>}

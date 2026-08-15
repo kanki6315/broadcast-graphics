@@ -55,11 +55,15 @@ test("all-class timing orders cars by overall position", () => {
   assert.deepEqual(drivers.map((candidate) => candidate.carIdx), [1, 2, 3, 4, 5]);
 });
 
-test("class gaps replace overall gaps and disappear for single-class races", () => {
+test("class gaps replace overall gaps in multi-class races", () => {
   const current = driver({
+    gapToLeader: 2.75,
+    intervalToAhead: .75,
     classGapToLeader: 1.25,
     classIntervalToAhead: .5,
     timingQuality: {
+      gapToLeader: { source: "derived", quality: "valid" },
+      intervalToAhead: { source: "derived", quality: "valid" },
       classGapToLeader: { source: "derived", quality: "valid" },
       classIntervalToAhead: { source: "derived", quality: "valid" },
     },
@@ -71,13 +75,20 @@ test("class gaps replace overall gaps and disappear for single-class races", () 
   />);
   assert.match(multiClassMarkup, /Class gap/);
   assert.match(multiClassMarkup, /Class interval/);
-  assert.doesNotMatch(multiClassMarkup, /overall/i);
+  assert.match(multiClassMarkup, /1\.250s/);
+  assert.match(multiClassMarkup, /0\.500s/);
+  assert.doesNotMatch(multiClassMarkup, /2\.750s|0\.750s|overall/i);
 
   const singleClassMarkup = renderToStaticMarkup(<CommentatorTimingTable
     drivers={[current]} expandedCarIdxs={new Set()}
     visibleColumns={columns} groupByClass={false} showClassGaps={false} onToggleExpanded={() => {}}
   />);
-  assert.doesNotMatch(singleClassMarkup, /Class gap|Class interval/);
+  assert.match(singleClassMarkup, />Gap </);
+  assert.match(singleClassMarkup, />Interval </);
+  assert.match(singleClassMarkup, /2\.750s/);
+  assert.match(singleClassMarkup, /0\.750s/);
+  assert.match(singleClassMarkup, /overall/);
+  assert.doesNotMatch(singleClassMarkup, /Class gap|Class interval|1\.250s|0\.500s/);
 });
 
 test("each sector has its own current, previous, and best column", () => {
