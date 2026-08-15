@@ -137,6 +137,7 @@ export function sortByOverallPosition(drivers: DriverState[]): DriverState[] {
 
 export interface CommentatorTimingTableProps {
   drivers: DriverState[];
+  overallFastestCarIdx?: number;
   expandedCarIdxs: ReadonlySet<number>;
   visibleColumns: ReadonlySet<CommentatorColumn>;
   groupByClass: boolean;
@@ -199,6 +200,19 @@ function intervalValue(driver: DriverState, classValue: boolean) {
 
 function lapTimeValue(driver: DriverState, field: "lastLap" | "bestLap") {
   return qualityValue(driver[field], timingQuality(driver, field), formatLapTime);
+}
+
+function lapTimeState(driver: DriverState, field: "lastLap" | "bestLap", overallFastestCarIdx?: number) {
+  const value = driver[field];
+  const quality = timingQuality(driver, field)?.quality;
+  const available = value != null && Number.isFinite(value) && value > 0 && quality !== "invalid" && quality !== "incomplete";
+  const personalBest = available && (field === "bestLap" || (driver.lastLapNumber != null && driver.lastLapNumber === driver.bestLapNumber));
+  const overallFastest = personalBest && driver.carIdx === overallFastestCarIdx;
+  return {
+    className: overallFastest ? "is-overall-fastest" : personalBest ? "is-personal-best" : "",
+    label: overallFastest ? `${field === "lastLap" ? "last" : "best"} · fastest` : personalBest ? `${field === "lastLap" ? "last" : "best"} · PB` : field === "lastLap" ? "last" : "best",
+    title: overallFastest ? "Overall fastest lap" : personalBest ? "Personal best lap" : undefined,
+  };
 }
 
 function totalPitVisitTime(visit: Pick<PitStopSummary, "pitLaneTime" | "boxTime" | "unknownTime">): number {
@@ -313,6 +327,7 @@ function PitVisitDetail({ driver, pitStops }: { driver: DriverState; pitStops: P
 
 export function CommentatorTimingTable({
   drivers,
+  overallFastestCarIdx,
   expandedCarIdxs,
   visibleColumns,
   groupByClass,
@@ -354,6 +369,8 @@ export function CommentatorTimingTable({
             const latestPitStop = pitStops
               .filter((candidate) => candidate.carIdx === driver.carIdx)
               .sort((left, right) => right.pitEntryTime - left.pitEntryTime)[0];
+            const lastLapState = lapTimeState(driver, "lastLap", overallFastestCarIdx);
+            const bestLapState = lapTimeState(driver, "bestLap", overallFastestCarIdx);
             return [
               showClassHeader ? (
                 <tr className="class-divider" key={`class-${driver.classId}`} style={{ "--class-color": driver.classColor } as CSSProperties}>
@@ -369,7 +386,7 @@ export function CommentatorTimingTable({
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
                 {showClassGaps && visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, true)}<small>{trend?.direction ?? "class"}</small></span></td>}
                 {showClassGaps && visibleColumns.has("interval") && <td className="single-value"><span>{intervalValue(driver, true)}<small>class</small></span></td>}
-                {visibleColumns.has("lapTimes") && <td className="paired-value"><span>{lapTimeValue(driver, "lastLap")}<small>last</small></span><span>{lapTimeValue(driver, "bestLap")}<small>best</small></span></td>}
+                {visibleColumns.has("lapTimes") && <td className="paired-value lap-time-pair"><span className={lastLapState.className} title={lastLapState.title}>{lapTimeValue(driver, "lastLap")}<small>{lastLapState.label}</small></span><span className={bestLapState.className} title={bestLapState.title}>{lapTimeValue(driver, "bestLap")}<small>{bestLapState.label}</small></span></td>}
                 {visibleColumns.has("sectors") && <td className="sectors-cell">{sectorSummary(driver)}</td>}
                 {visibleColumns.has("stint") && <td className="stint-cell">{stintSummary(stint)}</td>}
                 {visibleColumns.has("pit") && <td className="pit-cell">{pitVisitSummary(driver, latestPitStop)}</td>}

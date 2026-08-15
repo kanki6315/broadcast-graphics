@@ -129,6 +129,10 @@
 .quality-value, .position-change { white-space: nowrap; font: 600 18px/1 "Source Sans 3", sans-serif; }
 .quality-value.has-marker::first-letter { color: var(--orange); }
 .quality-value.is-unavailable, .position-change.is-unknown { color: var(--muted); }
+.lap-time-pair > .is-personal-best .quality-value { color: #177344; font-weight: 700; }
+.lap-time-pair > .is-overall-fastest .quality-value { color: #7e3bd1; font-weight: 700; }
+.lap-time-pair > .is-personal-best small { color: #177344; font-weight: 700; }
+.lap-time-pair > .is-overall-fastest small { color: #7e3bd1; font-weight: 700; }
 .position-change.is-gain { color: #177344; }
 .position-change.is-loss { color: #a22b23; }
 .lap-cell { text-align: right; }
