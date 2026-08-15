@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { IracingTrackMapClient, maskIracingSecret, pathOnlyOfficialSvg, startFinishOnlyOfficialSvg } from "./iracing-track-map.js";
+import { centerlineOnlyOfficialSvg, IracingTrackMapClient, maskIracingSecret, pathOnlyOfficialSvg, startFinishOnlyOfficialSvg } from "./iracing-track-map.js";
 
 const credentials = { clientId: "Gantry", clientSecret: "secret", username: "Driver@Example.com", password: "password" };
-const svg = `<svg viewBox="0 0 100 100"><path id="active" d="M0 0 L100 0 L100 100 L0 100 Z"/></svg>`;
+const svg = `<svg viewBox="0 0 100 100"><path id="active" d="M0 0L100 0L100 100L0 100ZM10 10L10 90L90 90L90 10Z"/></svg>`;
 
 test("masks iRacing OAuth secrets with a normalized identifier", () => {
   assert.equal(maskIracingSecret("Anagram-tactics-FOOTING-OPACITY-SHONE-keenly", " John.West@iracing.com "), "KIhAi2ynNPWvJsebdluGaBaPTRaUACqTPDCfyUuv46Y=");
@@ -12,6 +12,13 @@ test("masks iRacing OAuth secrets with a normalized identifier", () => {
 test("reduces an official SVG layer to inert path-only markup", () => {
   const result = pathOnlyOfficialSvg(`<svg viewBox="0 0 10 10"><style>path{stroke:red}</style><script>alert(1)</script><path id="route" class="active" d="M0 0L10 0L10 10Z"/></svg>`);
   assert.equal(result, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path id="iracing-path-1" d="M0 0L10 0L10 10Z"/></svg>`);
+});
+
+test("derives a single centerline from iRacing's two-sided track ribbon", () => {
+  const result = centerlineOnlyOfficialSvg(svg);
+  assert.match(result, /<path id="iracing-centerline"/);
+  assert.match(result, /d="M5,5L/);
+  assert.match(result, /95,5/);
 });
 
 test("reduces transformed iRacing symbol artwork to an inert S/F line", () => {
@@ -46,7 +53,7 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
   const result = await client.getTrackMap({ trackId: 509, trackName: "Algarve" });
-  assert.match(result.svg, /<path id="iracing-path-1"/);
+  assert.match(result.svg, /<path id="iracing-centerline"/);
   assert.doesNotMatch(result.svg, /Content-Type/);
   assert.equal(result.sourceUrl, "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg");
   assert.match(result.startFinishSvg ?? "", /M45,-10L45,10/);
