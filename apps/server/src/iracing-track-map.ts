@@ -38,6 +38,7 @@ interface TrackAsset {
 
 export interface IracingTrackMapAsset {
   svg: string;
+  startFinishSvg?: string;
   sourceUrl: string;
   sourceVersion: string;
   originalFilename: string;
@@ -91,13 +92,13 @@ function assetForTrack(payload: unknown, trackId: number): TrackAsset | null {
   return Object.values(root).map(record).find((candidate) => Number(candidate?.track_id) === trackId) ?? null;
 }
 
-function mapUrl(asset: TrackAsset): URL | null {
+function mapLayerUrl(asset: TrackAsset, layerName: string): URL | null {
   const layers = record(asset.track_map_layers);
   const trackMap = typeof asset.track_map === "string" && asset.track_map.trim() ? officialImageUrl(asset.track_map) : null;
-  const activeLayer = typeof layers?.active === "string" && layers.active.trim() ? layers.active : null;
-  if (!activeLayer) return trackMap;
+  const layer = typeof layers?.[layerName] === "string" && layers[layerName].trim() ? layers[layerName] as string : null;
+  if (!layer) return layerName === "active" ? trackMap : null;
   if (!trackMap) throw new IracingTrackMapError("iRacing published a map layer without its base map URL.", "invalid-asset-url");
-  return validateOfficialImageUrl(new URL(activeLayer, trackMap));
+  return validateOfficialImageUrl(new URL(layer, trackMap));
 }
 
 function validateOfficialImageUrl(url: URL): URL {
@@ -242,7 +243,7 @@ export class IracingTrackMapClient {
     const trackId = Number(layout.trackId);
     const asset = assetForTrack(await this.dataPayload(), trackId);
     if (!asset) throw new IracingTrackMapError(`iRacing has no asset record for track layout ${trackId}.`, "asset-not-found", 404);
-    const sourceUrl = mapUrl(asset);
+    const sourceUrl = mapLayerUrl(asset, "active");
     if (!sourceUrl) throw new IracingTrackMapError(`iRacing does not publish an SVG map for track layout ${trackId}.`, "map-not-found", 404);
     const response = await this.fetch(sourceUrl, { headers: { Accept: "image/svg+xml, text/plain;q=0.8" } });
     if (!response.ok) throw new IracingTrackMapError(`The iRacing SVG map could not be downloaded (${response.status}).`, "map-download-failed", 502);
@@ -250,9 +251,25 @@ export class IracingTrackMapClient {
     if (Number.isFinite(declaredLength) && declaredLength > MAX_SVG_BYTES) throw new IracingTrackMapError("The iRacing SVG exceeds Gantry's 1 MB map limit.", "asset-too-large", 400);
     const svg = await response.text();
     if (Buffer.byteLength(svg, "utf8") > MAX_SVG_BYTES) throw new IracingTrackMapError("The iRacing SVG exceeds Gantry's 1 MB map limit.", "asset-too-large", 400);
+    let startFinishSvg: string | undefined;
+    try {
+      const startFinishUrl = mapLayerUrl(asset, "start-finish");
+      if (startFinishUrl) {
+        const markerResponse = await this.fetch(startFinishUrl, { headers: { Accept: "image/svg+xml, text/plain;q=0.8" } });
+        const declaredMarkerLength = Number(markerResponse.headers.get("content-length"));
+        if (markerResponse.ok && (!Number.isFinite(declaredMarkerLength) || declaredMarkerLength <= MAX_SVG_BYTES)) {
+          const markerSvg = await markerResponse.text();
+          if (Buffer.byteLength(markerSvg, "utf8") <= MAX_SVG_BYTES) {
+            try { startFinishSvg = pathOnlyOfficialSvg(markerSvg); }
+            catch { startFinishSvg = undefined; }
+          }
+        }
+      }
+    } catch { startFinishSvg = undefined; }
     const basename = sourceUrl.pathname.split("/").pop() || `track-${trackId}.svg`;
     return {
       svg: pathOnlyOfficialSvg(svg),
+      startFinishSvg,
       sourceUrl: sourceUrl.href,
       sourceVersion: createHash("sha256").update(svg).digest("hex").slice(0, 16),
       originalFilename: `iRacing-${trackId}-${basename}`.slice(0, 240),

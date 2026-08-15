@@ -24,10 +24,11 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
       "509": {
         track_id: 509,
         track_map: "https://images-static.iracing.com/img/tracks/map/algarve/gp/track-map.svg",
-        track_map_layers: { active: "active.svg" },
+        track_map_layers: { active: "active.svg", "start-finish": "start-finish.svg" },
       },
     });
     if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg") return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
+    if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/start-finish.svg") return new Response(`<svg viewBox="0 0 100 100"><path d="M45 -10L45 10"/></svg>`);
     return new Response("not found", { status: 404 });
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
@@ -35,6 +36,7 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
   assert.match(result.svg, /<path id="iracing-path-1"/);
   assert.doesNotMatch(result.svg, /Content-Type/);
   assert.equal(result.sourceUrl, "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg");
+  assert.match(result.startFinishSvg ?? "", /M45 -10L45 10/);
   assert.match(result.originalFilename, /^iRacing-509-/);
   const tokenBody = requests[0]?.init?.body as URLSearchParams;
   assert.equal(tokenBody.get("grant_type"), "password_limited");
