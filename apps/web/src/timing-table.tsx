@@ -256,9 +256,9 @@ function sectorColumnSummary(driver: DriverState, sectorNumber: number) {
   const best = driver.sectors?.bestSectors?.find((sector) => sector.sectorNumber === sectorNumber);
   return (
     <span className="sector-column-summary" title={supported ? undefined : "This producer does not report derived sectors"}>
-      <span><small>Current</small>{sectorValue(current)}</span>
-      <span><small>Prev</small>{sectorValue(previous)}</span>
-      <span><small>Best</small>{sectorValue(best)}</span>
+      <span>{sectorValue(current)}</span>
+      <span>{sectorValue(previous)}</span>
+      <span>{sectorValue(best)}</span>
     </span>
   );
 }
@@ -396,7 +396,7 @@ export function CommentatorTimingTable({
           {showClassGaps && visibleColumns.has("gap") && <th className="gap-column">Class gap <small>to class leader</small></th>}
           {showClassGaps && visibleColumns.has("interval") && <th className="interval-column">Class interval <small>to car ahead</small></th>}
           {visibleColumns.has("lapTimes") && <th className="lap-times-column">Lap times <small>last / best</small></th>}
-          {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <th className="sector-column" key={sectorNumber}>Sector {sectorNumber}<small>current / prev / best</small></th>)}
+          {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <th className="sector-column" key={sectorNumber}>Sector {sectorNumber}<small className="sector-column-head"><span>Current</span><span>Prev</span><span>Best</span></small></th>)}
           {visibleColumns.has("stint") && <th className="stint-column">Stint <small>time / laps</small></th>}
           {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / lap / total</small></th>}
           {visibleColumns.has("status") && <th className="status-column">Status</th>}
