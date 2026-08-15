@@ -34,6 +34,9 @@ public sealed class TrackTimingTrackerTests
         Assert.All(lap, sector => Assert.Equal("valid", sector.Quality));
         Assert.Equal([1, 2, 3], lap.Select(sector => sector.SectorNumber));
         AssertClose(8.0833, lap.Sum(sector => sector.Value));
+        var timing = Assert.IsType<DriverSectorTiming>(tracker.GetSectorTiming(0, 3));
+        Assert.Equal([1, 2, 3], timing.BestSectors!.Select(sector => sector.SectorNumber));
+        Assert.All(timing.BestSectors!, sector => Assert.Contains("personal-best", sector.Comparisons!));
     }
 
     [Theory]

@@ -39,7 +39,8 @@ public sealed record CompletedSector(
 public sealed record DriverSectorTiming(
     [property: JsonPropertyName("currentSectorNumber")] int? CurrentSectorNumber,
     [property: JsonPropertyName("currentLap")] IReadOnlyList<CompletedSector> CurrentLap,
-    [property: JsonPropertyName("previousLap")] IReadOnlyList<CompletedSector> PreviousLap);
+    [property: JsonPropertyName("previousLap")] IReadOnlyList<CompletedSector> PreviousLap,
+    [property: JsonPropertyName("bestSectors")] IReadOnlyList<CompletedSector>? BestSectors = null);
 
 public sealed record PitVisitTiming(
     [property: JsonPropertyName("pitEntryTime")] double PitEntryTime,

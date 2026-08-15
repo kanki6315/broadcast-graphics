@@ -127,6 +127,13 @@ export function sortByClassPosition(drivers: DriverState[]): DriverState[] {
       || left.carIdx - right.carIdx);
 }
 
+export function sortByOverallPosition(drivers: DriverState[]): DriverState[] {
+  return [...drivers].sort((left, right) =>
+    sortablePosition(left.position) - sortablePosition(right.position)
+      || sortablePosition(left.classPosition) - sortablePosition(right.classPosition)
+      || left.carIdx - right.carIdx);
+}
+
 export interface CommentatorTimingTableProps {
   drivers: DriverState[];
   selectedCarIdx: number | null;
@@ -134,6 +141,7 @@ export interface CommentatorTimingTableProps {
   expandedCarIdxs: ReadonlySet<number>;
   visibleColumns: ReadonlySet<CommentatorColumn>;
   groupByClass: boolean;
+  showClassGaps?: boolean;
   stints?: DriverStintSummary[];
   gapTrends?: GapTrend[];
   pitCycles?: PitCycleSummary[];
@@ -219,11 +227,27 @@ function sectorValue(sector: CompletedSector) {
   return <span key={`${sector.lapNumber}-${sector.sectorNumber}`} className={`sector-time${fastest ? " is-overall-fastest" : personal ? " is-personal-best" : ""}`} title={title}><small>S{sector.sectorNumber}</small>{unavailable ? "--" : `${marker}${sector.value!.toFixed(3)}`}</span>;
 }
 
+function sectorSet(label: string, sectors: CompletedSector[], sectorNumbers: number[]) {
+  const byNumber = new Map(sectors.map((sector) => [sector.sectorNumber, sector]));
+  return (
+    <span className="sector-set">
+      <small>{label}</small>
+      <span>{sectorNumbers.map((sectorNumber) => {
+        const sector = byNumber.get(sectorNumber);
+        return sector ? sectorValue(sector) : <span className="sector-time is-empty" key={sectorNumber}><small>S{sectorNumber}</small>--</span>;
+      })}</span>
+    </span>
+  );
+}
+
 function sectorSummary(driver: DriverState) {
   if (!Object.hasOwn(driver, "sectors")) return <span className="sector-empty" title="This producer does not report derived sectors">--</span>;
-  const sectors = driver.sectors?.previousLap ?? [];
-  if (sectors.length === 0) return <span className="sector-empty">--</span>;
-  return <span className="sector-summary">{sectors.map(sectorValue)}</span>;
+  const current = driver.sectors?.currentLap ?? [];
+  const previous = driver.sectors?.previousLap ?? [];
+  const best = driver.sectors?.bestSectors ?? [];
+  const sectorNumbers = [...new Set([...current, ...previous, ...best].map((sector) => sector.sectorNumber))].sort((left, right) => left - right);
+  if (sectorNumbers.length === 0) return <span className="sector-empty">--</span>;
+  return <span className="sector-summary">{sectorSet("Current", current, sectorNumbers)}{sectorSet("Previous", previous, sectorNumbers)}{sectorSet("Best", best, sectorNumbers)}</span>;
 }
 
 function formatDuration(seconds: number): string {
@@ -281,6 +305,7 @@ export function CommentatorTimingTable({
   expandedCarIdxs,
   visibleColumns,
   groupByClass,
+  showClassGaps = new Set(drivers.map((driver) => driver.classId)).size > 1,
   stints = [],
   gapTrends = [],
   pitCycles = [],
@@ -288,7 +313,7 @@ export function CommentatorTimingTable({
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
   let previousClassId: number | null = null;
-  const columnCount = 2 + visibleColumns.size;
+  const columnCount = 2 + [...visibleColumns].filter((column) => showClassGaps || (column !== "gap" && column !== "interval")).length;
 
   return (
     <div className="commentator-table-wrap">
@@ -298,10 +323,10 @@ export function CommentatorTimingTable({
           <th className="driver-column">Driver / team</th>
           {visibleColumns.has("change") && <th>Change</th>}
           {visibleColumns.has("lap") && <th>Lap</th>}
-          {visibleColumns.has("gap") && <th>Gap <small>overall / class</small></th>}
-          {visibleColumns.has("interval") && <th>Interval <small>overall / class</small></th>}
+          {showClassGaps && visibleColumns.has("gap") && <th>Class gap <small>to class leader</small></th>}
+          {showClassGaps && visibleColumns.has("interval") && <th>Class interval <small>to car ahead</small></th>}
           {visibleColumns.has("lapTimes") && <th>Lap times <small>last / best</small></th>}
-          {visibleColumns.has("sectors") && <th>Sectors <small>previous lap</small></th>}
+          {visibleColumns.has("sectors") && <th className="sectors-column">Sectors <small>current / previous / best</small></th>}
           {visibleColumns.has("stint") && <th>Stint <small>time / laps</small></th>}
           {visibleColumns.has("pit") && <th>Pit visit</th>}
           {visibleColumns.has("status") && <th>Status</th>}
@@ -340,10 +365,10 @@ export function CommentatorTimingTable({
                 <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small>{driver.team} · {driver.className}</small></span></td>
                 {visibleColumns.has("change") && <td className="change-cell"><span>{positionDelta(driver.positionChange)}<small>overall</small></span><span>{positionDelta(driver.classPositionChange)}<small>class</small></span></td>}
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
-                {visibleColumns.has("gap") && <td className="paired-value"><span>{gapValue(driver, false)}<small>overall</small></span><span>{gapValue(driver, true)}<small>class{trend?.direction ? ` · ${trend.direction}` : ""}</small></span></td>}
-                {visibleColumns.has("interval") && <td className="paired-value"><span>{intervalValue(driver, false)}<small>overall</small></span><span>{intervalValue(driver, true)}<small>class</small></span></td>}
+                {showClassGaps && visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, true)}<small>{trend?.direction ?? "class"}</small></span></td>}
+                {showClassGaps && visibleColumns.has("interval") && <td className="single-value"><span>{intervalValue(driver, true)}<small>class</small></span></td>}
                 {visibleColumns.has("lapTimes") && <td className="paired-value"><span>{lapTimeValue(driver, "lastLap")}<small>last</small></span><span>{lapTimeValue(driver, "bestLap")}<small>best</small></span></td>}
-                {visibleColumns.has("sectors") && <td>{sectorSummary(driver)}</td>}
+                {visibleColumns.has("sectors") && <td className="sectors-cell">{sectorSummary(driver)}</td>}
                 {visibleColumns.has("stint") && <td>{stintSummary(stint)}</td>}
                 {visibleColumns.has("pit") && <td>{pitVisitSummary(driver)}</td>}
                 {visibleColumns.has("status") && <td><span className={`commentator-status status-${driver.pitState ?? driver.trackStatus}`}>{status}</span></td>}
