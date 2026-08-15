@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Columns3, Flag, LineChart, LogOut, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
-import { isExpectedUnavailableTimingField, type DriverState } from "@racecontrol/protocol";
+import { isExpectedUnavailableTimingField, type CompletedSessionReview, type DriverState, type HistorySessionSummary } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
   defaultCommentatorColumns,
@@ -16,6 +16,8 @@ import { CircuitMap } from "./circuit-map";
 import { useTrackMap } from "./use-track-map";
 import { useGapHistory } from "./use-gap-history";
 import { GapVisualizer } from "./gap-visualizer";
+import { SessionReview } from "./session-review";
+import { timingJson } from "./timing-api";
 import "./commentator-timing.css";
 
 const preferencesKey = "gantry.commentator-timing.v1";
@@ -54,14 +56,52 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const [preferences, setPreferences] = useState<CommentatorPreferences>(loadPreferences);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [historySessions, setHistorySessions] = useState<HistorySessionSummary[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState("live");
+  const [sessionReview, setSessionReview] = useState<CompletedSessionReview | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const reviewingHistory = selectedSessionId !== "live";
   const mapResource = useTrackMap(state?.trackConfiguration?.activeMap);
   const gapHistory = useGapHistory(state?.session?.id);
+
+  useEffect(() => {
+    const eventId = state?.session?.externalSubSessionId;
+    let cancelled = false;
+    const query = eventId == null ? "" : `?eventId=${encodeURIComponent(eventId)}`;
+    void timingJson<HistorySessionSummary[]>(`/api/history/sessions${query}`)
+      .then((sessions) => { if (!cancelled) setHistorySessions(sessions); })
+      .catch(() => { if (!cancelled) setHistorySessions([]); });
+    return () => { cancelled = true; };
+  }, [state?.session?.externalSubSessionId, state?.session?.id]);
+
+  useEffect(() => {
+    if (!reviewingHistory || preferences.classId === "all" || sessionReview?.classes.some((carClass) => carClass.id === preferences.classId)) return;
+    setPreferences((current) => ({ ...current, classId: "all" }));
+  }, [preferences.classId, reviewingHistory, sessionReview?.classes]);
+
+  useEffect(() => {
+    if (selectedSessionId === "live") {
+      setSessionReview(null);
+      setReviewError("");
+      setReviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setReviewLoading(true);
+    setReviewError("");
+    void timingJson<CompletedSessionReview>(`/api/history/sessions/${encodeURIComponent(selectedSessionId)}`)
+      .then((review) => { if (!cancelled) setSessionReview(review); })
+      .catch((loadError) => { if (!cancelled) setReviewError(loadError instanceof Error ? loadError.message : "Completed session could not be loaded."); })
+      .finally(() => { if (!cancelled) setReviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedSessionId]);
 
   useEffect(() => {
     window.localStorage.setItem(preferencesKey, JSON.stringify(preferences));
   }, [preferences]);
 
-  const classes = state?.session?.classes ?? [];
+  const classes = reviewingHistory ? sessionReview?.classes ?? [] : state?.session?.classes ?? [];
   const filteredDrivers = useMemo(() => {
     const drivers = state?.session?.drivers ?? [];
     return preferences.classId === "all"
@@ -118,6 +158,19 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
     }));
   }
 
+  async function selectSectorRevision(revision: string) {
+    if (selectedSessionId === "live") return;
+    setReviewLoading(true);
+    setReviewError("");
+    try {
+      setSessionReview(await timingJson<CompletedSessionReview>(`/api/history/sessions/${encodeURIComponent(selectedSessionId)}?revision=${encodeURIComponent(revision)}`));
+    } catch (loadError) {
+      setReviewError(loadError instanceof Error ? loadError.message : "That sector definition could not be loaded.");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
   if (!state) {
     return (
       <main className="loading-screen">
@@ -171,18 +224,25 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
         </nav>
       </header>
 
-      <main className="commentator-workspace" aria-labelledby="commentator-title">
+      <main className={`commentator-workspace${reviewingHistory ? " is-reviewing-history" : ""}`} aria-labelledby="commentator-title">
         <div className="commentator-commandbar">
           <section className="commentator-heading">
             <div>
-              <h1 id="commentator-title">Race timing</h1>
-              <p>Live running order, battle candidates, stint context, and pit detail.</p>
+              <h1 id="commentator-title">{reviewingHistory ? "Session review" : "Race timing"}</h1>
+              <p>{reviewingHistory ? "Frozen classifications and recorded sector evidence." : "Live running order, battle candidates, stint context, and pit detail."}</p>
             </div>
+            <label className="session-selector">
+              <span>Session data</span>
+              <select value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)}>
+                <option value="live">Live · {session?.name ?? "waiting"}</option>
+                {historySessions.map((historySession) => <option key={historySession.id} value={historySession.id}>Completed · {historySession.name} · {historySession.trackName}</option>)}
+              </select>
+            </label>
           </section>
 
           <section className="commentator-controls" aria-label="Timing view controls">
             <div className="class-filter" role="group" aria-label="Class filter">
-              <button className={preferences.classId === "all" ? "is-selected" : ""} onClick={() => selectClass("all")}>All classes <span>{session?.drivers.length ?? 0}</span></button>
+              <button className={preferences.classId === "all" ? "is-selected" : ""} onClick={() => selectClass("all")}>All classes <span>{reviewingHistory ? sessionReview?.results.length ?? 0 : session?.drivers.length ?? 0}</span></button>
               {classes.map((carClass) => (
                 <button
                   key={carClass.id}
@@ -194,7 +254,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
                 </button>
               ))}
             </div>
-            <details className="column-chooser">
+            {!reviewingHistory && <details className="column-chooser">
               <summary><Columns3 aria-hidden="true" />Columns <span>{displayedColumnCount}</span></summary>
               <fieldset>
                 <legend>Visible timing groups</legend>
@@ -204,16 +264,17 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
                   <label key={column}><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => toggleColumn(column)} />{commentatorColumnLabels[column]}</label>
                 ))}
               </fieldset>
-            </details>
-            <button className={`gap-visualizer-trigger${gapHistory.modal.open ? " is-selected" : ""}`} onClick={openGapVisualizer} disabled={!session || classes.length === 0}><LineChart aria-hidden="true" />Gap visualizer</button>
+            </details>}
+            {!reviewingHistory && <button className={`gap-visualizer-trigger${gapHistory.modal.open ? " is-selected" : ""}`} onClick={openGapVisualizer} disabled={!session || classes.length === 0}><LineChart aria-hidden="true" />Gap visualizer</button>}
           </section>
 
           <div className="commentator-key" aria-label="Timing key">
             <span><b>~</b>Contains inference</span>
-            <span><b>?</b>Quality not reported</span>
+            <span><b>{reviewingHistory ? "—" : "?"}</b>{reviewingHistory ? "Unavailable / invalid" : "Quality not reported"}</span>
           </div>
         </div>
 
+        {reviewingHistory ? <SessionReview review={sessionReview} loading={reviewLoading} error={reviewError} classId={preferences.classId} onRevisionChange={(revision) => void selectSectorRevision(revision)} /> : <>
         <section className="commentator-context-deck" aria-label="Circuit position and live race intelligence">
           <div className="commentator-position-instrument">
           {mapResource.definition && mapResource.calibration ? (
@@ -258,8 +319,9 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           lapHistoryByCarIdx={gapHistory.recentByCarIdx}
           onToggleExpanded={toggleExpanded}
         />
+        </>}
       </main>
-      {gapHistory.modal.open && <GapVisualizer
+      {!reviewingHistory && gapHistory.modal.open && <GapVisualizer
         history={gapHistory.modal.history}
         classes={classes}
         loading={gapHistory.modal.loading}

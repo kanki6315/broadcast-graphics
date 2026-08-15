@@ -199,3 +199,59 @@ test("persists semantic sectors idempotently and isolates definition revisions",
   assert.equal((await history.listSectors(revisedUpdate, 7)).length, 2);
   await history.close();
 });
+
+test("finalizes the previous session on a session switch and exposes its results and sectors", async () => {
+  const repository = new MemoryRaceHistoryRepository();
+  const history = new RaceHistoryService(repository);
+  const definition = {
+    revision: "qualifying-r1", source: "iracing" as const, sessionId: "87765685-1", trackId: 168,
+    trackName: "Long Beach", boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }],
+  };
+  const sector = {
+    carIdx: 7, lapNumber: 1, sectorNumber: 1, definitionRevision: definition.revision,
+    source: "derived" as const, quality: "valid" as const, value: 47.8, completedAt: 50,
+  };
+  const qualifying = session(driver({
+    position: 1,
+    classPosition: 1,
+    bestLap: 95.6,
+    sectors: { currentSectorNumber: 2, currentLap: [], previousLap: [sector] },
+  }), {
+    id: "87765685-1",
+    name: "Qualifying",
+    type: "qualifying",
+    externalSessionNumber: 1,
+    sectorDefinition: definition,
+  });
+  const race = session(driver(), { id: "87765685-2", externalSessionNumber: 2 });
+
+  history.ingest(qualifying);
+  history.ingest(race);
+
+  const sessions = await history.listSessions(87_765_685);
+  assert.deepEqual(sessions.map((item) => item.sourceSessionId), [qualifying.id]);
+  assert.equal(sessions[0]?.resultCount, 1);
+  assert.equal(sessions[0]?.sectorCount, 1);
+  const review = await history.reviewSession(sessions[0]!.id);
+  assert.equal(review?.session.type, "qualifying");
+  assert.equal(review?.results[0]?.position, 1);
+  assert.equal(review?.results[0]?.bestSectors[0]?.value, 47.8);
+  assert.deepEqual(
+    (await history.listSessionSectors(sessions[0]!.id, 7))?.map((item) => item.value),
+    [47.8],
+  );
+  await history.close();
+});
+
+test("marks a terminal session complete without waiting for another session", async () => {
+  const repository = new MemoryRaceHistoryRepository();
+  const history = new RaceHistoryService(repository);
+  const checkered = session(driver(), { phase: "checkered", flag: "checkered" });
+
+  history.ingest(checkered);
+
+  const sessions = await history.listSessions(checkered.externalSubSessionId!);
+  assert.equal(sessions.length, 1);
+  assert.ok(sessions[0]?.completedAt);
+  await history.close();
+});
