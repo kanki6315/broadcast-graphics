@@ -183,6 +183,29 @@ test("pit summary total includes unresolved time so commentators do not need to 
   assert.doesNotMatch(markup, /<small>Unknown<\/small>/);
 });
 
+test("expanded driver detail shows only the supplied last ten scoring-line gaps", () => {
+  const current = driver({ lastLapNumber: 12 });
+  const laps = Array.from({ length: 10 }, (_, index) => ({
+    id: `lap-${index + 3}`, sessionId: "race", source: "iracing" as const, sourceMode: "live" as const,
+    carIdx: 7, carNumber: "23", driverName: "Driver", classId: 1, className: "GT3",
+    lapNumber: index + 3, lapTime: 96, position: 2, classPosition: 2,
+    gapToLeader: 1 + index / 10, gapToClassLeader: 1 + index / 10,
+    lapsBehindLeader: 0, lapsBehindClassLeader: 0, personalBest: false,
+    sessionTime: 100 + index * 96, flag: "green" as const, phase: "racing" as const,
+    observedAt: "2026-08-15T00:00:00.000Z",
+  }));
+  const markup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]} expandedCarIdxs={new Set([7])}
+    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onToggleExpanded={() => {}}
+    lapHistoryByCarIdx={new Map([[7, { laps, loading: false, error: null }]])}
+  />);
+  assert.match(markup, /Last 10 lap gaps/);
+  assert.match(markup, /L3/);
+  assert.match(markup, /L12/);
+  assert.match(markup, /\+1\.900/);
+  assert.equal((markup.match(/<small>L\d+<\/small>/g) ?? []).length, 10);
+});
+
 test("dirty and inferred sectors never receive fastest styling", () => {
   const markup = render(driver({
     sectors: {

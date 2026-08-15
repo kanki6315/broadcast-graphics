@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { CompletedLap, CompletedSector, DriverState, SectorDefinition, SessionState } from "@racecontrol/protocol";
+import type { ClassGapHistoryPoint, CompletedLap, CompletedSector, DriverState, SectorDefinition, SessionState } from "@racecontrol/protocol";
 import { Pool, type PoolClient } from "pg";
 
 export interface RaceHistoryRepository {
   initialize(): Promise<void>;
   recordLap(session: SessionState, driver: DriverState, startingPosition?: number | null): Promise<CompletedLap | null>;
   listLaps(session: SessionState, carIdx: number, limit: number): Promise<CompletedLap[]>;
+  listClassGaps(session: SessionState, classId: number, afterLapByCar: ReadonlyMap<number, number>): Promise<ClassGapHistoryPoint[]>;
   recordSectors(session: SessionState, driver: DriverState, definition: SectorDefinition, sectors: CompletedSector[]): Promise<CompletedSector[]>;
   listSectors(session: SessionState, carIdx: number, limit: number): Promise<CompletedSector[]>;
   close(): Promise<void>;
@@ -73,6 +74,23 @@ export class MemoryRaceHistoryRepository implements RaceHistoryRepository {
       .slice(0, limit)
       .reverse()
       .map((lap) => structuredClone(lap));
+  }
+
+  async listClassGaps(session: SessionState, classId: number, afterLapByCar: ReadonlyMap<number, number>): Promise<ClassGapHistoryPoint[]> {
+    return [...this.records.values()]
+      .filter((lap) => lap.sessionId === session.id
+        && lap.source === session.source
+        && lap.sourceMode === session.sourceMode
+        && lap.classId === classId
+        && lap.lapNumber > (afterLapByCar.get(lap.carIdx) ?? 0))
+      .sort((left, right) => left.lapNumber - right.lapNumber || left.carIdx - right.carIdx)
+      .map((lap) => ({
+        carIdx: lap.carIdx,
+        lapNumber: lap.lapNumber,
+        classPosition: lap.classPosition,
+        gapToClassLeader: lap.gapToClassLeader,
+        lapsBehindClassLeader: lap.lapsBehindClassLeader,
+      }));
   }
 
   async recordSectors(session: SessionState, _driver: DriverState, definition: SectorDefinition, sectors: CompletedSector[]): Promise<CompletedSector[]> {
@@ -347,6 +365,30 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
     }));
   }
 
+  async listClassGaps(session: SessionState, classId: number, afterLapByCar: ReadonlyMap<number, number>): Promise<ClassGapHistoryPoint[]> {
+    const watermarks = Object.fromEntries([...afterLapByCar].map(([carIdx, lapNumber]) => [String(carIdx), lapNumber]));
+    const result = await this.pool.query<Pick<LapRow,
+      "car_idx" | "lap_number" | "class_position" | "scoring_gap_to_class_leader_ms" | "laps_behind_class_leader">>(`
+      SELECT entry.car_idx, lap.lap_number, lap.class_position,
+             lap.scoring_gap_to_class_leader_ms, lap.laps_behind_class_leader
+      FROM bg_completed_laps lap
+      JOIN bg_broadcast_sessions session ON session.id = lap.session_id
+      JOIN bg_session_entries entry ON entry.id = lap.entry_id
+      JOIN bg_session_classes class ON class.session_id = session.id AND class.class_id = entry.class_id
+      WHERE session.source = $1 AND session.source_mode = $2
+        AND session.source_session_id = $3 AND class.class_id = $4
+        AND lap.lap_number > COALESCE(($5::jsonb ->> entry.car_idx::text)::integer, 0)
+      ORDER BY lap.lap_number, entry.car_idx
+    `, [session.source, session.sourceMode, session.id, classId, JSON.stringify(watermarks)]);
+    return result.rows.map((row) => ({
+      carIdx: row.car_idx,
+      lapNumber: row.lap_number,
+      classPosition: row.class_position,
+      gapToClassLeader: seconds(row.scoring_gap_to_class_leader_ms),
+      lapsBehindClassLeader: row.laps_behind_class_leader,
+    }));
+  }
+
   async recordSectors(session: SessionState, driver: DriverState, definition: SectorDefinition, sectors: CompletedSector[]): Promise<CompletedSector[]> {
     if (sectors.length === 0) return [];
     const client = await this.pool.connect();
@@ -569,6 +611,11 @@ export class RaceHistoryService {
   async listLaps(session: SessionState, carIdx: number, limit = 20): Promise<CompletedLap[]> {
     await this.queue;
     return this.repository.listLaps(session, carIdx, Math.max(1, Math.min(limit, 200)));
+  }
+
+  async listClassGaps(session: SessionState, classId: number, afterLapByCar: ReadonlyMap<number, number> = new Map()): Promise<ClassGapHistoryPoint[]> {
+    await this.queue;
+    return this.repository.listClassGaps(session, classId, afterLapByCar);
   }
 
   async listSectors(session: SessionState, carIdx: number, limit = 60): Promise<CompletedSector[]> {

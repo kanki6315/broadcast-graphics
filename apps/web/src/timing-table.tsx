@@ -7,12 +7,14 @@ import {
   type PitCycleSummary,
   type PitStopSummary,
   type CompletedSector,
+  type CompletedLap,
   type TimingQualityMetadata,
   isExpectedUnavailableTimingField,
 } from "@racecontrol/protocol";
 import React from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { RefreshCw } from "lucide-react";
+import type { RecentLapHistoryResource } from "./use-gap-history";
 
 export interface TimingTableProps {
   drivers: DriverState[];
@@ -146,6 +148,7 @@ export interface CommentatorTimingTableProps {
   gapTrends?: GapTrend[];
   pitCycles?: PitCycleSummary[];
   pitStops?: PitStopSummary[];
+  lapHistoryByCarIdx?: ReadonlyMap<number, RecentLapHistoryResource>;
   onToggleExpanded: (carIdx: number) => void;
 }
 
@@ -288,7 +291,40 @@ function qualityWarnings(driver: DriverState): string[] {
     .map(([field, quality]) => `${field}: ${qualityLabel(quality)}`);
 }
 
-function PitVisitDetail({ driver, pitStops }: { driver: DriverState; pitStops: PitStopSummary[] }) {
+function lapGapLabel(lap: CompletedLap): string {
+  if ((lap.lapsBehindClassLeader ?? 0) > 0) return `+${lap.lapsBehindClassLeader}L`;
+  if (lap.classPosition === 1) return "Leader";
+  return lap.gapToClassLeader == null ? "--" : `+${lap.gapToClassLeader.toFixed(3)}`;
+}
+
+function lapGapPath(laps: CompletedLap[]): string {
+  const numeric = laps.filter((lap) => lap.gapToClassLeader != null && (lap.lapsBehindClassLeader ?? 0) === 0);
+  const maxGap = Math.max(1, ...numeric.map((lap) => lap.gapToClassLeader!));
+  let drawing = false;
+  return laps.map((lap, index) => {
+    if (lap.gapToClassLeader == null || (lap.lapsBehindClassLeader ?? 0) > 0) {
+      drawing = false;
+      return "";
+    }
+    const x = laps.length === 1 ? 260 : 8 + (index / (laps.length - 1)) * 504;
+    const y = 6 + (lap.gapToClassLeader / maxGap) * 42;
+    const command = drawing ? "L" : "M";
+    drawing = true;
+    return `${command}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+function LapGapHistory({ resource }: { resource: RecentLapHistoryResource | undefined }) {
+  if (!resource || resource.loading) return <p>Loading the latest completed-lap gaps…</p>;
+  if (resource.error) return <p className="lap-gap-error">{resource.error}</p>;
+  if (resource.laps.length === 0) return <p>No completed-lap gap history has been recorded for this car.</p>;
+  return <div className="lap-gap-history">
+    <svg viewBox="0 0 520 54" preserveAspectRatio="none" aria-hidden="true"><line x1="8" x2="512" y1="48" y2="48" /><path d={lapGapPath(resource.laps)} /></svg>
+    <div className="lap-gap-values">{resource.laps.map((lap) => <span key={lap.lapNumber}><small>L{lap.lapNumber}</small><strong>{lapGapLabel(lap)}</strong></span>)}</div>
+  </div>;
+}
+
+function PitVisitDetail({ driver, pitStops, lapHistory }: { driver: DriverState; pitStops: PitStopSummary[]; lapHistory?: RecentLapHistoryResource }) {
   const visit = driver.latestPitVisit;
   const pitSummarySupported = Object.hasOwn(driver, "latestPitVisit");
   const warnings = qualityWarnings(driver);
@@ -318,6 +354,10 @@ function PitVisitDetail({ driver, pitStops }: { driver: DriverState; pitStops: P
         ) : <p>{pitSummarySupported ? (visit ? "Pit history is waiting for race intelligence." : "No pit stop has been reported for this car.") : "This telemetry producer does not support pit-stop summaries."}</p>}
       </section>
       <section>
+        <span className="detail-kicker">Last 10 lap gaps · seconds to class leader</span>
+        <LapGapHistory resource={lapHistory} />
+      </section>
+      <section>
         <span className="detail-kicker">Timing confidence</span>
         {warnings.length > 0 ? <ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : <p>All reported timing fields are valid.</p>}
       </section>
@@ -336,6 +376,7 @@ export function CommentatorTimingTable({
   gapTrends = [],
   pitCycles = [],
   pitStops = [],
+  lapHistoryByCarIdx = new Map(),
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
   let previousClassId: number | null = null;
@@ -392,7 +433,7 @@ export function CommentatorTimingTable({
                 {visibleColumns.has("pit") && <td className="pit-cell">{pitVisitSummary(driver, latestPitStop)}</td>}
                 {visibleColumns.has("status") && <td><span className={`commentator-status status-${driver.pitState ?? driver.trackStatus}`}>{status}</span></td>}
               </tr>,
-              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><div className="expanded-intelligence"><PitVisitDetail driver={driver} pitStops={pitStops} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous stint</dt><dd>{stint?.recentCompleted ? `${stint.recentCompleted.driverName} · ${formatDuration(stint.recentCompleted.duration)} · ${stint.recentCompleted.lapCount} laps` : stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
+              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><div className="expanded-intelligence"><PitVisitDetail driver={driver} pitStops={pitStops} lapHistory={lapHistoryByCarIdx.get(driver.carIdx)} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous stint</dt><dd>{stint?.recentCompleted ? `${stint.recentCompleted.driverName} · ${formatDuration(stint.recentCompleted.duration)} · ${stint.recentCompleted.lapCount} laps` : stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
             ];
           })}
         </tbody>

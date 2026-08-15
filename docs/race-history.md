@@ -69,6 +69,8 @@ GET /api/history/laps?carIdx=7&limit=20
 
 Derived values such as gap gained/lost, average pace, consistency, and fastest-lap rankings should be calculated from these immutable records rather than stored as independent facts.
 
+Commentator timing also exposes compact, on-demand class gap history at `GET /api/history/class-gaps?classId=…`. The first request returns all recorded scoring-line gaps for that class. Later requests may send comma-separated `carIdx:lapNumber` watermarks through `after`, allowing the browser to merge only laps newer than each cached car. The Gap Visualizer refreshes this cache before opening and then freezes its displayed snapshot; it never joins the high-frequency live-state broadcast. Expanded timing rows independently request at most ten recent completed laps for the selected car.
+
 ## Replaying an endurance diagnostic capture
 
 When the representative capture arrives:

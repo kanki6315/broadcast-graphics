@@ -151,6 +151,23 @@ test("records a lapped car without inventing a seconds gap", async () => {
   await history.close();
 });
 
+test("lists compact class gap history and applies per-car incremental watermarks", async () => {
+  const repository = new MemoryRaceHistoryRepository();
+  const history = new RaceHistoryService(repository);
+  const leader = driver({ carIdx: 1, carNumber: "1", classPosition: 1, position: 1, lastLapGapToClassLeader: 0 });
+  const chaser = driver({ carIdx: 2, carNumber: "2", classPosition: 2, position: 2, lastLapGapToClassLeader: 1.2 });
+  history.ingest(session(leader, { drivers: [leader, chaser] }));
+  const leaderLap2 = { ...leader, lapsCompleted: 2, currentLap: 3, lastLapNumber: 2, lastLapGapToClassLeader: 0 };
+  const chaserLap2 = { ...chaser, lapsCompleted: 2, currentLap: 3, lastLapNumber: 2, lastLapGapToClassLeader: 1.6 };
+  history.ingest(session(leaderLap2, { lap: 3, lapsCompleted: 2, drivers: [leaderLap2, chaserLap2] }));
+
+  const full = await history.listClassGaps(session(), 1);
+  assert.deepEqual(full.map((point) => [point.carIdx, point.lapNumber]), [[1, 1], [2, 1], [1, 2], [2, 2]]);
+  const incremental = await history.listClassGaps(session(), 1, new Map([[1, 2], [2, 1]]));
+  assert.deepEqual(incremental.map((point) => [point.carIdx, point.lapNumber, point.gapToClassLeader]), [[2, 2, 1.6]]);
+  await history.close();
+});
+
 test("persists semantic sectors idempotently and isolates definition revisions", async () => {
   const repository = new MemoryRaceHistoryRepository();
   const history = new RaceHistoryService(repository);
