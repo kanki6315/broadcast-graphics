@@ -351,6 +351,31 @@ export interface CompletedLap {
   observedAt: string;
 }
 
+export interface ClassGapHistoryPoint {
+  carIdx: number;
+  lapNumber: number;
+  classPosition: number | null;
+  gapToClassLeader: number | null;
+  lapsBehindClassLeader: number | null;
+}
+
+export interface ClassGapHistoryDriver {
+  carIdx: number;
+  carNumber: string;
+  name: string;
+  team: string;
+  classId: number;
+  className: string;
+  classColor: string;
+}
+
+export interface ClassGapHistoryResponse {
+  sessionId: string;
+  classId: number;
+  drivers: ClassGapHistoryDriver[];
+  points: ClassGapHistoryPoint[];
+}
+
 export type TrendDirection = "opening" | "closing" | "stable";
 export type TrendSuppressionReason =
   | "telemetry-gap"

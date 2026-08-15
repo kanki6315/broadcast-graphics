@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Columns3, Flag, GitCommitHorizontal, LogOut, Map as MapIcon, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
+import { Columns3, Flag, GitCommitHorizontal, LineChart, LogOut, Map as MapIcon, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import { isExpectedUnavailableTimingField, type DriverState } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
@@ -14,6 +14,8 @@ import { BattleWatch } from "./battle-watch";
 import { useLiveState } from "./use-live-state";
 import { CircuitMap } from "./circuit-map";
 import { useTrackMap } from "./use-track-map";
+import { useGapHistory } from "./use-gap-history";
+import { GapVisualizer } from "./gap-visualizer";
 import "./commentator-timing.css";
 
 const preferencesKey = "gantry.commentator-timing.v1";
@@ -56,6 +58,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const mapResource = useTrackMap(state?.trackConfiguration?.activeMap);
+  const gapHistory = useGapHistory(state?.session?.id);
 
   useEffect(() => {
     window.localStorage.setItem(preferencesKey, JSON.stringify(preferences));
@@ -71,6 +74,11 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
 
   const expandedCarIdxs = useMemo(() => new Set(preferences.expandedCarIdxs), [preferences.expandedCarIdxs]);
   const visibleColumns = useMemo(() => new Set(preferences.visibleColumns), [preferences.visibleColumns]);
+
+  useEffect(() => {
+    if (!state?.session?.id) return;
+    for (const carIdx of preferences.expandedCarIdxs) void gapHistory.loadRecentLaps(carIdx);
+  }, [gapHistory.loadRecentLaps, preferences.expandedCarIdxs, state?.session?.id]);
 
   async function logout() {
     setLoggingOut(true);
@@ -88,12 +96,20 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   }
 
   function toggleExpanded(carIdx: number) {
+    if (!preferences.expandedCarIdxs.includes(carIdx)) void gapHistory.loadRecentLaps(carIdx);
     setPreferences((current) => ({
       ...current,
       expandedCarIdxs: current.expandedCarIdxs.includes(carIdx)
         ? current.expandedCarIdxs.filter((candidate) => candidate !== carIdx)
         : [...current.expandedCarIdxs, carIdx],
     }));
+  }
+
+  function openGapVisualizer() {
+    if (!session) return;
+    const leadingClassId = sortByOverallPosition(session.drivers).find((driver) => driver.classPosition > 0)?.classId;
+    const classId = preferences.classId === "all" ? leadingClassId ?? session.classes[0]?.id : preferences.classId;
+    if (classId != null) void gapHistory.openClassHistory(classId);
   }
 
   function toggleColumn(column: CommentatorColumn) {
@@ -191,6 +207,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
               <button className={preferences.positionView === "map" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "map" }))}><MapIcon aria-hidden="true" />Map</button>
               <button className={preferences.positionView === "ribbon" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "ribbon" }))}><GitCommitHorizontal aria-hidden="true" />Ribbon</button>
             </div>
+            <button className={`gap-visualizer-trigger${gapHistory.modal.open ? " is-selected" : ""}`} onClick={openGapVisualizer} disabled={!session || classes.length === 0}><LineChart aria-hidden="true" />Gap visualizer</button>
           </section>
 
           <div className="commentator-key" aria-label="Timing key">
@@ -237,9 +254,18 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           gapTrends={intelligence?.gapTrends}
           pitCycles={intelligence?.pitCycles}
           pitStops={intelligence?.pitStops}
+          lapHistoryByCarIdx={gapHistory.recentByCarIdx}
           onToggleExpanded={toggleExpanded}
         />
       </main>
+      {gapHistory.modal.open && <GapVisualizer
+        history={gapHistory.modal.history}
+        classes={classes}
+        loading={gapHistory.modal.loading}
+        error={gapHistory.modal.error}
+        onSelectClass={(classId) => void gapHistory.openClassHistory(classId)}
+        onClose={gapHistory.closeModal}
+      />}
     </div>
   );
 }

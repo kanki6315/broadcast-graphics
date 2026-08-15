@@ -249,6 +249,44 @@ app.get<{ Querystring: { carIdx?: string; limit?: string } }>("/api/history/laps
   }
   return history.listLaps(session, carIdx, limit);
 });
+app.get<{ Querystring: { classId?: string; after?: string } }>("/api/history/class-gaps", async (request, reply) => {
+  if (!await requireAdmin(request, reply)) return;
+  const session = store.snapshot().session;
+  const classId = Number(request.query.classId);
+  if (!session || !Number.isInteger(classId) || !session.classes.some((candidate) => candidate.id === classId)) {
+    return reply.code(400).send({ error: "An active session and valid integer classId are required." });
+  }
+  const afterLapByCar = new Map<number, number>();
+  if (request.query.after) {
+    if (request.query.after.length > 2_048) return reply.code(400).send({ error: "History watermarks are too large." });
+    for (const item of request.query.after.split(",")) {
+      const [rawCarIdx, rawLapNumber, ...extra] = item.split(":");
+      const carIdx = Number(rawCarIdx);
+      const lapNumber = Number(rawLapNumber);
+      if (extra.length > 0 || !Number.isInteger(carIdx) || !Number.isInteger(lapNumber) || lapNumber < 0) {
+        return reply.code(400).send({ error: "History watermarks must use carIdx:lapNumber pairs." });
+      }
+      afterLapByCar.set(carIdx, lapNumber);
+    }
+  }
+  const drivers = session.drivers
+    .filter((driver) => driver.classId === classId)
+    .map((driver) => ({
+      carIdx: driver.carIdx,
+      carNumber: driver.carNumber,
+      name: driver.name,
+      team: driver.team,
+      classId: driver.classId,
+      className: driver.className,
+      classColor: driver.classColor,
+    }));
+  return {
+    sessionId: session.id,
+    classId,
+    drivers,
+    points: await history.listClassGaps(session, classId, afterLapByCar),
+  };
+});
 
 app.get("/api/track-config/active", async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;
