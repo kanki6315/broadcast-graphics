@@ -143,6 +143,25 @@ public sealed class PitTimingTrackerTests
     }
 
     [Fact]
+    public void TerminalFramesDoNotAdvanceAnOpenPitVisit()
+    {
+        var tracker = new PitTimingTracker();
+
+        Apply(tracker, 100, "pit-lane");
+        var racing = Apply(tracker, 105, "pit-lane");
+        var checkered = Assert.Single(tracker.Apply(
+            "session", 115, [Driver("pit-lane", 41)], freeze: true));
+        var coolDown = Assert.Single(tracker.Apply(
+            "session", 130, [Driver("unobserved", 41)], freeze: true));
+
+        Assert.Equal(5, racing.LatestPitVisit!.PitLaneTime);
+        Assert.Equal(5, checkered.LatestPitVisit!.PitLaneTime);
+        Assert.Equal(5, coolDown.LatestPitVisit!.PitLaneTime);
+        Assert.Equal(0, coolDown.LatestPitVisit.UnknownTime);
+        Assert.Empty(tracker.GetGaps(7));
+    }
+
+    [Fact]
     public async Task DiagnosticCapturePersistsOpenAndResolvedGapEvidence()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"gantry-pit-gap-{Guid.NewGuid():N}");

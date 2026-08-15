@@ -288,6 +288,27 @@ public sealed class TelemetrySnapshotMapperTests
         Assert.Equal(1, state.Drivers.Single(driver => driver.CarIdx == 0).Position);
     }
 
+    [Fact]
+    public void CheckeredBestLapFallsBackToOfficialResults()
+    {
+        var result = Result(0, 1, 0);
+        result.FastestLap = 3;
+        result.FastestTime = 68.432f;
+        var state = TelemetrySnapshotMapper.Map(Telemetry(
+            positions: [1],
+            classPositions: [1],
+            lapsCompleted: [4],
+            f2Times: [0],
+            bestLapTimes: [-1],
+            bestLapNumbers: [-1],
+            sessionState: SVappsLAB.iRacingTelemetrySDK.SessionState.Checkered),
+            SessionInfo("Race", [Driver(0)], [result]));
+
+        var driver = Assert.Single(state.Drivers);
+        AssertClose(68.432, driver.BestLap);
+        Assert.Equal(3, driver.BestLapNumber);
+    }
+
     private static TelemetryData Telemetry(
         int[] positions,
         int[] classPositions,

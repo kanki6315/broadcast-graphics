@@ -21,7 +21,11 @@ internal sealed class PitTimingTracker(Action<PitTimingGap>? onGapRecord = null)
     private string? sessionId;
     private double lastSessionTime = double.NegativeInfinity;
 
-    public DriverState[] Apply(string currentSessionId, double? sessionTime, IReadOnlyList<DriverState> drivers)
+    public DriverState[] Apply(
+        string currentSessionId,
+        double? sessionTime,
+        IReadOnlyList<DriverState> drivers,
+        bool freeze = false)
     {
         if (!string.Equals(sessionId, currentSessionId, StringComparison.Ordinal) ||
             sessionTime is { } time && time + 1 < lastSessionTime)
@@ -31,7 +35,7 @@ internal sealed class PitTimingTracker(Action<PitTimingGap>? onGapRecord = null)
         }
 
         if (sessionTime is not { } observedAt || !double.IsFinite(observedAt)) return drivers.ToArray();
-        lastSessionTime = observedAt;
+        if (!freeze) lastSessionTime = observedAt;
 
         return drivers.Select(driver =>
         {
@@ -43,8 +47,8 @@ internal sealed class PitTimingTracker(Action<PitTimingGap>? onGapRecord = null)
 
             var pitState = driver.PitState ?? "unobserved";
             var driverId = driver.UserId > 0 ? driver.UserId.ToString(CultureInfo.InvariantCulture) : null;
-            state.Observe(observedAt, pitState, driverId);
-            return driver with { LatestPitVisit = state.LatestVisit(observedAt) };
+            if (!freeze) state.Observe(observedAt, pitState, driverId);
+            return driver with { LatestPitVisit = state.LatestVisit(freeze ? lastSessionTime : observedAt) };
         }).ToArray();
     }
 
