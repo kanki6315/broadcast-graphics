@@ -324,7 +324,8 @@ internal static class TelemetrySnapshotMapper
             .ToArray();
         drivers = AddLivePositions(drivers, sessionType, phase);
         var sessionTime = NormalizeTime(telemetry.SessionTime);
-        if (pitTiming is not null) drivers = pitTiming.Apply(sessionId, sessionTime, drivers);
+        if (pitTiming is not null)
+            drivers = pitTiming.Apply(sessionId, sessionTime, drivers, phase is "checkered" or "cool-down");
         if (racePositions is not null) drivers = racePositions.Apply(sessionId, sessionType, phase, drivers);
         var weekend = info.WeekendInfo;
         var trackName = weekend?.TrackDisplayName;
@@ -462,7 +463,7 @@ internal static class TelemetrySnapshotMapper
         var lapsCompleted = ValueAt(telemetry.CarIdxLapCompleted, index);
         if (lapsCompleted < 0 && result is not null) lapsCompleted = result.LapsComplete;
         var lastLap = NormalizeTime(ValueAt(telemetry.CarIdxLastLapTime, index)) ?? NormalizeTime(result?.LastTime);
-        var bestLap = NormalizeTime(ValueAt(telemetry.CarIdxBestLapTime, index));
+        var bestLap = NormalizeTime(ValueAt(telemetry.CarIdxBestLapTime, index)) ?? NormalizeTime(result?.FastestTime);
         var currentLap = ValueAt(telemetry.CarIdxLap, index);
         if (currentLap <= 0 && lapsCompleted >= 0) currentLap = lapsCompleted + 1;
         var bestLapNumber = ValueAt(telemetry.CarIdxBestLapNum, index);
