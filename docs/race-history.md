@@ -18,6 +18,8 @@ Production race history is stored in PostgreSQL as semantic timing records. Raw 
 
 The server creates these tables at startup when `DATABASE_URL` is configured. Local development without a database uses an in-memory history repository.
 
+A final normalized snapshot is retained with each completed broadcast session so classifications include entries that never completed a timed lap. Practice and qualifying are finalized when the next session arrives; race sessions are also finalized at checkered or cool-down. A telemetry disconnect alone does not complete a session, so reconnects continue the same record.
+
 ## Completed-lap semantics
 
 A race lap is eligible for storage only when all of the following refer to the same completed lap:
@@ -70,6 +72,8 @@ GET /api/history/laps?carIdx=7&limit=20
 Derived values such as gap gained/lost, average pace, consistency, and fastest-lap rankings should be calculated from these immutable records rather than stored as independent facts.
 
 Commentator timing also exposes compact, on-demand class gap history at `GET /api/history/class-gaps?classId=…`. The first request returns all recorded scoring-line gaps for that class. Later requests may send comma-separated `carIdx:lapNumber` watermarks through `after`, allowing the browser to merge only laps newer than each cached car. The Gap Visualizer refreshes this cache before opening and then freezes its displayed snapshot; it never joins the high-frequency live-state broadcast. Expanded timing rows independently request at most ten recent completed laps for the selected car.
+
+The session-review selector reads completed sessions through `GET /api/history/sessions?eventId=…`, loads frozen classifications and revision-scoped best sectors from `GET /api/history/sessions/:id`, and fetches one entry's lap-by-lap sectors on demand from `GET /api/history/sessions/:id/sectors?carIdx=…&revision=…`. These routes accept administrator sessions or commentator keys and never combine fastest-sector comparisons across definition revisions.
 
 ## Replaying an endurance diagnostic capture
 

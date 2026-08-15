@@ -297,6 +297,41 @@ app.get<{ Querystring: { classId?: string; after?: string } }>("/api/history/cla
     points: await history.listClassGaps(session, classId, afterLapByCar),
   };
 });
+app.get<{ Querystring: { eventId?: string } }>("/api/history/sessions", async (request, reply) => {
+  if (!await requireTimingReader(request, reply)) return;
+  const eventId = request.query.eventId == null ? undefined : Number(request.query.eventId);
+  if (eventId != null && (!Number.isSafeInteger(eventId) || eventId <= 0)) {
+    return reply.code(400).send({ error: "eventId must be a positive integer." });
+  }
+  return history.listSessions(eventId);
+});
+app.get<{ Params: { id: string }; Querystring: { revision?: string } }>("/api/history/sessions/:id", async (request, reply) => {
+  if (!await requireTimingReader(request, reply)) return;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.params.id)) {
+    return reply.code(400).send({ error: "Session history id is invalid." });
+  }
+  const review = await history.reviewSession(request.params.id, request.query.revision?.trim() || undefined);
+  if (!review) return reply.code(404).send({ error: "Completed session not found." });
+  return review;
+});
+app.get<{
+  Params: { id: string };
+  Querystring: { carIdx?: string; revision?: string; limit?: string };
+}>("/api/history/sessions/:id/sectors", async (request, reply) => {
+  if (!await requireTimingReader(request, reply)) return;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.params.id)) {
+    return reply.code(400).send({ error: "Session history id is invalid." });
+  }
+  const carIdx = Number(request.query.carIdx);
+  const limit = request.query.limit == null ? 600 : Number(request.query.limit);
+  const revision = request.query.revision?.trim() || undefined;
+  if (!Number.isInteger(carIdx) || !Number.isInteger(limit) || limit < 1) {
+    return reply.code(400).send({ error: "Integer carIdx and positive integer limit are required." });
+  }
+  const sectors = await history.listSessionSectors(request.params.id, carIdx, revision, limit);
+  if (!sectors) return reply.code(404).send({ error: "Completed session not found." });
+  return sectors;
+});
 
 app.get("/api/track-config/active", async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;

@@ -376,6 +376,55 @@ export interface ClassGapHistoryResponse {
   points: ClassGapHistoryPoint[];
 }
 
+export interface HistorySessionSummary {
+  /** Opaque history-store identifier used by the review endpoints. */
+  id: string;
+  sourceSessionId: string;
+  source: TelemetrySource;
+  sourceMode: TelemetrySourceMode;
+  externalSubSessionId: number | null;
+  externalSessionNumber: number | null;
+  name: string;
+  type: SessionType;
+  trackId: number | null;
+  trackName: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  completedAt: string | null;
+  resultCount: number;
+  sectorCount: number;
+}
+
+export interface CompletedSessionResult {
+  carIdx: number;
+  position: number;
+  classPosition: number;
+  carNumber: string;
+  name: string;
+  team: string;
+  classId: number;
+  className: string;
+  classColor: string;
+  lapsCompleted: number;
+  lastLap: number | null;
+  bestLap: number | null;
+  gapToLeader: number | null;
+  classGapToLeader: number | null;
+  lapsBehindLeader: number;
+  lapsBehindClassLeader: number;
+  trackStatus: TrackStatus;
+  bestSectors: CompletedSector[];
+}
+
+export interface CompletedSessionReview {
+  session: HistorySessionSummary;
+  classes: CarClassState[];
+  results: CompletedSessionResult[];
+  sectorDefinitions: SectorDefinition[];
+  /** Revision used for best-sector comparisons in this response. */
+  sectorRevision: string | null;
+}
+
 export type TrendDirection = "opening" | "closing" | "stable";
 export type TrendSuppressionReason =
   | "telemetry-gap"
