@@ -20,15 +20,21 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
     const url = input.toString(); requests.push({ url, init });
     if (url.includes("/oauth2/token")) return Response.json({ access_token: "access", expires_in: 600, refresh_token: "refresh", refresh_token_expires_in: 604800 });
     if (url.endsWith("/data/track/assets")) return Response.json({ link: "https://cdn.example.test/tracks.json" });
-    if (url === "https://cdn.example.test/tracks.json") return Response.json({ "509": { track_id: 509, track_map_layers: { active: "/tracks/algarve/gp/active.svg" } } });
-    if (url === "https://images-static.iracing.com/tracks/algarve/gp/active.svg") return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
+    if (url === "https://cdn.example.test/tracks.json") return Response.json({
+      "509": {
+        track_id: 509,
+        track_map: "https://images-static.iracing.com/img/tracks/map/algarve/gp/track-map.svg",
+        track_map_layers: { active: "active.svg" },
+      },
+    });
+    if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg") return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
     return new Response("not found", { status: 404 });
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
   const result = await client.getTrackMap({ trackId: 509, trackName: "Algarve" });
   assert.match(result.svg, /<path id="iracing-path-1"/);
   assert.doesNotMatch(result.svg, /Content-Type/);
-  assert.equal(result.sourceUrl, "https://images-static.iracing.com/tracks/algarve/gp/active.svg");
+  assert.equal(result.sourceUrl, "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg");
   assert.match(result.originalFilename, /^iRacing-509-/);
   const tokenBody = requests[0]?.init?.body as URLSearchParams;
   assert.equal(tokenBody.get("grant_type"), "password_limited");
@@ -42,7 +48,7 @@ test("reuses an unexpired access token", async () => {
   const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
     const url = input.toString();
     if (url.includes("/oauth2/token")) { tokenCalls += 1; return Response.json({ access_token: "access", expires_in: 600 }); }
-    if (url.endsWith("/data/track/assets")) return Response.json({ "12": { track_id: 12, track_map: "/track.svg" } });
+    if (url.endsWith("/data/track/assets")) return Response.json({ "12": { track_id: 12, track_map: "/tracks/track.svg" } });
     return new Response(svg);
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
@@ -60,7 +66,7 @@ test("rotates the refresh token after the access token expires", async () => {
       const grant = (init?.body as URLSearchParams).get("grant_type")!; grants.push(grant);
       return Response.json({ access_token: `access-${grants.length}`, expires_in: 60, refresh_token: `refresh-${grants.length}`, refresh_token_expires_in: 600 });
     }
-    if (url.endsWith("/data/track/assets")) return Response.json({ "12": { track_id: 12, track_map: "/track.svg" } });
+    if (url.endsWith("/data/track/assets")) return Response.json({ "12": { track_id: 12, track_map: "/tracks/track.svg" } });
     return new Response(svg);
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => now);
