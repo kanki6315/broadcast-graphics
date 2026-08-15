@@ -9,6 +9,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import type { ClientMessage, SectorBoundary, ServerMessage, TrackLayoutIdentity } from "@racecontrol/protocol";
 import { createAuthenticationStore } from "./auth-store.js";
 import { loadClientRelease, streamClientRelease } from "./client-release.js";
+import { IracingTrackMapClient, IracingTrackMapError, iracingCredentialsFromEnvironment } from "./iracing-track-map.js";
 import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
 import { RaceIntelligenceService } from "./race-intelligence-service.js";
@@ -50,6 +51,8 @@ const historyRepository = createRaceHistoryRepository(process.env.DATABASE_URL);
 await historyRepository.initialize();
 const trackConfiguration = createTrackConfigurationRepository(process.env.DATABASE_URL);
 await trackConfiguration.initialize();
+const iracingCredentials = iracingCredentialsFromEnvironment(process.env);
+const iracingTrackMaps = iracingCredentials ? new IracingTrackMapClient(iracingCredentials) : null;
 const registry = new PackageRegistry(packageRoot);
 const packages = await registry.list();
 const clientRelease = await loadClientRelease(clientReleaseRoot);
@@ -266,6 +269,39 @@ app.post<{ Body: { svg?: unknown } }>("/api/track-config/import-preview", { body
     if (typeof request.body?.svg !== "string") return reply.code(400).send({ error: "SVG text is required." });
     return await trackConfiguration.previewImport(request.body.svg);
   } catch (error) { return sendConfigurationFailure(reply, error); }
+});
+
+app.post<{ Body: { layout?: unknown } }>("/api/track-config/maps/iracing", async (request, reply) => {
+  const admin = await requireAdmin(request, reply); if (!admin) return;
+  if (!iracingTrackMaps) return reply.code(503).send({
+    error: "iRacing map import is not configured on the server.",
+    code: "iracing-not-configured",
+  });
+  try {
+    const layout = request.body?.layout ? requestedLayout(request.body.layout) : currentLayout();
+    if (!layout) return reply.code(404).send({ error: "No active track layout is available." });
+    const asset = await iracingTrackMaps.getTrackMap(layout);
+    const preview = await trackConfiguration.previewImport(asset.svg);
+    const selected = preview.candidates[0];
+    if (!selected) return reply.code(422).send({ error: "The iRacing SVG contains no usable closed centerline." });
+    if (preview.candidates.length > 1) return reply.code(422).send({
+      error: `The iRacing SVG contains ${preview.candidates.length} closed paths, so Gantry will not guess which one is the centerline. Download the official layer and use local SVG import to choose it explicitly.`,
+      code: "ambiguous-centerline",
+    });
+    const map = await trackConfiguration.importMap({
+      svg: asset.svg,
+      layout,
+      selectedPathId: selected.id,
+      source: "iracing",
+      sourceVersion: asset.sourceVersion,
+      originalFilename: asset.originalFilename,
+      author: admin.username,
+    });
+    return reply.code(201).send(map);
+  } catch (error) {
+    if (error instanceof IracingTrackMapError) return reply.code(error.status).send({ error: error.message, code: error.code });
+    return sendConfigurationFailure(reply, error);
+  }
 });
 
 app.post<{ Body: Record<string, unknown> }>("/api/track-config/maps", { bodyLimit: 1_100_000 }, async (request, reply) => {

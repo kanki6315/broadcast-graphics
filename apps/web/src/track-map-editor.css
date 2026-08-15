@@ -30,6 +30,15 @@
 .map-config-grid section > header svg { width: 18px; flex: none; color: var(--orange); }
 .map-config-grid h2 { margin: 0; font: 700 15px var(--display); text-transform: uppercase; letter-spacing: .04em; }
 .map-config-grid section > header p { margin: 2px 0 0; color: var(--inspection); font-size: 8px; text-transform: uppercase; letter-spacing: .05em; }
+.iracing-import { width: 100%; min-height: 58px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid var(--ink); padding: 9px; background: var(--orange); color: var(--ink); text-align: left; cursor: pointer; }
+.iracing-import:hover:not(:disabled), .iracing-import:focus-visible { background: var(--inspection); outline: 2px solid var(--orange); outline-offset: 1px; }
+.iracing-import:disabled { cursor: not-allowed; opacity: .45; }
+.iracing-import > svg { width: 22px; }
+.iracing-import strong, .iracing-import small { display: block; }
+.iracing-import strong { font: 700 13px var(--display); text-transform: uppercase; }
+.iracing-import small { margin-top: 2px; font-size: 8px; }
+.import-divider { display: flex; align-items: center; gap: 7px; margin: 8px 0; color: var(--muted); font: 700 8px var(--display); text-transform: uppercase; }
+.import-divider::before, .import-divider::after { height: 1px; flex: 1; background: var(--paper-line); content: ""; }
 .svg-drop { min-height: 120px; display: grid; place-items: center; align-content: center; gap: 5px; border: 1px dashed var(--muted); padding: 14px; text-align: center; cursor: pointer; }
 .svg-drop:hover, .svg-drop:focus-within { background: rgba(184, 194, 189, .2); border-color: var(--orange); }
 .svg-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
