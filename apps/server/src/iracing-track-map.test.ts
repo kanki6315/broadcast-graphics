@@ -43,6 +43,26 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
   assert.equal(new Headers(requests[1]?.init?.headers).get("Authorization"), "Bearer access");
 });
 
+test("downloads an active layer from iRacing's core-sites asset host", async () => {
+  const activeUrl = "https://ir-core-sites.iracing.com/members/member_images/tracks/algarve/gp/active.svg";
+  const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
+    const url = input.toString();
+    if (url.includes("/oauth2/token")) return Response.json({ access_token: "access", expires_in: 600 });
+    if (url.endsWith("/data/track/assets")) return Response.json({
+      "509": {
+        track_id: 509,
+        track_map: "https://ir-core-sites.iracing.com/members/member_images/tracks/algarve/gp/track-map.svg",
+        track_map_layers: { active: "active.svg" },
+      },
+    });
+    if (url === activeUrl) return new Response(svg);
+    return new Response("not found", { status: 404 });
+  };
+  const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
+  const result = await client.getTrackMap({ trackId: 509, trackName: "Algarve" });
+  assert.equal(result.sourceUrl, activeUrl);
+});
+
 test("reuses an unexpired access token", async () => {
   let tokenCalls = 0;
   const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
