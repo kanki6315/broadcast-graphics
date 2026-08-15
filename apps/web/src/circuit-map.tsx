@@ -7,10 +7,10 @@ export interface CircuitMapProps {
   definition: TrackMapDefinition;
   calibration: TrackMapCalibration;
   drivers: DriverState[];
-  selectedCarIdx: number | null;
+  selectedCarIdx?: number | null;
   nearbyCarIdxs?: ReadonlySet<number>;
   sectorBoundaries?: SectorBoundary[];
-  onSelectCar: (carIdx: number) => void;
+  onSelectCar?: (carIdx: number) => void;
   readOnly?: boolean;
   fallback?: ReactNode;
 }
@@ -26,7 +26,7 @@ function unavailable(driver: DriverState): boolean {
     || quality?.quality === "invalid" || quality?.quality === "incomplete";
 }
 
-export function CircuitMap({ definition, calibration, drivers, selectedCarIdx, nearbyCarIdxs = new Set(), sectorBoundaries = [], onSelectCar, readOnly = true, fallback }: CircuitMapProps) {
+export function CircuitMap({ definition, calibration, drivers, selectedCarIdx = null, nearbyCarIdxs = new Set(), sectorBoundaries = [], onSelectCar, readOnly = true, fallback }: CircuitMapProps) {
   const pathRef = useRef<SVGPathElement>(null);
   const [pathReady, setPathReady] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -67,14 +67,14 @@ export function CircuitMap({ definition, calibration, drivers, selectedCarIdx, n
   const centerX = definition.viewBox[0] + definition.viewBox[2] / 2;
   const centerY = definition.viewBox[1] + definition.viewBox[3] / 2;
   const handleKey = (event: KeyboardEvent<SVGGElement>, carIdx: number) => {
-    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectCar(carIdx); }
+    if (onSelectCar && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onSelectCar(carIdx); }
   };
 
   return (
     <section className="circuit-map" aria-label="Calibrated circuit position map" data-read-only={readOnly}>
       <header>
         <div><strong>Circuit map</strong><span>CAL {calibration.revision} · {calibration.direction} · {definition.source}</span></div>
-        <div className="circuit-map-legend" aria-label="Map key"><span><i className="legend-selected" />Selected</span><span><i className="legend-nearby" />Same-class proximity</span><span><b>L</b>Class leader</span></div>
+        <div className="circuit-map-legend" aria-label="Map key">{onSelectCar && <><span><i className="legend-selected" />Selected</span><span><i className="legend-nearby" />Same-class proximity</span></>}<span><b>L</b>Class leader</span></div>
       </header>
       <div className="circuit-map-stage">
         <svg viewBox={definition.viewBox.join(" ")} role="img" aria-label={`${definition.layout.trackName} calibrated centerline`}>
@@ -89,13 +89,13 @@ export function CircuitMap({ definition, calibration, drivers, selectedCarIdx, n
               const uncertain = driver.timingQuality?.lapDistPct?.quality === "inferred";
               return <g
                 key={driver.carIdx}
-                role="button"
-                tabIndex={0}
-                aria-label={`Select car ${driver.carNumber}, ${driver.name}, ${driver.className} position ${driver.classPosition}${uncertain ? ", position inferred" : ""}`}
+                role={onSelectCar ? "button" : undefined}
+                tabIndex={onSelectCar ? 0 : undefined}
+                aria-label={`Car ${driver.carNumber}, ${driver.name}, ${driver.className} position ${driver.classPosition}${uncertain ? ", position inferred" : ""}`}
                 className={`circuit-car${selected ? " is-selected" : ""}${nearby ? " is-nearby" : ""}${classLeader ? " is-class-leader" : ""}${uncertain ? " is-uncertain" : ""}`}
                 style={{ transform: `translate(${point.x}px, ${point.y}px)`, "--class-color": driver.classColor } as CSSProperties}
-                onClick={() => onSelectCar(driver.carIdx)}
-                onKeyDown={(event) => handleKey(event, driver.carIdx)}
+                onClick={onSelectCar ? () => onSelectCar(driver.carIdx) : undefined}
+                onKeyDown={onSelectCar ? (event) => handleKey(event, driver.carIdx) : undefined}
               >
                 <title>#{driver.carNumber} {driver.name} · {driver.className} P{driver.classPosition}</title>
                 <circle r={selected ? 8.5 : 6.5} />
@@ -108,9 +108,9 @@ export function CircuitMap({ definition, calibration, drivers, selectedCarIdx, n
       </div>
       <aside className="circuit-map-dock" aria-label="Cars not placed on the racing centerline">
         <div><strong>Pit dock</strong><span>{groups.pit.length}</span></div>
-        <div className="map-dock-cars">{groups.pit.length ? groups.pit.map((driver) => <button key={driver.carIdx} type="button" onClick={() => onSelectCar(driver.carIdx)} className={driver.carIdx === selectedCarIdx ? "is-selected" : ""} style={{ "--class-color": driver.classColor } as CSSProperties}>#{driver.carNumber}<small>{driver.pitState === "pit-stall" ? "STALL" : "LANE"}</small></button>) : <span>Clear</span>}</div>
+        <div className="map-dock-cars">{groups.pit.length ? groups.pit.map((driver) => onSelectCar ? <button key={driver.carIdx} type="button" onClick={() => onSelectCar(driver.carIdx)} className={driver.carIdx === selectedCarIdx ? "is-selected" : ""} style={{ "--class-color": driver.classColor } as CSSProperties}>#{driver.carNumber}<small>{driver.pitState === "pit-stall" ? "STALL" : "LANE"}</small></button> : <span className="map-dock-car" key={driver.carIdx} style={{ "--class-color": driver.classColor } as CSSProperties}>#{driver.carNumber}<small>{driver.pitState === "pit-stall" ? "STALL" : "LANE"}</small></span>) : <span>Clear</span>}</div>
         <div><strong>Unavailable</strong><span>{groups.unknown.length}</span></div>
-        <div className="map-dock-cars">{groups.unknown.length ? groups.unknown.map((driver) => <button key={driver.carIdx} type="button" onClick={() => onSelectCar(driver.carIdx)} className={driver.carIdx === selectedCarIdx ? "is-selected" : ""} style={{ "--class-color": driver.classColor } as CSSProperties}>#{driver.carNumber}<small>{driver.trackStatus === "retired" ? "OUT" : "NO POS"}</small></button>) : <span>None</span>}</div>
+        <div className="map-dock-cars">{groups.unknown.length ? groups.unknown.map((driver) => onSelectCar ? <button key={driver.carIdx} type="button" onClick={() => onSelectCar(driver.carIdx)} className={driver.carIdx === selectedCarIdx ? "is-selected" : ""} style={{ "--class-color": driver.classColor } as CSSProperties}>#{driver.carNumber}<small>{driver.trackStatus === "retired" ? "OUT" : "NO POS"}</small></button> : <span className="map-dock-car" key={driver.carIdx} style={{ "--class-color": driver.classColor } as CSSProperties}>#{driver.carNumber}<small>{driver.trackStatus === "retired" ? "OUT" : "NO POS"}</small></span>) : <span>None</span>}</div>
       </aside>
     </section>
   );
