@@ -76,7 +76,7 @@
 .percentage-marker line { stroke: var(--ink); stroke-width: .3; }
 .percentage-marker circle { fill: var(--orange); stroke: var(--ink); stroke-width: .28; }
 .percentage-marker rect { fill: var(--ink); stroke: var(--stock); stroke-width: .18; }
-.percentage-marker text { fill: var(--stock); font: 700 1.45px var(--display); text-anchor: middle; letter-spacing: .04em; }
+.percentage-marker text { fill: var(--stock); font: 700 1.6px var(--display); text-anchor: middle; letter-spacing: .04em; }
 .percentage-marker.is-start circle { fill: var(--stock); stroke: var(--orange); stroke-width: .42; }
 .percentage-marker.is-start rect { fill: var(--orange); stroke: var(--ink); }
 .percentage-marker.is-start text { fill: var(--ink); }
