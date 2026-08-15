@@ -90,18 +90,25 @@ function assetForTrack(payload: unknown, trackId: number): TrackAsset | null {
   return Object.values(root).map(record).find((candidate) => Number(candidate?.track_id) === trackId) ?? null;
 }
 
-function mapPath(asset: TrackAsset): string | null {
+function mapUrl(asset: TrackAsset): URL | null {
   const layers = record(asset.track_map_layers);
-  const candidates = [layers?.active, asset.track_map];
-  return candidates.find((value): value is string => typeof value === "string" && value.trim().length > 0) ?? null;
+  const trackMap = typeof asset.track_map === "string" && asset.track_map.trim() ? officialImageUrl(asset.track_map) : null;
+  const activeLayer = typeof layers?.active === "string" && layers.active.trim() ? layers.active : null;
+  if (!activeLayer) return trackMap;
+  if (!trackMap) throw new IracingTrackMapError("iRacing published a map layer without its base map URL.", "invalid-asset-url");
+  return validateOfficialImageUrl(new URL(activeLayer, trackMap));
 }
 
-function officialImageUrl(path: string): URL {
-  const url = new URL(path.replace(/^\/+/, ""), IMAGE_ROOT);
+function validateOfficialImageUrl(url: URL): URL {
   if (url.protocol !== "https:" || url.hostname !== "images-static.iracing.com") {
     throw new IracingTrackMapError("iRacing returned an invalid track-map asset URL.", "invalid-asset-url");
   }
   return url;
+}
+
+function officialImageUrl(path: string): URL {
+  const url = new URL(path.replace(/^\/+/, ""), IMAGE_ROOT);
+  return validateOfficialImageUrl(url);
 }
 
 function attribute(tag: string, name: string): string | undefined {
@@ -234,9 +241,8 @@ export class IracingTrackMapClient {
     const trackId = Number(layout.trackId);
     const asset = assetForTrack(await this.dataPayload(), trackId);
     if (!asset) throw new IracingTrackMapError(`iRacing has no asset record for track layout ${trackId}.`, "asset-not-found", 404);
-    const path = mapPath(asset);
-    if (!path) throw new IracingTrackMapError(`iRacing does not publish an SVG map for track layout ${trackId}.`, "map-not-found", 404);
-    const sourceUrl = officialImageUrl(path);
+    const sourceUrl = mapUrl(asset);
+    if (!sourceUrl) throw new IracingTrackMapError(`iRacing does not publish an SVG map for track layout ${trackId}.`, "map-not-found", 404);
     const response = await this.fetch(sourceUrl, { headers: { Accept: "image/svg+xml, text/plain;q=0.8" } });
     if (!response.ok) throw new IracingTrackMapError(`The iRacing SVG map could not be downloaded (${response.status}).`, "map-download-failed", 502);
     const declaredLength = Number(response.headers.get("content-length"));
