@@ -170,49 +170,52 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
       </header>
 
       <main className="commentator-workspace" aria-labelledby="commentator-title">
-        <section className="commentator-heading">
-          <div>
-            <h1 id="commentator-title">Race timing</h1>
-            <p>{selectedDriver ? `Following #${selectedDriver.carNumber} ${selectedDriver.name} · ${selectedDriver.className} P${selectedDriver.classPosition}` : "Select a car to follow its class battle and stop detail."}</p>
-          </div>
+        <div className="commentator-commandbar">
+          <section className="commentator-heading">
+            <div>
+              <h1 id="commentator-title">Race timing</h1>
+              <p>{selectedDriver ? `Following #${selectedDriver.carNumber} ${selectedDriver.name} · ${selectedDriver.className} P${selectedDriver.classPosition}` : "Select a car to follow its class battle and stop detail."}</p>
+            </div>
+          </section>
+
+          <section className="commentator-controls" aria-label="Timing view controls">
+            <div className="class-filter" role="group" aria-label="Class filter">
+              <button className={preferences.classId === "all" ? "is-selected" : ""} onClick={() => selectClass("all")}>All classes <span>{session?.drivers.length ?? 0}</span></button>
+              {classes.map((carClass) => (
+                <button
+                  key={carClass.id}
+                  className={preferences.classId === carClass.id ? "is-selected" : ""}
+                  onClick={() => selectClass(carClass.id)}
+                  style={{ "--class-color": carClass.color } as CSSProperties}
+                >
+                  {carClass.name} <span>{carClass.carCount}</span>
+                </button>
+              ))}
+            </div>
+            <details className="column-chooser">
+              <summary><Columns3 aria-hidden="true" />Columns <span>{displayedColumnCount}</span></summary>
+              <fieldset>
+                <legend>Visible timing groups</legend>
+                {(Object.keys(commentatorColumnLabels) as CommentatorColumn[])
+                  .filter((column) => showClassGaps || (column !== "gap" && column !== "interval"))
+                  .map((column) => (
+                  <label key={column}><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => toggleColumn(column)} />{commentatorColumnLabels[column]}</label>
+                ))}
+              </fieldset>
+            </details>
+            <div className="position-view-toggle" role="group" aria-label="Track position view">
+              <button className={preferences.positionView === "map" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "map" }))}><MapIcon aria-hidden="true" />Map</button>
+              <button className={preferences.positionView === "ribbon" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "ribbon" }))}><GitCommitHorizontal aria-hidden="true" />Ribbon</button>
+            </div>
+          </section>
+
           <div className="commentator-key" aria-label="Timing key">
             <span><i className="key-selection" />Selected</span>
             <span><i className="key-rival" />Nearby in class</span>
             <span><b>~</b>Contains inference</span>
             <span><b>?</b>Quality not reported</span>
           </div>
-        </section>
-
-        <section className="commentator-controls" aria-label="Timing view controls">
-          <div className="class-filter" role="group" aria-label="Class filter">
-            <button className={preferences.classId === "all" ? "is-selected" : ""} onClick={() => selectClass("all")}>All classes <span>{session?.drivers.length ?? 0}</span></button>
-            {classes.map((carClass) => (
-              <button
-                key={carClass.id}
-                className={preferences.classId === carClass.id ? "is-selected" : ""}
-                onClick={() => selectClass(carClass.id)}
-                style={{ "--class-color": carClass.color } as CSSProperties}
-              >
-                {carClass.name} <span>{carClass.carCount}</span>
-              </button>
-            ))}
-          </div>
-          <details className="column-chooser">
-            <summary><Columns3 aria-hidden="true" />Columns <span>{displayedColumnCount}</span></summary>
-            <fieldset>
-              <legend>Visible timing groups</legend>
-              {(Object.keys(commentatorColumnLabels) as CommentatorColumn[])
-                .filter((column) => showClassGaps || (column !== "gap" && column !== "interval"))
-                .map((column) => (
-                <label key={column}><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => toggleColumn(column)} />{commentatorColumnLabels[column]}</label>
-              ))}
-            </fieldset>
-          </details>
-          <div className="position-view-toggle" role="group" aria-label="Track position view">
-            <button className={preferences.positionView === "map" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "map" }))}><MapIcon aria-hidden="true" />Map</button>
-            <button className={preferences.positionView === "ribbon" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "ribbon" }))}><GitCommitHorizontal aria-hidden="true" />Ribbon</button>
-          </div>
-        </section>
+        </div>
 
         <section className="commentator-intelligence" aria-label="Live race intelligence">
           <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} selectedCarIdx={preferences.selectedCarIdx} onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))} />

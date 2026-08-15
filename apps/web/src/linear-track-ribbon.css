@@ -12,6 +12,7 @@
 .track-ribbon-unobserved { grid-column: 1 / -1; display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--paper-line); }
 .track-ribbon-unobserved > div { display: flex; flex-wrap: wrap; gap: 4px; }
 .track-ribbon.variant-commentator { grid-template-columns: minmax(0, 1fr) minmax(190px, auto); gap: 10px 20px; padding: 10px 0; }
+.track-ribbon.variant-commentator .track-ribbon-unobserved > div { flex-wrap: nowrap; overflow-x: auto; }
 .track-ribbon-header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .track-ribbon-header > strong { font: 700 16px var(--display); text-transform: uppercase; letter-spacing: .065em; }
 .track-ribbon-header > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; color: var(--muted); font-size: 12px; }
