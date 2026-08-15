@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Columns3, Flag, GitCommitHorizontal, LineChart, LogOut, Map as MapIcon, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
+import { Columns3, Flag, LineChart, LogOut, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import { isExpectedUnavailableTimingField, type DriverState } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
@@ -24,14 +24,12 @@ interface CommentatorPreferences {
   classId: number | "all";
   expandedCarIdxs: number[];
   visibleColumns: CommentatorColumn[];
-  positionView: "map" | "ribbon";
 }
 
 const defaultPreferences: CommentatorPreferences = {
   classId: "all",
   expandedCarIdxs: [],
   visibleColumns: [...defaultCommentatorColumns],
-  positionView: "map",
 };
 
 function loadPreferences(): CommentatorPreferences {
@@ -45,7 +43,6 @@ function loadPreferences(): CommentatorPreferences {
         ? stored.expandedCarIdxs.filter((carIdx): carIdx is number => typeof carIdx === "number")
         : [],
       visibleColumns: validColumns.length > 0 ? validColumns : [...defaultCommentatorColumns],
-      positionView: stored.positionView === "ribbon" ? "ribbon" : "map",
     };
   } catch {
     return defaultPreferences;
@@ -133,6 +130,11 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
 
   const telemetryHealthy = socketConnected && state.connection === "connected";
   const session = state.session;
+  const overallFastestCarIdx = session?.drivers.reduce<DriverState | undefined>((fastest, driver) => {
+    const quality = driver.timingQuality?.bestLap?.quality;
+    if (driver.bestLap == null || !Number.isFinite(driver.bestLap) || driver.bestLap <= 0 || quality === "invalid" || quality === "incomplete") return fastest;
+    return !fastest || driver.bestLap < fastest.bestLap! ? driver : fastest;
+  }, undefined)?.carIdx;
   const isSimulated = session?.sourceMode === "simulation";
   const showClassGaps = classes.length > 1 || new Set(session?.drivers.map((driver) => driver.classId)).size > 1;
   const displayedColumnCount = 2 + [...visibleColumns].filter((column) => showClassGaps || (column !== "gap" && column !== "interval")).length;
@@ -174,7 +176,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           <section className="commentator-heading">
             <div>
               <h1 id="commentator-title">Race timing</h1>
-              <p>Read-only race order, timing, and stint detail.</p>
+              <p>Live running order, battle candidates, stint context, and pit detail.</p>
             </div>
           </section>
 
@@ -203,10 +205,6 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
                 ))}
               </fieldset>
             </details>
-            <div className="position-view-toggle" role="group" aria-label="Track position view">
-              <button className={preferences.positionView === "map" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "map" }))}><MapIcon aria-hidden="true" />Map</button>
-              <button className={preferences.positionView === "ribbon" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "ribbon" }))}><GitCommitHorizontal aria-hidden="true" />Ribbon</button>
-            </div>
             <button className={`gap-visualizer-trigger${gapHistory.modal.open ? " is-selected" : ""}`} onClick={openGapVisualizer} disabled={!session || classes.length === 0}><LineChart aria-hidden="true" />Gap visualizer</button>
           </section>
 
@@ -216,16 +214,9 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           </div>
         </div>
 
-        <section className="commentator-intelligence" aria-label="Live race intelligence">
-          <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} />
-          <div className={`quality-watch${warnings.length > 0 ? " has-warnings" : ""}`}>
-            <TriangleAlert aria-hidden="true" />
-            <div><strong>{warnings.length > 0 ? `${warnings.length} timing warning${warnings.length === 1 ? "" : "s"}` : "Timing quality clear"}</strong><span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span></div>
-          </div>
-        </section>
-
-        <div className="commentator-position-instrument">
-          {preferences.positionView === "map" && mapResource.definition && mapResource.calibration ? (
+        <section className="commentator-context-deck" aria-label="Circuit position and live race intelligence">
+          <div className="commentator-position-instrument">
+          {mapResource.definition && mapResource.calibration ? (
             <CircuitMap
               definition={mapResource.definition}
               calibration={mapResource.calibration}
@@ -235,17 +226,27 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
             />
           ) : (
             <>
-              {preferences.positionView === "map" && <p className="map-fallback-status" role="status">{mapResource.loading ? "Loading calibrated circuit map…" : mapResource.error ? `${mapResource.error} Showing linear track.` : "No verified map is active for this layout. Showing linear track."}</p>}
+              <p className="map-fallback-status" role="status">{mapResource.loading ? "Loading calibrated circuit map…" : mapResource.error ? `${mapResource.error} Showing linear track.` : "No verified map is active for this layout. Showing linear track."}</p>
               <LinearTrackRibbon
                 drivers={filteredDrivers}
                 variant="commentator"
               />
             </>
           )}
-        </div>
+          </div>
+          <div className="commentator-battle-context">
+            <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} />
+            <div className={`quality-watch${warnings.length > 0 ? " has-warnings" : ""}`}>
+              <TriangleAlert aria-hidden="true" />
+              <strong>{warnings.length > 0 ? `${warnings.length} timing warning${warnings.length === 1 ? "" : "s"}` : "Timing quality clear"}</strong>
+              <span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span>
+            </div>
+          </div>
+        </section>
 
         <CommentatorTimingTable
           drivers={filteredDrivers}
+          overallFastestCarIdx={overallFastestCarIdx}
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}
           groupByClass={false}
