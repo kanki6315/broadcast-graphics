@@ -245,6 +245,22 @@ export interface DriverState {
   lastLapLapsBehindClassLeader: number | null;
 }
 
+/** True when a timing field has no meaningful value for the driver's current race position. */
+export function isExpectedUnavailableTimingField(driver: DriverState, field: string): boolean {
+  switch (field) {
+    case "gapToLeader":
+      return driver.position === 1 || driver.lapsBehindLeader > 0;
+    case "intervalToAhead":
+      return driver.position === 1;
+    case "classGapToLeader":
+      return driver.classPosition === 1 || driver.lapsBehindClassLeader > 0;
+    case "classIntervalToAhead":
+      return driver.classPosition === 1;
+    default:
+      return false;
+  }
+}
+
 export interface CarClassState {
   id: number;
   name: string;

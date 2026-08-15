@@ -106,3 +106,18 @@ test("a sector revision change resets the session cache instead of mixing compar
   assert.equal(service.snapshot()?.sectorDefinitionRevision, "r2");
   assert.ok(service.snapshot()?.gapTrends.every((trend) => trend.quality === "incomplete"));
 });
+
+test("does not warn for timing fields that are unavailable by position or lap deficit", () => {
+  const service = new RaceIntelligenceService(() => 0, 0);
+  service.ingest(session(20, [driver(19, 1, 1, null, {
+    lapsBehindLeader: 6,
+    timingQuality: {
+      gapToLeader: { source: "derived", quality: "incomplete" },
+      classIntervalToAhead: { source: "derived", quality: "incomplete" },
+      lastLap: { source: "iracing", quality: "incomplete" },
+    },
+  })]));
+
+  const warnings = service.snapshot()!.qualityWarnings;
+  assert.deepEqual(warnings.map((warning) => warning.field), ["lastLap"]);
+});

@@ -10,6 +10,7 @@ import type {
   TimingQualityWarning,
   TrendSuppressionReason,
 } from "@racecontrol/protocol";
+import { isExpectedUnavailableTimingField } from "@racecontrol/protocol";
 
 interface GapSample { at: number; gap: number; }
 interface StintState extends DriverStintSummary { startLap: number; }
@@ -246,6 +247,7 @@ function qualityWarnings(session: SessionState, at: number, _byCar: Map<number, 
   for (const driver of session.drivers) {
     for (const [field, quality] of Object.entries(driver.timingQuality ?? {})) {
       if (!quality || quality.quality === "valid") continue;
+      if (isExpectedUnavailableTimingField(driver, field)) continue;
       warnings.push({
         id: `${driver.carIdx}:${field}:${quality.reason ?? quality.quality}`,
         carIdx: driver.carIdx, field, quality: quality.quality, reason: quality.reason,

@@ -7,6 +7,7 @@ import {
   type PitCycleSummary,
   type CompletedSector,
   type TimingQualityMetadata,
+  isExpectedUnavailableTimingField,
 } from "@racecontrol/protocol";
 import React from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -240,7 +241,7 @@ function stintSummary(stint: DriverStintSummary | undefined) {
 function qualityWarnings(driver: DriverState): string[] {
   if (!driver.timingQuality) return ["Timing quality metadata not reported"];
   return Object.entries(driver.timingQuality)
-    .filter(([, quality]) => quality && quality.quality !== "valid")
+    .filter(([field, quality]) => quality && quality.quality !== "valid" && !isExpectedUnavailableTimingField(driver, field))
     .map(([field, quality]) => `${field}: ${qualityLabel(quality)}`);
 }
 

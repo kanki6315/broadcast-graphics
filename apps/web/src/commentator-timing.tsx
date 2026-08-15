@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Columns3, Flag, GitCommitHorizontal, LogOut, Map as MapIcon, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
-import type { DriverState } from "@racecontrol/protocol";
+import { isExpectedUnavailableTimingField, type DriverState } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
   defaultCommentatorColumns,
@@ -135,7 +135,13 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const isSimulated = session?.sourceMode === "simulation";
   const intelligence = state.intelligence;
   const warningCarIdxs = new Set(filteredDrivers.map((driver) => driver.carIdx));
-  const warnings = (intelligence?.qualityWarnings ?? []).filter((warning) => warning.carIdx == null || warningCarIdxs.has(warning.carIdx));
+  const driversByCarIdx = new Map(filteredDrivers.map((driver) => [driver.carIdx, driver]));
+  const warnings = (intelligence?.qualityWarnings ?? []).filter((warning) => {
+    if (warning.carIdx == null) return true;
+    if (!warningCarIdxs.has(warning.carIdx)) return false;
+    const driver = driversByCarIdx.get(warning.carIdx);
+    return !driver || !isExpectedUnavailableTimingField(driver, warning.field);
+  });
 
   return (
     <div className="commentator-shell">

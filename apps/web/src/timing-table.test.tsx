@@ -97,6 +97,27 @@ test("stint context is presented from the canonical intelligence snapshot", () =
   assert.match(markup, /inferred-box · inferred/);
 });
 
+test("expanded confidence omits positionally unavailable leader timing", () => {
+  const current = driver({
+    position: 20,
+    classPosition: 1,
+    lapsBehindLeader: 6,
+    timingQuality: {
+      gapToLeader: { source: "derived", quality: "incomplete" },
+      classIntervalToAhead: { source: "derived", quality: "incomplete" },
+      lastLap: { source: "iracing", quality: "incomplete" },
+    },
+  });
+  const markup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]} selectedCarIdx={7} nearbyCarIdxs={new Set()} expandedCarIdxs={new Set([7])}
+    visibleColumns={new Set(defaultCommentatorColumns)} groupByClass={false} onSelectCar={() => {}} onToggleExpanded={() => {}}
+  />);
+
+  assert.doesNotMatch(markup, /gapToLeader: incomplete/);
+  assert.doesNotMatch(markup, /classIntervalToAhead: incomplete/);
+  assert.match(markup, /lastLap: incomplete/);
+});
+
 test("Battle Watch filters shared candidates by class and contains no control commands", () => {
   const drivers = [driver({ carIdx: 1, carNumber: "1", classId: 1 }), driver({ carIdx: 2, carNumber: "2", classId: 1 }), driver({ carIdx: 3, carNumber: "3", classId: 2 }), driver({ carIdx: 4, carNumber: "4", classId: 2 })];
   const intelligence: RaceIntelligenceSnapshot = {
