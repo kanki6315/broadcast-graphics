@@ -20,6 +20,11 @@ interface ProjectedCar {
   uncertain: boolean;
 }
 
+interface LabelLayout {
+  cars: ProjectedCar[];
+  offsets: Map<number, DisplayPoint>;
+}
+
 function rotatePoint(point: DisplayPoint, center: DisplayPoint, degrees: number): DisplayPoint {
   const radians = degrees * Math.PI / 180;
   const cosine = Math.cos(radians);
@@ -46,27 +51,40 @@ function projectPoint(point: DisplayPoint, viewBox: [number, number, number, num
   return { x: offsetX + (rotated.x - viewX) * scale, y: offsetY + (rotated.y - viewY) * scale };
 }
 
-function spreadLabels(cars: ProjectedCar[], stage: DisplayPoint, minimumX = 41, minimumY = 27): ProjectedCar[] {
+function spreadLabels(cars: ProjectedCar[], stage: DisplayPoint, previousOffsets: ReadonlyMap<number, DisplayPoint>, minimumX = 41, minimumY = 27): LabelLayout {
   const placed: ProjectedCar[] = [];
+  const nextOffsets = new Map<number, DisplayPoint>();
   const step = minimumY + 1;
   const offsets = [0, -step, step, -step * 2, step * 2, -step * 3, step * 3];
   for (const car of cars) {
     let candidate = car.displayPoint;
-    outer: for (const yOffset of offsets) {
-      for (const xOffset of [0, -22, 22]) {
-        const next = {
-          x: Math.max(24, Math.min(stage.x - 24, car.displayPoint.x + xOffset)),
-          y: Math.max(17, Math.min(stage.y - 17, car.displayPoint.y + yOffset)),
-        };
-        if (placed.every((item) => Math.abs(item.displayPoint.x - next.x) >= minimumX || Math.abs(item.displayPoint.y - next.y) >= minimumY)) {
-          candidate = next;
-          break outer;
-        }
+    let selectedOffset = { x: 0, y: 0 };
+    const previousOffset = previousOffsets.get(car.driver.carIdx);
+    if (previousOffset) {
+      candidate = {
+        x: Math.max(24, Math.min(stage.x - 24, car.displayPoint.x + previousOffset.x)),
+        y: Math.max(17, Math.min(stage.y - 17, car.displayPoint.y + previousOffset.y)),
+      };
+      placed.push({ ...car, displayPoint: candidate });
+      nextOffsets.set(car.driver.carIdx, previousOffset);
+      continue;
+    }
+    const candidates = offsets.flatMap((yOffset) => [0, -22, 22].map((xOffset) => ({ x: xOffset, y: yOffset })));
+    outer: for (const { x: xOffset, y: yOffset } of candidates) {
+      const next = {
+        x: Math.max(24, Math.min(stage.x - 24, car.displayPoint.x + xOffset)),
+        y: Math.max(17, Math.min(stage.y - 17, car.displayPoint.y + yOffset)),
+      };
+      if (placed.every((item) => Math.abs(item.displayPoint.x - next.x) >= minimumX || Math.abs(item.displayPoint.y - next.y) >= minimumY)) {
+        candidate = next;
+        selectedOffset = { x: xOffset, y: yOffset };
+        break outer;
       }
     }
     placed.push({ ...car, displayPoint: candidate });
+    nextOffsets.set(car.driver.carIdx, selectedOffset);
   }
-  return placed;
+  return { cars: placed, offsets: nextOffsets };
 }
 
 function isPit(driver: DriverState): boolean {
@@ -83,6 +101,7 @@ function unavailable(driver: DriverState): boolean {
 export function CircuitMap({ definition, calibration, drivers, sectorBoundaries = [], fallback }: CircuitMapProps) {
   const pathRef = useRef<SVGPathElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const labelOffsetsRef = useRef<Map<number, DisplayPoint>>(new Map());
   const [pathReady, setPathReady] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [stageSize, setStageSize] = useState<DisplayPoint>({ x: 0, y: 0 });
@@ -135,7 +154,10 @@ export function CircuitMap({ definition, calibration, drivers, sectorBoundaries 
     uncertain: driver.timingQuality?.lapDistPct?.quality === "inferred",
   })), [calibration.rotationDegrees, definition.viewBox, positioned.points, stageSize]);
 
-  const labelCars = useMemo(() => spreadLabels(projectedCars, stageSize), [projectedCars, stageSize]);
+  const labelLayout = useMemo(() => spreadLabels(projectedCars, stageSize, labelOffsetsRef.current), [projectedCars, stageSize]);
+  useLayoutEffect(() => {
+    labelOffsetsRef.current = labelLayout.offsets;
+  }, [labelLayout.offsets]);
 
   if (renderError || positioned.error) return <><div className="circuit-map-error" role="alert"><strong>Circuit map unavailable</strong><span>{renderError ?? positioned.error} Linear track remains active.</span></div>{fallback}</>;
 
@@ -160,7 +182,7 @@ export function CircuitMap({ definition, calibration, drivers, sectorBoundaries 
           </g>
         </svg>
         <div className="circuit-map-label-layer" aria-label="Cars circulating on the circuit">
-          {labelCars.map((car) => (
+          {labelLayout.cars.map((car) => (
             <span
               key={car.driver.carIdx}
               title={`#${car.driver.carNumber} ${car.driver.name} · ${car.driver.className} P${car.driver.classPosition}${car.uncertain ? " · position inferred" : ""}`}
