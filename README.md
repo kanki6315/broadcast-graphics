@@ -33,8 +33,8 @@ http://localhost:5173/overlay?package=pri-hoosier-500
 Map configuration is an authenticated operator task; the commentator page remains read-only.
 
 1. Connect live, replay, or simulated telemetry so Gantry has the current exact track layout identity.
-2. Open `/control`, choose **Track config**, then select a local SVG under **Import and select centerline**. Supported sources are manually imported, bundled, or a documented official iRacing source if one is added later; Gantry does not scrape track assets.
-3. Review the sanitized path-only preview. Choose the closed path that represents the racing centerline and store it. If multiple paths validate, selection is always explicit; an automatic first choice is only a suggestion.
+2. Open `/control`, choose **Track config**, then use **Import from iRacing** to retrieve the official SVG for the live `track_id`. A local SVG remains available as a fallback.
+3. The official import is stored automatically only when its active layer contains one valid closed path. For a local SVG, review the sanitized preview and explicitly choose the path representing the racing centerline. Gantry never guesses when multiple official paths validate.
 4. Choose the stored map. Click the centerline at start/finish, select forward or reverse travel, optionally set display rotation, and save a new calibration revision.
 5. Review the 10% progression markers against known track direction or a replay. Activate the saved calibration for this layout.
 6. In **Sector definition editor**, start from the active native iRacing boundaries, drag handles on the centerline, use arrow keys for 0.5%-lap moves, add a boundary by arming **Add boundary** and clicking the path, or delete an optional boundary. S1/start-finish cannot move here.
@@ -88,6 +88,8 @@ Before a release, complete the [Windows telemetry client smoke test](docs/window
 
 The server requires `ADMIN_PASSWORD` and `DATABASE_URL` in production. In development it prints a random one-time admin password at startup and uses `apps/server/data/auth.json` unless a database URL is supplied. Production access keys, admin sessions, broadcast sessions, entries, drivers, and completed laps are stored in PostgreSQL. Raw telemetry frames remain in memory. Key secrets are hashed and their full value is shown only when created. The access screen generates vMix/OBS overlay URLs with a view key in the URL fragment, keeping it out of ordinary HTTP requests and referrer headers.
 
+Official track-map import uses iRacing's headless OAuth **Password Limited** flow. Set `IRACING_CLIENT_ID`, `IRACING_CLIENT_SECRET`, `IRACING_USERNAME`, and `IRACING_PASSWORD` only in the server environment. Gantry masks both secrets as required before transmission, caches the short-lived access token in memory, and rotates the single-use refresh token. Credentials and tokens are never returned to the browser or written to the database.
+
 ## Railway deployment
 
 The repository includes a multi-stage production `Dockerfile` and `railway.toml`. The container tests and publishes the Windows telemetry client, then builds the control panel, overlays, protocol package, and server into one deployment so downloads, HTTP, authentication, and WebSocket traffic share the same origin.
@@ -102,6 +104,10 @@ The repository includes a multi-stage production `Dockerfile` and `railway.toml`
    ADMIN_PASSWORD=<long generated password>
    DATABASE_URL=${{Postgres.DATABASE_URL}}
    DISABLE_SIMULATOR=1
+   IRACING_CLIENT_ID=<issued OAuth client ID>
+   IRACING_CLIENT_SECRET=<issued OAuth client secret>
+   IRACING_USERNAME=<authorized iRacing account email>
+   IRACING_PASSWORD=<iRacing account password>
    ```
 
    If the database service has a name other than `Postgres`, use that service name in the reference variable. The server creates its authentication and `bg_*` race-history tables during startup.

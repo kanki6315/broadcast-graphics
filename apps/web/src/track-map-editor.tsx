@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowLeft, Check, CircleDot, GitBranch, LockKeyhole, MapPinned, MousePointer2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Check, CircleDot, CloudDownload, GitBranch, LockKeyhole, MapPinned, MousePointer2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import type {
   SectorBoundary,
   SectorDefinitionRevision,
@@ -104,6 +104,18 @@ export function TrackMapEditor() {
     finally { setBusy(false); }
   }
 
+  async function importIracingMap() {
+    if (!layout) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const map = await api<TrackMapDefinition>("/api/track-config/maps/iracing", { method: "POST", body: JSON.stringify({ layout }) });
+      setMaps((current) => current.some((item) => item.id === map.id) ? current : [map, ...current]);
+      setSelectedMapId(map.id);
+      setMessage(`Official iRacing centerline stored as map ${map.id.slice(0, 8)}. Calibrate start/finish and direction before activation.`);
+    } catch (importError) { setError(importError instanceof Error ? importError.message : "The iRacing map could not be imported."); }
+    finally { setBusy(false); }
+  }
+
   function projected(event: Pick<ReactPointerEvent<SVGSVGElement>, "clientX" | "clientY">) {
     if (!svgRef.current || !pathRef.current || !activeCalibration) return null;
     return projectToPath(pathRef.current, clientPointToViewBox(svgRef.current, event.clientX, event.clientY), activeCalibration);
@@ -195,6 +207,8 @@ export function TrackMapEditor() {
         {(error || message) && <div className={`map-config-notice${error ? " is-error" : ""}`} role={error ? "alert" : "status"}>{error || message}<button type="button" onClick={() => { setError(""); setMessage(""); }}>Dismiss</button></div>}
         <div className="map-config-grid">
           <section className="map-import-panel" aria-labelledby="map-import-title"><header><Upload aria-hidden="true" /><div><h2 id="map-import-title">Import and select centerline</h2><p>SVG only · 1 MB · inert closed paths</p></div></header>
+            <button className="iracing-import" type="button" disabled={busy || !layout.trackId} onClick={() => void importIracingMap()}><CloudDownload aria-hidden="true" /><span><strong>{busy ? "Contacting iRacing…" : "Import from iRacing"}</strong><small>Official SVG for track layout {layout.trackId ?? "unknown"}</small></span></button>
+            <div className="import-divider"><span>or choose a local file</span></div>
             <label className="svg-drop"><input type="file" accept="image/svg+xml,.svg" disabled={busy} onChange={(event) => void selectFile(event.target.files?.[0])} /><Upload aria-hidden="true" /><strong>{busy ? "Validating asset…" : "Choose local SVG"}</strong><span>Scripts, event handlers, CSS, images, fonts, and external URLs are rejected.</span></label>
             {preview && <div className="path-selection"><div className="path-preview"><svg viewBox={preview.viewBox.join(" ")} aria-label="Sanitized path candidates">{preview.candidates.map((candidate) => <path key={candidate.id} d={candidate.pathData} className={candidate.id === selectedPathId ? "is-selected" : ""} onClick={() => setSelectedPathId(candidate.id)} />)}</svg></div><fieldset><legend>Validated paths</legend>{preview.candidates.map((candidate) => <label key={candidate.id} className={candidate.id === selectedPathId ? "is-selected" : ""}><input type="radio" name="centerline" checked={candidate.id === selectedPathId} onChange={() => setSelectedPathId(candidate.id)} /><span><strong>{candidate.id}</strong><small>{candidate.length.toFixed(1)} units · closed</small></span></label>)}</fieldset><button className="config-primary" type="button" disabled={!selectedPathId || busy} onClick={() => void saveMap()}><Save aria-hidden="true" />Store selected centerline</button></div>}
           </section>
