@@ -335,7 +335,14 @@ internal static class TelemetrySnapshotMapper
             string.Equals(sectorDefinitionOverride.TrackName, trackName ?? "Unknown track", StringComparison.OrdinalIgnoreCase)
                 ? sectorDefinitionOverride with { SessionId = sessionId }
                 : nativeSectorDefinition;
-        trackTiming?.Observe(sessionId, sessionTime, drivers, sectorDefinition);
+        trackTiming?.Observe(
+            sessionId,
+            sessionTime,
+            drivers,
+            sectorDefinition,
+            sessionType,
+            phase,
+            weekend?.WeekendOptions?.StandingStart == 1);
         drivers = AddRaceTiming(drivers, sessionType, sessionTime, trackTiming)
             .Select(driver => driver with { Sectors = trackTiming?.GetSectorTiming(driver.CarIdx, driver.CurrentLap) })
             .ToArray();

@@ -40,6 +40,52 @@ public sealed class TrackTimingTrackerTests
     }
 
     [Fact]
+    public void TracksSectorOneOnFirstQualifyingLapAfterLapZeroOutLap()
+    {
+        var tracker = new TrackTimingTracker();
+        Observe(tracker, 10, Driver(0, 0, .95), ThreeSectors);
+        Observe(tracker, 11, Driver(0, 1, .05), ThreeSectors);
+        Observe(tracker, 13.5, Driver(0, 1, .35), ThreeSectors);
+        Observe(tracker, 16.5, Driver(0, 1, .75), ThreeSectors);
+        Observe(tracker, 19, Driver(0, 2, .05, lastLap: 8.0833), ThreeSectors);
+
+        var lap = tracker.GetCompletedSectorTimes(0).Where(sector => sector.LapNumber == 1).ToArray();
+        Assert.Equal([1, 2, 3], lap.Select(sector => sector.SectorNumber));
+        Assert.All(lap, sector => Assert.Equal("valid", sector.Quality));
+        AssertClose(8.0833, lap.Sum(sector => sector.Value));
+    }
+
+    [Fact]
+    public void StandingStartSeedsFirstRaceSectorAtRacingTransition()
+    {
+        var tracker = new TrackTimingTracker();
+        ObserveRace(tracker, 9, Driver(0, 0, .95), "warmup", standingStart: true);
+        ObserveRace(tracker, 10, Driver(0, 0, .95), "racing", standingStart: true);
+        ObserveRace(tracker, 11, Driver(0, 1, .05), "racing", standingStart: true);
+        ObserveRace(tracker, 13.5, Driver(0, 1, .35), "racing", standingStart: true);
+
+        var sector = Assert.Single(tracker.GetCompletedSectorTimes(0));
+        Assert.Equal(1, sector.LapNumber);
+        Assert.Equal(1, sector.SectorNumber);
+        Assert.Equal("valid", sector.Quality);
+        AssertClose(3.0833, sector.Value);
+    }
+
+    [Fact]
+    public void RollingStartDoesNotSeedAllCarsAtRacingTransition()
+    {
+        var tracker = new TrackTimingTracker();
+        ObserveRace(tracker, 9, Driver(0, 0, .90), "parade-laps", standingStart: false);
+        ObserveRace(tracker, 10, Driver(0, 0, .92), "racing", standingStart: false);
+        ObserveRace(tracker, 11, Driver(0, 1, .02), "racing", standingStart: false);
+        ObserveRace(tracker, 13.5, Driver(0, 1, .35), "racing", standingStart: false);
+
+        var sector = Assert.Single(tracker.GetCompletedSectorTimes(0));
+        Assert.Equal(1, sector.SectorNumber);
+        AssertClose(2.3212, sector.Value);
+    }
+
+    [Fact]
     public void IndexesPersonalClassAndOverallFastestSectorsOnlyWhenResultsChange()
     {
         var tracker = new TrackTimingTracker();
@@ -189,6 +235,14 @@ public sealed class TrackTimingTrackerTests
 
     private static void Observe(TrackTimingTracker tracker, double time, DriverState driver, SectorDefinition definition) =>
         tracker.Observe(definition.SessionId, time, [driver], definition);
+
+    private static void ObserveRace(
+        TrackTimingTracker tracker,
+        double time,
+        DriverState driver,
+        string phase,
+        bool standingStart) =>
+        tracker.Observe(ThreeSectors.SessionId, time, [driver], ThreeSectors, "race", phase, standingStart);
 
     private static DriverState Driver(int carIdx, int lap, double pct, double? lastLap = null) => new(
         carIdx, carIdx + 1, (carIdx + 1).ToString(), $"Driver {carIdx}", $"Team {carIdx}", "GT3",

@@ -23,6 +23,7 @@ internal sealed class TrackTimingTracker
     private readonly Dictionary<int, CarHistory> cars = [];
     private string? sessionId;
     private string? definitionRevision;
+    private string? lastPhase;
     private double lastSessionTime = double.NegativeInfinity;
     private SectorDefinition? definition;
     private bool comparisonsDirty;
@@ -31,7 +32,10 @@ internal sealed class TrackTimingTracker
         string currentSessionId,
         double? sessionTime,
         IReadOnlyList<DriverState> drivers,
-        SectorDefinition? sectorDefinition = null)
+        SectorDefinition? sectorDefinition = null,
+        string sessionType = "practice",
+        string phase = "invalid",
+        bool standingStart = false)
     {
         if (sessionTime is null || !double.IsFinite(sessionTime.Value)) return;
         var sessionChanged = !string.Equals(sessionId, currentSessionId, StringComparison.Ordinal) ||
@@ -42,11 +46,17 @@ internal sealed class TrackTimingTracker
             cars.Clear();
             sessionId = currentSessionId;
             comparisonsDirty = false;
+            lastPhase = null;
         }
 
         definition = sectorDefinition;
         definitionRevision = sectorDefinition?.Revision;
         lastSessionTime = sessionTime.Value;
+        var standingStartBegan = standingStart &&
+            string.Equals(sessionType, "race", StringComparison.Ordinal) &&
+            string.Equals(phase, "racing", StringComparison.Ordinal) &&
+            lastPhase is "get-in-car" or "warmup" or "parade-laps";
+        lastPhase = phase;
         var observedCars = drivers.Select(driver => driver.CarIdx).ToHashSet();
         foreach (var history in cars.Where(pair => !observedCars.Contains(pair.Key)).Select(pair => pair.Value))
             history.Missing = true;
@@ -75,6 +85,7 @@ internal sealed class TrackTimingTracker
 
             var invalidReason = DiscontinuityReason(history, driver, distance!.Value, sessionTime.Value);
             if (invalidReason is not null) Invalidate(history, invalidReason);
+            if (standingStartBegan) SeedStandingStart(history, sessionTime.Value);
 
             var sample = new TrackSample(
                 distance.Value,
@@ -170,6 +181,10 @@ internal sealed class TrackTimingTracker
         {
             var crossing = Interpolate(before, after, boundary.AbsoluteDistance);
             var closeEnough = after.SessionTime - before.SessionTime <= MaximumBoundarySampleSeconds;
+            if (history.LastCrossing is { SyntheticStart: true } synthetic &&
+                boundary.SectorNumber == synthetic.SectorNumber &&
+                Math.Abs(boundary.AbsoluteDistance - synthetic.AbsoluteDistance) < 0.000_001)
+                continue;
             if (history.LastCrossing is { } start)
             {
                 var expected = NextSector(start.SectorNumber, definition.Boundaries);
@@ -217,6 +232,14 @@ internal sealed class TrackTimingTracker
             }
             history.LastCrossing = crossing with { SectorNumber = boundary.SectorNumber };
         }
+    }
+
+    private void SeedStandingStart(CarHistory history, double sessionTime)
+    {
+        var start = definition?.Boundaries.MinBy(boundary => boundary.StartPct);
+        if (start is null || start.StartPct > 0.001) return;
+        history.PendingInvalidReason = null;
+        history.LastCrossing = new TrackCrossing(start.StartPct, sessionTime, history.Generation, start.SectorNumber, true);
     }
 
     private void ReconcileCompletedLap(CarHistory history, DriverState driver, double sessionTime)
@@ -358,7 +381,9 @@ internal sealed class TrackTimingTracker
     }
 
     private static double? RaceDistance(DriverState driver) =>
-        driver.CurrentLap > 0 && driver.LapDistPct is >= 0 and < 1.5
+        // iRacing reports the qualifying out-lap as lap zero. Keeping that
+        // distance lets the start/finish crossing seed sector one of lap one.
+        driver.CurrentLap >= 0 && driver.LapDistPct is >= 0 and < 1.5
             ? driver.CurrentLap - 1 + driver.LapDistPct.Value
             : null;
 
@@ -375,6 +400,11 @@ internal sealed class TrackTimingTracker
     }
 
     private sealed record TrackSample(double Distance, double SessionTime, int LapNumber, double LapDistPct, int Generation);
-    private sealed record TrackCrossing(double AbsoluteDistance, double SessionTime, int Generation, int SectorNumber);
+    private sealed record TrackCrossing(
+        double AbsoluteDistance,
+        double SessionTime,
+        int Generation,
+        int SectorNumber,
+        bool SyntheticStart = false);
     private sealed record BoundaryCrossing(int SectorNumber, double AbsoluteDistance);
 }
