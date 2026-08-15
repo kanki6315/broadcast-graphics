@@ -145,7 +145,7 @@ export interface CommentatorTimingTableProps {
   stints?: DriverStintSummary[];
   gapTrends?: GapTrend[];
   pitCycles?: PitCycleSummary[];
-  onSelectCar: (carIdx: number) => void;
+  onSelectCar?: (carIdx: number) => void;
   onToggleExpanded: (carIdx: number) => void;
 }
 
@@ -351,16 +351,16 @@ export function CommentatorTimingTable({
               ) : null,
               <tr
                 key={driver.carIdx}
-                className={`${selected ? "is-selected" : ""}${nearby ? " is-nearby" : ""}`}
-                onClick={() => onSelectCar(driver.carIdx)}
+                className={`${selected ? "is-selected" : ""}${nearby ? " is-nearby" : ""}${onSelectCar ? " is-selectable" : ""}`}
+                onClick={onSelectCar ? () => onSelectCar(driver.carIdx) : undefined}
                 onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
+                  if (!onSelectCar || (event.key !== "Enter" && event.key !== " ")) return;
                   event.preventDefault();
                   onSelectCar(driver.carIdx);
                 }}
-                tabIndex={0}
-                aria-label={`Follow ${driver.name}, class position ${driver.classPosition}`}
-                aria-current={selected ? "true" : undefined}
+                tabIndex={onSelectCar ? 0 : undefined}
+                aria-label={onSelectCar ? `Follow ${driver.name}, class position ${driver.classPosition}` : undefined}
+                aria-current={onSelectCar && selected ? "true" : undefined}
               >
                 <td className="position-cell" aria-expanded={expanded} title={`${expanded ? "Hide" : "Show"} timing detail`} onClick={(event) => { event.stopPropagation(); onToggleExpanded(driver.carIdx); }}><span><strong>{driver.position}</strong><small className="class-position" style={{ "--class-color": driver.classColor } as CSSProperties}>C{driver.classPosition}</small></span></td>
                 <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small><span className="team-name">{driver.team}</span><span className="driver-class-name">{driver.className}</span></small></span></td>

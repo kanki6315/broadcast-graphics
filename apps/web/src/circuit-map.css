@@ -1,14 +1,12 @@
-.circuit-map { min-height: 196px; display: grid; grid-template-columns: minmax(0, 1fr) 154px; grid-template-rows: auto minmax(0, 1fr); border-block: 1px solid var(--ink); background: var(--stock); font-variant-numeric: tabular-nums; }
-.circuit-map > header { grid-column: 1 / -1; min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 5px 9px; border-bottom: 1px solid var(--ink); }
-.circuit-map > header strong { display: block; font: 700 13px var(--display); text-transform: uppercase; letter-spacing: .08em; }
-.circuit-map > header > div:first-child span { display: block; margin-top: 2px; color: var(--muted); font: 600 8px var(--display); text-transform: uppercase; letter-spacing: .07em; }
-.circuit-map-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 12px; color: var(--muted); font-size: 9px; }
-.circuit-map-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.circuit-map { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 144px; grid-template-rows: 36px minmax(0, 1fr); background: var(--stock); font-variant-numeric: tabular-nums; }
+.circuit-map > header { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; border-bottom: 1px solid var(--ink); }
+.circuit-map > header strong { display: block; font: 700 12px var(--display); text-transform: uppercase; letter-spacing: .08em; }
+.circuit-map > header > div:first-child span { display: block; margin-top: 1px; color: var(--muted); font: 600 7px var(--display); text-transform: uppercase; letter-spacing: .07em; }
+.circuit-map-legend { min-width: 0; display: flex; justify-content: flex-end; gap: 8px; color: var(--muted); font-size: 8px; white-space: nowrap; }
+.circuit-map-legend span { display: inline-flex; align-items: center; gap: 3px; }
 .circuit-map-legend i, .circuit-map-legend b { width: 11px; height: 11px; display: grid; place-items: center; border: 1px solid var(--ink); font: 700 8px var(--display); }
-.circuit-map-legend .legend-selected { outline: 2px solid var(--orange); outline-offset: 1px; background: var(--ink); }
-.circuit-map-legend .legend-nearby { background: var(--inspection); }
-.circuit-map-stage { min-width: 0; min-height: 160px; background-image: linear-gradient(var(--paper-line) 1px, transparent 1px), linear-gradient(90deg, var(--paper-line) 1px, transparent 1px); background-size: 24px 24px; overflow: hidden; }
-.circuit-map-stage svg { width: 100%; height: 100%; max-height: 245px; display: block; padding: 10px; overflow: visible; }
+.circuit-map-stage { position: relative; min-width: 0; min-height: 0; background-image: linear-gradient(var(--paper-line) 1px, transparent 1px), linear-gradient(90deg, var(--paper-line) 1px, transparent 1px); background-size: 24px 24px; overflow: hidden; }
+.circuit-map-stage svg { width: 100%; height: 100%; display: block; padding: 10px; overflow: visible; }
 .circuit-map-bed, .circuit-map-centerline { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .circuit-map-bed { stroke: var(--stock); stroke-width: 9; }
 .circuit-map-centerline { stroke: var(--ink); stroke-width: 3; }
@@ -16,30 +14,25 @@
 .sector-map-marker text { fill: var(--muted); font: 700 7px var(--display); text-anchor: middle; paint-order: stroke; stroke: var(--stock); stroke-width: 2px; }
 .sector-map-marker.is-start circle { fill: var(--orange); stroke: var(--ink); }
 .sector-map-marker.is-start text { fill: var(--ink); }
-.circuit-car { --class-color: var(--muted); cursor: pointer; transition: transform 140ms cubic-bezier(.16, 1, .3, 1); outline: none; }
-.circuit-car circle { fill: var(--stock); stroke: var(--class-color); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
-.circuit-car text { fill: var(--ink); font: 700 6px var(--display); pointer-events: none; }
-.circuit-car.is-nearby circle { fill: color-mix(in srgb, var(--class-color) 20%, var(--stock)); stroke-width: 3.5; }
-.circuit-car.is-selected circle { fill: var(--ink); stroke: var(--orange); stroke-width: 4; }
-.circuit-car.is-selected text { fill: var(--stock); }
-.circuit-car:focus-visible circle { stroke: var(--orange); stroke-width: 5; }
-.circuit-car.is-uncertain circle { stroke-dasharray: 3 2; }
-.circuit-car .leader-mark { fill: var(--stock); stroke: var(--ink); stroke-width: 3px; paint-order: stroke; font-size: 7px; }
+.circuit-car-anchor { --class-color: var(--muted); pointer-events: none; transition: transform 140ms cubic-bezier(.16, 1, .3, 1); }
+.circuit-car-anchor circle { fill: var(--stock); stroke: var(--class-color); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.circuit-car-anchor.is-uncertain circle { stroke-dasharray: 3 2; }
+.circuit-map-label-layer { position: absolute; inset: 0; pointer-events: none; }
+.circuit-car-label { --class-color: var(--muted); position: absolute; min-width: 32px; height: 24px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; border: 1px solid var(--ink); border-top: 2px solid var(--class-color); padding: 1px 5px; background: var(--ink); color: var(--stock); font: 700 11px/1 var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; transform: translate(-50%, -50%); transition: left 140ms cubic-bezier(.16, 1, .3, 1), top 140ms cubic-bezier(.16, 1, .3, 1); }
+.circuit-car-label b { min-width: 10px; height: 10px; display: grid; place-items: center; border: 1px solid currentColor; font: 700 7px/1 var(--display); }
+.circuit-car-label.is-uncertain { border-style: dashed; }
 .circuit-map-dock { min-width: 0; display: grid; grid-template-columns: 1fr auto; align-content: start; border-left: 1px solid var(--ink); background: rgba(184, 194, 189, .12); }
-.circuit-map-dock > div:nth-child(odd) { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--ink); font: 700 10px var(--display); text-transform: uppercase; }
+.circuit-map-dock > div:nth-child(odd) { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px; border-bottom: 1px solid var(--ink); font: 700 9px var(--display); text-transform: uppercase; }
 .circuit-map-dock > div:nth-child(odd) span { color: var(--orange); }
-.map-dock-cars { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; min-height: 31px; padding: 5px 7px 8px; color: var(--muted); font-size: 9px; }
-.map-dock-cars button { --class-color: var(--muted); min-width: 38px; height: 28px; border: 2px solid var(--class-color); border-radius: 0; padding: 1px 4px; background: var(--stock); color: var(--ink); font: 700 10px var(--display); }
-.map-dock-cars button small { display: block; color: var(--muted); font-size: 6px; letter-spacing: .04em; }
-.map-dock-cars button:hover, .map-dock-cars button:focus-visible { background: var(--inspection); outline: 2px solid var(--orange); outline-offset: 1px; }
-.map-dock-cars button.is-selected { background: var(--ink); color: var(--stock); outline: 2px solid var(--orange); }
+.map-dock-cars { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; min-height: 29px; padding: 4px 6px 6px; color: var(--muted); font-size: 8px; }
+.map-dock-car { --class-color: var(--muted); min-width: 38px; height: 27px; display: grid; place-items: center; border: 2px solid var(--class-color); padding: 1px 4px; background: var(--stock); color: var(--ink); font: 700 10px var(--display); }
+.map-dock-car small { display: block; margin-top: -4px; color: var(--muted); font-size: 6px; letter-spacing: .04em; }
 .circuit-map-error { min-height: 68px; display: flex; align-items: center; gap: 8px; border-block: 1px solid var(--validation-red); padding: 9px 12px; background: var(--validation-wash); color: var(--validation-red); }
 .circuit-map-error strong, .circuit-map-error span { display: block; }
 .circuit-map-error strong { font: 700 12px var(--display); text-transform: uppercase; }
 .circuit-map-error span { font-size: 10px; }
 @media (max-width: 850px) {
   .circuit-map { grid-template-columns: minmax(0, 1fr) 126px; min-width: 640px; }
-  .circuit-map-stage { min-height: 150px; }
-  .circuit-map-legend span:nth-child(2) { display: none; }
+  .circuit-map-legend { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .circuit-car { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .circuit-car-anchor, .circuit-car-label { transition: none; } }

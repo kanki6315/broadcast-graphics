@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Columns3, Flag, GitCommitHorizontal, LogOut, Map as MapIcon, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
+import { Columns3, Flag, LogOut, MonitorCog, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import { isExpectedUnavailableTimingField, type DriverState } from "@racecontrol/protocol";
 import {
   commentatorColumnLabels,
@@ -20,18 +20,14 @@ const preferencesKey = "gantry.commentator-timing.v1";
 
 interface CommentatorPreferences {
   classId: number | "all";
-  selectedCarIdx: number | null;
   expandedCarIdxs: number[];
   visibleColumns: CommentatorColumn[];
-  positionView: "map" | "ribbon";
 }
 
 const defaultPreferences: CommentatorPreferences = {
   classId: "all",
-  selectedCarIdx: null,
   expandedCarIdxs: [],
   visibleColumns: [...defaultCommentatorColumns],
-  positionView: "map",
 };
 
 function loadPreferences(): CommentatorPreferences {
@@ -41,12 +37,10 @@ function loadPreferences(): CommentatorPreferences {
     const validColumns = (stored.visibleColumns ?? []).filter((column): column is CommentatorColumn => column in commentatorColumnLabels);
     return {
       classId: stored.classId === "all" || typeof stored.classId === "number" ? stored.classId : "all",
-      selectedCarIdx: typeof stored.selectedCarIdx === "number" ? stored.selectedCarIdx : null,
       expandedCarIdxs: Array.isArray(stored.expandedCarIdxs)
         ? stored.expandedCarIdxs.filter((carIdx): carIdx is number => typeof carIdx === "number")
         : [],
       visibleColumns: validColumns.length > 0 ? validColumns : [...defaultCommentatorColumns],
-      positionView: stored.positionView === "ribbon" ? "ribbon" : "map",
     };
   } catch {
     return defaultPreferences;
@@ -72,19 +66,6 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
       : sortByClassPosition(drivers.filter((driver) => driver.classId === preferences.classId));
   }, [preferences.classId, state?.session?.drivers]);
 
-  useEffect(() => {
-    if (filteredDrivers.length === 0) return;
-    if (filteredDrivers.some((driver) => driver.carIdx === preferences.selectedCarIdx)) return;
-    setPreferences((current) => ({ ...current, selectedCarIdx: filteredDrivers[0]?.carIdx ?? null }));
-  }, [filteredDrivers, preferences.selectedCarIdx]);
-
-  const selectedDriver = filteredDrivers.find((driver) => driver.carIdx === preferences.selectedCarIdx) ?? null;
-  const nearbyClassCarIdxs = useMemo(() => new Set(filteredDrivers
-    .filter((driver) => selectedDriver
-      && driver.classId === selectedDriver.classId
-      && driver.carIdx !== selectedDriver.carIdx
-      && Math.abs(driver.classPosition - selectedDriver.classPosition) <= 2)
-    .map((driver) => driver.carIdx)), [filteredDrivers, selectedDriver]);
   const expandedCarIdxs = useMemo(() => new Set(preferences.expandedCarIdxs), [preferences.expandedCarIdxs]);
   const visibleColumns = useMemo(() => new Set(preferences.visibleColumns), [preferences.visibleColumns]);
 
@@ -174,7 +155,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           <section className="commentator-heading">
             <div>
               <h1 id="commentator-title">Race timing</h1>
-              <p>{selectedDriver ? `Following #${selectedDriver.carNumber} ${selectedDriver.name} · ${selectedDriver.className} P${selectedDriver.classPosition}` : "Select a car to follow its class battle and stop detail."}</p>
+              <p>Live running order, battle candidates, stint context, and pit detail.</p>
             </div>
           </section>
 
@@ -203,58 +184,51 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
                 ))}
               </fieldset>
             </details>
-            <div className="position-view-toggle" role="group" aria-label="Track position view">
-              <button className={preferences.positionView === "map" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "map" }))}><MapIcon aria-hidden="true" />Map</button>
-              <button className={preferences.positionView === "ribbon" ? "is-selected" : ""} onClick={() => setPreferences((current) => ({ ...current, positionView: "ribbon" }))}><GitCommitHorizontal aria-hidden="true" />Ribbon</button>
-            </div>
           </section>
 
           <div className="commentator-key" aria-label="Timing key">
-            <span><i className="key-selection" />Selected</span>
-            <span><i className="key-rival" />Nearby in class</span>
             <span><b>~</b>Contains inference</span>
             <span><b>?</b>Quality not reported</span>
           </div>
         </div>
 
-        <section className="commentator-intelligence" aria-label="Live race intelligence">
-          <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} selectedCarIdx={preferences.selectedCarIdx} onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))} />
-          <div className={`quality-watch${warnings.length > 0 ? " has-warnings" : ""}`}>
-            <TriangleAlert aria-hidden="true" />
-            <div><strong>{warnings.length > 0 ? `${warnings.length} timing warning${warnings.length === 1 ? "" : "s"}` : "Timing quality clear"}</strong><span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span></div>
-          </div>
-        </section>
-
-        <div className="commentator-position-instrument">
-          {preferences.positionView === "map" && mapResource.definition && mapResource.calibration ? (
+        <section className="commentator-context-deck" aria-label="Circuit position and live race intelligence">
+          <div className="commentator-position-instrument">
+          {mapResource.definition && mapResource.calibration ? (
             <CircuitMap
               definition={mapResource.definition}
               calibration={mapResource.calibration}
               drivers={filteredDrivers}
-              selectedCarIdx={preferences.selectedCarIdx}
-              nearbyCarIdxs={nearbyClassCarIdxs}
               sectorBoundaries={state.trackConfiguration?.activeSectorDefinition?.boundaries}
-              onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
-              fallback={<LinearTrackRibbon drivers={filteredDrivers} selectedCarIdx={preferences.selectedCarIdx} nearbyCarIdxs={nearbyClassCarIdxs} onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))} variant="commentator" />}
+              fallback={<LinearTrackRibbon drivers={filteredDrivers} selectedCarIdx={null} nearbyCarIdxs={new Set()} onSelectCar={() => {}} variant="commentator" />}
             />
           ) : (
             <>
-              {preferences.positionView === "map" && <p className="map-fallback-status" role="status">{mapResource.loading ? "Loading calibrated circuit map…" : mapResource.error ? `${mapResource.error} Showing linear track.` : "No verified map is active for this layout. Showing linear track."}</p>}
+              <p className="map-fallback-status" role="status">{mapResource.loading ? "Loading calibrated circuit map…" : mapResource.error ? `${mapResource.error} Showing linear track.` : "No verified map is active for this layout. Showing linear track."}</p>
               <LinearTrackRibbon
                 drivers={filteredDrivers}
-                selectedCarIdx={preferences.selectedCarIdx}
-                nearbyCarIdxs={nearbyClassCarIdxs}
-                onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
+                selectedCarIdx={null}
+                nearbyCarIdxs={new Set()}
+                onSelectCar={() => {}}
                 variant="commentator"
               />
             </>
           )}
-        </div>
+          </div>
+          <div className="commentator-battle-context">
+            <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} />
+            <div className={`quality-watch${warnings.length > 0 ? " has-warnings" : ""}`}>
+              <TriangleAlert aria-hidden="true" />
+              <strong>{warnings.length > 0 ? `${warnings.length} timing warning${warnings.length === 1 ? "" : "s"}` : "Timing quality clear"}</strong>
+              <span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span>
+            </div>
+          </div>
+        </section>
 
         <CommentatorTimingTable
           drivers={filteredDrivers}
-          selectedCarIdx={preferences.selectedCarIdx}
-          nearbyCarIdxs={nearbyClassCarIdxs}
+          selectedCarIdx={null}
+          nearbyCarIdxs={new Set()}
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}
           groupByClass={false}
@@ -262,7 +236,6 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           stints={intelligence?.stints}
           gapTrends={intelligence?.gapTrends}
           pitCycles={intelligence?.pitCycles}
-          onSelectCar={(carIdx) => setPreferences((current) => ({ ...current, selectedCarIdx: carIdx }))}
           onToggleExpanded={toggleExpanded}
         />
       </main>
