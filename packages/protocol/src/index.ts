@@ -90,6 +90,8 @@ export interface TrackMapDefinition {
   sanitizedSvg?: string;
   centerlinePath: string;
   centerlinePathId: string;
+  suggestedStartFinishPathPct?: number | null;
+  startFinishMarkerPaths?: string[];
   viewBox: [number, number, number, number];
   createdAt: string;
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   lapPctToPathPct,
+  inferStartFinishPathPct,
   nearestPathPoint,
   pathPctToLapPct,
   pointAtPathPct,
@@ -30,6 +31,19 @@ test("resolves points by normalized length and nearest point", () => {
   const nearest = nearestPathPoint(path, { x: 52, y: 8 });
   assert.deepEqual(nearest.point, { x: 52, y: 0 });
   assert.ok(Math.abs(nearest.pathPct - 0.13) < 0.000_001);
+});
+
+test("locates the official start-finish layer where it crosses the centerline", () => {
+  const result = inferStartFinishPathPct(square, `<svg viewBox="0 0 100 100"><path d="M 45 -10 L 45 10"/></svg>`);
+  assert.ok(result);
+  assert.ok(Math.abs(result.pathPct - 0.1125) < 0.000_001);
+  assert.deepEqual(result.markerPaths, ["M 45 -10 L 45 10"]);
+});
+
+test("falls back to the marker centroid when the reference does not cross the centerline", () => {
+  const result = inferStartFinishPathPct(square, `<svg viewBox="0 0 100 100"><path d="M 48 5 L 52 5"/></svg>`);
+  assert.ok(result);
+  assert.ok(Math.abs(result.pathPct - 0.125) < 0.000_001);
 });
 
 test("requires a closed, nonzero finite path", () => {
