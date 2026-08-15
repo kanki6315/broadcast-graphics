@@ -66,6 +66,10 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const gapHistory = useGapHistory(state?.session?.id);
 
   useEffect(() => {
+    if (state?.session?.id) setSelectedSessionId("live");
+  }, [state?.session?.id]);
+
+  useEffect(() => {
     const eventId = state?.session?.externalSubSessionId;
     let cancelled = false;
     const query = eventId == null ? "" : `?eventId=${encodeURIComponent(eventId)}`;
@@ -234,7 +238,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
             <label className="session-selector">
               <span>Session data</span>
               <select value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)}>
-                <option value="live">Live · {session?.name ?? "waiting"}</option>
+                <option value="live">Active · {session?.name ?? "waiting"}</option>
                 {historySessions.map((historySession) => <option key={historySession.id} value={historySession.id}>Completed · {historySession.name} · {historySession.trackName}</option>)}
               </select>
             </label>
