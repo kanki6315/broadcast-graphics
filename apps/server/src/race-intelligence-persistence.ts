@@ -6,7 +6,7 @@ import type { RaceStateCheckpoint } from "./race-state-projection.js";
 import { StateStore } from "./state-store.js";
 
 export interface RaceRecoveryCheckpoint {
-  schemaVersion: 1;
+  schemaVersion: 2;
   intelligence: RaceIntelligenceCheckpoint;
   raceState: RaceStateCheckpoint | null;
 }
@@ -76,17 +76,17 @@ export class PostgresRaceIntelligenceCheckpointRepository implements RaceIntelli
   async load(session: SessionState): Promise<RaceRecoveryCheckpoint | null> {
     const result = await this.pool.query<CheckpointRow>(`
       SELECT payload FROM bg_race_intelligence_checkpoints
-      WHERE source=$1 AND source_mode=$2 AND source_session_id=$3 AND sector_revision=$4 AND schema_version=1
+      WHERE source=$1 AND source_mode=$2 AND source_session_id=$3 AND sector_revision=$4 AND schema_version=2
     `, [session.source, session.sourceMode, session.id, sectorRevision(session)]);
     const checkpoint = result.rows[0]?.payload;
-    return checkpoint?.schemaVersion === 1 ? checkpoint : null;
+    return checkpoint?.schemaVersion === 2 ? checkpoint : null;
   }
 
   async save(session: SessionState, checkpoint: RaceRecoveryCheckpoint): Promise<void> {
     await this.pool.query(`
       INSERT INTO bg_race_intelligence_checkpoints (
         source, source_mode, source_session_id, schema_version, sector_revision, payload, updated_at
-      ) VALUES ($1,$2,$3,1,$4,$5,now())
+      ) VALUES ($1,$2,$3,2,$4,$5,now())
       ON CONFLICT (source, source_mode, source_session_id, sector_revision) DO UPDATE SET
         schema_version=EXCLUDED.schema_version,
         sector_revision=EXCLUDED.sector_revision,
@@ -113,7 +113,7 @@ function semanticSignature(checkpoint: RaceRecoveryCheckpoint): string {
     stints: checkpoint.intelligence.stints.map(({ duration: _, lapCount: __, ...stint }) => stint),
     pitVisits: checkpoint.intelligence.pitVisits.map(({ carIdx, visits }) => ({
       carIdx,
-      visits: visits.map(([entry, visit]) => [entry, visit.lastPitExitTime, visit.stopCount, visit.quality]),
+      visits: visits.map(([entry, visit]) => [entry, visit.pitExitTime, visit.pitLap, visit.driverChange, visit.exitDriverId, visit.quality]),
     })),
     raceState: checkpoint.raceState,
   });
@@ -149,7 +149,7 @@ export class RaceIntelligencePersistence {
     this.lastSignature = null;
     this.latest = null;
     const promise = this.repository.load(session).then((checkpoint) => {
-      if (checkpoint?.schemaVersion === 1 && this.intelligence.restore(session, checkpoint.intelligence)) {
+      if (checkpoint?.schemaVersion === 2 && this.intelligence.restore(session, checkpoint.intelligence)) {
         if (checkpoint.raceState?.sessionId === session.id) this.store.restoreRaceState(checkpoint.raceState);
       }
     }).catch(this.onError).finally(() => {
@@ -172,7 +172,7 @@ export class RaceIntelligencePersistence {
     const intelligence = this.intelligence.checkpoint();
     if (!intelligence) return;
     const checkpoint: RaceRecoveryCheckpoint = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       intelligence,
       raceState: this.store.raceStateCheckpoint(),
     };

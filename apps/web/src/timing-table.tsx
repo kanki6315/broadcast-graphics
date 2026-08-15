@@ -5,6 +5,7 @@ import {
   type DriverTimingField,
   type GapTrend,
   type PitCycleSummary,
+  type PitStopSummary,
   type CompletedSector,
   type TimingQualityMetadata,
   isExpectedUnavailableTimingField,
@@ -145,6 +146,7 @@ export interface CommentatorTimingTableProps {
   stints?: DriverStintSummary[];
   gapTrends?: GapTrend[];
   pitCycles?: PitCycleSummary[];
+  pitStops?: PitStopSummary[];
   onSelectCar: (carIdx: number) => void;
   onToggleExpanded: (carIdx: number) => void;
 }
@@ -202,7 +204,7 @@ function lapTimeValue(driver: DriverState, field: "lastLap" | "bestLap") {
   return qualityValue(driver[field], timingQuality(driver, field), formatLapTime);
 }
 
-function pitVisitSummary(driver: DriverState) {
+function pitVisitSummary(driver: DriverState, pitStop: PitStopSummary | undefined) {
   const visit = driver.latestPitVisit;
   if (!Object.hasOwn(driver, "latestPitVisit")) return <span className="pit-summary is-empty" title="This producer does not report pit summaries">--</span>;
   if (!visit) return <span className="pit-summary is-empty">No visit</span>;
@@ -211,6 +213,7 @@ function pitVisitSummary(driver: DriverState) {
       <span className="pit-summary-totals">
         <span><small>Lane</small>{formatSeconds(visit.pitLaneTime)}</span>
         <span className={visit.inferredBoxTime > 0 ? "contains-inference" : ""}><small>Box</small>{visit.inferredBoxTime > 0 ? "~" : ""}{formatSeconds(visit.boxTime)}</span>
+        <span><small>Lap</small>{pitStop ? `L${pitStop.pitLap}` : "--"}</span>
         <span className={visit.unknownTime > 0 ? "contains-unknown" : ""}><small>Unknown</small>{formatSeconds(visit.unknownTime)}</span>
         {visit.driverChange && <span className="pit-driver-change" title="Driver change"><RefreshCw aria-label="Driver change" /></span>}
       </span>
@@ -270,26 +273,34 @@ function qualityWarnings(driver: DriverState): string[] {
     .map(([field, quality]) => `${field}: ${qualityLabel(quality)}`);
 }
 
-function PitVisitDetail({ driver }: { driver: DriverState }) {
+function PitVisitDetail({ driver, pitStops }: { driver: DriverState; pitStops: PitStopSummary[] }) {
   const visit = driver.latestPitVisit;
   const pitSummarySupported = Object.hasOwn(driver, "latestPitVisit");
   const warnings = qualityWarnings(driver);
+  const orderedStops = pitStops
+    .filter((stop) => stop.carIdx === driver.carIdx)
+    .sort((left, right) => right.pitEntryTime - left.pitEntryTime);
   return (
     <div className="commentator-detail-grid">
       <section>
-        <span className="detail-kicker">Pit visit supplied by server</span>
-        {visit ? (
-          <dl className="pit-detail-list">
-            <div><dt>Entry</dt><dd>{formatSeconds(visit.pitEntryTime)}</dd></div>
-            <div><dt>Exit</dt><dd>{visit.pitExitTime == null ? "Open visit" : formatSeconds(visit.pitExitTime)}</dd></div>
-            <div><dt>Lane total</dt><dd>{formatSeconds(visit.pitLaneTime)}</dd></div>
-            <div><dt>Box total</dt><dd>{formatSeconds(visit.boxTime)}</dd></div>
-            <div><dt>Observed box</dt><dd>{formatSeconds(visit.observedBoxTime)}</dd></div>
-            <div><dt>Inferred box</dt><dd>{formatSeconds(visit.inferredBoxTime)}</dd></div>
-            <div><dt>Unknown</dt><dd>{formatSeconds(visit.unknownTime)}</dd></div>
-            <div><dt>Driver change</dt><dd>{visit.driverChange ? "Yes" : "No"}</dd></div>
-          </dl>
-        ) : <p>{pitSummarySupported ? "No pit visit has been reported for this car." : "This telemetry producer does not support pit-visit summaries."}</p>}
+        <span className="detail-kicker">Race pit-stop history</span>
+        {orderedStops.length > 0 ? (
+          <div className="pit-history-wrap">
+            <div className="pit-history-table" role="table" aria-label={`${driver.name} pit-stop history`}>
+              <div className="pit-history-head" role="row"><span role="columnheader">Stop</span><span role="columnheader">Lap</span><span role="columnheader">Entry</span><span role="columnheader">Lane</span><span role="columnheader">Stationary</span><span role="columnheader">Driver change</span></div>
+              {orderedStops.map((stop, index) => (
+                <div key={stop.pitEntryTime} className={`pit-history-row quality-${stop.quality}`} role="row" title={`Pit-stop timing quality: ${stop.quality}`}>
+                  <span role="cell">#{orderedStops.length - index}{stop.pitExitTime == null && <small>Open</small>}</span>
+                  <span role="cell">L{stop.pitLap}</span>
+                  <span role="cell">{formatSeconds(stop.pitEntryTime)}</span>
+                  <span role="cell">{formatSeconds(stop.pitLaneTime)}</span>
+                  <span role="cell" className={stop.inferredBoxTime > 0 ? "contains-inference" : ""}>{stop.inferredBoxTime > 0 ? "~" : ""}{formatSeconds(stop.boxTime)}{stop.unknownTime > 0 && <small>{formatSeconds(stop.unknownTime)} unknown</small>}</span>
+                  <span role="cell">{stop.driverChange ? <><strong>{stop.exitDriverName ?? "Driver not identified"}</strong><small>in{stop.entryDriverName ? ` · from ${stop.entryDriverName}` : ""}</small></> : <span className="no-driver-change">No change</span>}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : <p>{pitSummarySupported ? (visit ? "Pit history is waiting for race intelligence." : "No pit stop has been reported for this car.") : "This telemetry producer does not support pit-stop summaries."}</p>}
       </section>
       <section>
         <span className="detail-kicker">Timing confidence</span>
@@ -310,6 +321,7 @@ export function CommentatorTimingTable({
   stints = [],
   gapTrends = [],
   pitCycles = [],
+  pitStops = [],
   onSelectCar,
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
@@ -329,7 +341,7 @@ export function CommentatorTimingTable({
           {visibleColumns.has("lapTimes") && <th className="lap-times-column">Lap times <small>last / best</small></th>}
           {visibleColumns.has("sectors") && <th className="sectors-column">Sectors <small>current / previous / best</small></th>}
           {visibleColumns.has("stint") && <th className="stint-column">Stint <small>time / laps</small></th>}
-          {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / unknown</small></th>}
+          {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / lap / unknown</small></th>}
           {visibleColumns.has("status") && <th className="status-column">Status</th>}
         </tr></thead>
         <tbody>
@@ -343,6 +355,9 @@ export function CommentatorTimingTable({
             const stint = stints.find((candidate) => candidate.carIdx === driver.carIdx);
             const trend = gapTrends.find((candidate) => candidate.chasingCarIdx === driver.carIdx && candidate.quality === "valid");
             const pitCycle = pitCycles.find((candidate) => candidate.carIdx === driver.carIdx);
+            const latestPitStop = pitStops
+              .filter((candidate) => candidate.carIdx === driver.carIdx)
+              .sort((left, right) => right.pitEntryTime - left.pitEntryTime)[0];
             return [
               showClassHeader ? (
                 <tr className="class-divider" key={`class-${driver.classId}`} style={{ "--class-color": driver.classColor } as CSSProperties}>
@@ -371,10 +386,10 @@ export function CommentatorTimingTable({
                 {visibleColumns.has("lapTimes") && <td className="paired-value"><span>{lapTimeValue(driver, "lastLap")}<small>last</small></span><span>{lapTimeValue(driver, "bestLap")}<small>best</small></span></td>}
                 {visibleColumns.has("sectors") && <td className="sectors-cell">{sectorSummary(driver)}</td>}
                 {visibleColumns.has("stint") && <td className="stint-cell">{stintSummary(stint)}</td>}
-                {visibleColumns.has("pit") && <td className="pit-cell">{pitVisitSummary(driver)}</td>}
+                {visibleColumns.has("pit") && <td className="pit-cell">{pitVisitSummary(driver, latestPitStop)}</td>}
                 {visibleColumns.has("status") && <td><span className={`commentator-status status-${driver.pitState ?? driver.trackStatus}`}>{status}</span></td>}
               </tr>,
-              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><div className="expanded-intelligence"><PitVisitDetail driver={driver} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous stint</dt><dd>{stint?.recentCompleted ? `${stint.recentCompleted.driverName} · ${formatDuration(stint.recentCompleted.duration)} · ${stint.recentCompleted.lapCount} laps` : stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
+              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><div className="expanded-intelligence"><PitVisitDetail driver={driver} pitStops={pitStops} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous stint</dt><dd>{stint?.recentCompleted ? `${stint.recentCompleted.driverName} · ${formatDuration(stint.recentCompleted.duration)} · ${stint.recentCompleted.lapCount} laps` : stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
             ];
           })}
         </tbody>
