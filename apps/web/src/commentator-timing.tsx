@@ -114,6 +114,11 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
 
   const telemetryHealthy = socketConnected && state.connection === "connected";
   const session = state.session;
+  const overallFastestCarIdx = session?.drivers.reduce<DriverState | undefined>((fastest, driver) => {
+    const quality = driver.timingQuality?.bestLap?.quality;
+    if (driver.bestLap == null || !Number.isFinite(driver.bestLap) || driver.bestLap <= 0 || quality === "invalid" || quality === "incomplete") return fastest;
+    return !fastest || driver.bestLap < fastest.bestLap! ? driver : fastest;
+  }, undefined)?.carIdx;
   const isSimulated = session?.sourceMode === "simulation";
   const showClassGaps = classes.length > 1 || new Set(session?.drivers.map((driver) => driver.classId)).size > 1;
   const displayedColumnCount = 2 + [...visibleColumns].filter((column) => showClassGaps || (column !== "gap" && column !== "interval")).length;
@@ -224,6 +229,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
 
         <CommentatorTimingTable
           drivers={filteredDrivers}
+          overallFastestCarIdx={overallFastestCarIdx}
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}
           groupByClass={false}

@@ -100,6 +100,45 @@ test("current, previous, and best sectors share the timing row", () => {
   assert.match(markup, /29\.900/);
 });
 
+test("commentator lap times distinguish personal and overall best laps", () => {
+  const current = driver({
+    lastLap: 89.5,
+    bestLap: 89.5,
+    lastLapNumber: 5,
+    bestLapNumber: 5,
+    timingQuality: {
+      lastLap: { source: "iracing", quality: "valid" },
+      bestLap: { source: "iracing", quality: "valid" },
+    },
+  });
+  const markup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]}
+    overallFastestCarIdx={7}
+    expandedCarIdxs={new Set()}
+    visibleColumns={new Set(["lapTimes"])}
+    groupByClass={false}
+    onToggleExpanded={() => {}}
+  />);
+
+  assert.match(markup, /is-overall-fastest[^>]*title="Overall fastest lap"[^>]*>.*last · fastest/s);
+  assert.match(markup, /is-overall-fastest[^>]*title="Overall fastest lap"[^>]*>.*best · fastest/s);
+});
+
+test("commentator best lap remains a labelled personal best when the last lap is slower", () => {
+  const markup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[driver({ lastLap: 90, bestLap: 89.5, lastLapNumber: 5, bestLapNumber: 3 })]}
+    overallFastestCarIdx={8}
+    expandedCarIdxs={new Set()}
+    visibleColumns={new Set(["lapTimes"])}
+    groupByClass={false}
+    onToggleExpanded={() => {}}
+  />);
+
+  assert.match(markup, />last<\/small>/);
+  assert.match(markup, /is-personal-best[^>]*title="Personal best lap"[^>]*>.*best · PB/s);
+  assert.doesNotMatch(markup, /last · PB/);
+});
+
 test("pit summary preserves tracker totals and marks only inferred box time", () => {
   const current = driver({
     latestPitVisit: {
