@@ -76,7 +76,7 @@ test("driver changes retain stint and pit-cycle context for observed, inferred, 
   const service = new RaceIntelligenceService(() => 0, 0);
   const initial = [0, 1, 2, 3].map((carIdx) => driver(carIdx, carIdx + 1, 1, 0));
   service.ingest(session(100, initial));
-  const visit = { pitEntryTime: 95, pitLaneTime: 3, boxTime: 2, unknownTime: 0, observedBoxTime: 2, inferredBoxTime: 0, driverChange: true, quality: "incomplete" as const };
+  const visit = { pitEntryTime: 95, pitLaneTime: 3, boxTime: 2, unknownTime: 0, observedBoxTime: 2, inferredBoxTime: 0, driverChange: true, entryDriverId: "1000", quality: "incomplete" as const };
   service.ingest(session(110, [
     driver(0, 1, 1, 0, { userId: 9000, name: "New 0", pitState: "pit-stall", onPitRoad: true, latestPitVisit: visit }),
     driver(1, 2, 1, 0, { userId: 9001, name: "New 1", pitState: "pit-stall", onPitRoad: true, latestPitVisit: { ...visit, inferredBoxTime: 2 } }),
@@ -91,6 +91,11 @@ test("driver changes retain stint and pit-cycle context for observed, inferred, 
   assert.equal(contexts.get(3), "away-from-pits");
   assert.equal(service.snapshot()!.stints.find((stint) => stint.carIdx === 3)?.quality, "invalid");
   assert.equal(service.snapshot()!.pitCycles.find((cycle) => cycle.carIdx === 0)?.stopCount, 1);
+  const changedStop = service.snapshot()!.pitStops.find((stop) => stop.carIdx === 0)!;
+  assert.equal(changedStop.pitLap, 11);
+  assert.equal(changedStop.boxTime, 2);
+  assert.equal(changedStop.entryDriverName, "Driver 0");
+  assert.equal(changedStop.exitDriverName, "New 0");
 });
 
 test("restores stint and pit-cycle state without restoring transient gap history", () => {

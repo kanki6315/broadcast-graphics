@@ -5,6 +5,7 @@ import type {
   DriverStintSummary,
   GapTrend,
   PitCycleSummary,
+  PitStopSummary,
   RaceIntelligenceSnapshot,
   SessionState,
   TimingQualityWarning,
@@ -19,7 +20,7 @@ export interface RaceIntelligenceCheckpoint {
   sessionId: string;
   sectorDefinitionRevision: string | null;
   stints: StintState[];
-  pitVisits: Array<{ carIdx: number; visits: Array<[number, PitCycleSummary]> }>;
+  pitVisits: Array<{ carIdx: number; visits: Array<[number, PitStopSummary]> }>;
 }
 
 const historyWindowSeconds = 30;
@@ -31,7 +32,7 @@ export class RaceIntelligenceService {
   private sectorDefinitionRevision: string | null = null;
   private readonly histories = new Map<string, GapSample[]>();
   private readonly stints = new Map<number, StintState>();
-  private readonly pitVisits = new Map<number, Map<number, PitCycleSummary>>();
+  private readonly pitVisits = new Map<number, Map<number, PitStopSummary>>();
   private cached: RaceIntelligenceSnapshot | null = null;
   private lastPublishedAt = Number.NEGATIVE_INFINITY;
 
@@ -150,15 +151,30 @@ export class RaceIntelligenceService {
     for (const driver of session.drivers) {
       const visit = driver.latestPitVisit;
       if (!visit) continue;
-      const visits = this.pitVisits.get(driver.carIdx) ?? new Map<number, PitCycleSummary>();
+      const visits = this.pitVisits.get(driver.carIdx) ?? new Map<number, PitStopSummary>();
+      const existing = visits.get(visit.pitEntryTime);
+      const stint = this.stints.get(driver.carIdx);
+      const entryDriverId = visit.entryDriverId ?? existing?.entryDriverId;
+      const exitDriverId = visit.exitDriverId
+        ?? existing?.exitDriverId
+        ?? (visit.driverChange && driver.userId > 0 ? String(driver.userId) : undefined);
       visits.set(visit.pitEntryTime, {
         carIdx: driver.carIdx,
-        stopCount: visits.size + (visits.has(visit.pitEntryTime) ? 0 : 1),
-        lastPitEntryTime: visit.pitEntryTime,
-        lastPitExitTime: visit.pitExitTime,
-        totalPitLaneTime: visit.pitLaneTime,
-        totalBoxTime: visit.boxTime,
-        totalUnknownTime: visit.unknownTime,
+        pitLap: existing?.pitLap ?? Math.max(1, driver.currentLap),
+        pitEntryTime: visit.pitEntryTime,
+        pitExitTime: visit.pitExitTime,
+        pitLaneTime: visit.pitLaneTime,
+        boxTime: visit.boxTime,
+        unknownTime: visit.unknownTime,
+        observedBoxTime: visit.observedBoxTime,
+        inferredBoxTime: visit.inferredBoxTime,
+        driverChange: visit.driverChange,
+        entryDriverId,
+        entryDriverName: existing?.entryDriverName ?? driverNameFor(stint, entryDriverId) ?? driver.name,
+        exitDriverId,
+        exitDriverName: visit.driverChange
+          ? driverNameFor(stint, exitDriverId) ?? driver.name
+          : existing?.exitDriverName,
         quality: visit.quality === "valid" ? "valid" : visit.quality === "contains-inference" ? "inferred" : "incomplete",
       });
       this.pitVisits.set(driver.carIdx, visits);
@@ -185,16 +201,23 @@ export class RaceIntelligenceService {
         }
       }
     }
-    const pitCycles = [...this.pitVisits.entries()].map(([carIdx, visits]) => {
-      const ordered = [...visits.values()].sort((a, b) => (a.lastPitEntryTime ?? 0) - (b.lastPitEntryTime ?? 0));
+    const pitCycles: PitCycleSummary[] = [...this.pitVisits.entries()].map(([carIdx, visits]) => {
+      const ordered = [...visits.values()].sort((a, b) => a.pitEntryTime - b.pitEntryTime);
       const latest = ordered.at(-1)!;
       return {
-        ...latest, carIdx, stopCount: ordered.length,
-        totalPitLaneTime: ordered.reduce((sum, visit) => sum + visit.totalPitLaneTime, 0),
-        totalBoxTime: ordered.reduce((sum, visit) => sum + visit.totalBoxTime, 0),
-        totalUnknownTime: ordered.reduce((sum, visit) => sum + visit.totalUnknownTime, 0),
+        carIdx, stopCount: ordered.length,
+        lastPitEntryTime: latest.pitEntryTime,
+        lastPitExitTime: latest.pitExitTime,
+        totalPitLaneTime: ordered.reduce((sum, visit) => sum + visit.pitLaneTime, 0),
+        totalBoxTime: ordered.reduce((sum, visit) => sum + visit.boxTime, 0),
+        totalUnknownTime: ordered.reduce((sum, visit) => sum + visit.unknownTime, 0),
+        quality: ordered.some((visit) => visit.quality === "incomplete") ? "incomplete"
+          : ordered.some((visit) => visit.quality === "inferred") ? "inferred" : "valid",
       };
     });
+    const pitStops = [...this.pitVisits.values()]
+      .flatMap((visits) => [...visits.values()])
+      .sort((a, b) => a.pitEntryTime - b.pitEntryTime);
     return {
       sessionId: session.id,
       sectorDefinitionRevision: session.sectorDefinition?.revision ?? null,
@@ -202,6 +225,7 @@ export class RaceIntelligenceService {
       battles: battles.sort((a, b) => (a.currentGap ?? Infinity) - (b.currentGap ?? Infinity)),
       gapTrends: trends,
       pitCycles,
+      pitStops,
       stints: [...this.stints.values()].map(({ startLap: _, ...stint }) => ({ ...stint })),
       qualityWarnings: qualityWarnings(session, at, byCar),
     };
@@ -225,6 +249,15 @@ export class RaceIntelligenceService {
     const direction = Math.abs(rate) < 0.02 ? "stable" : rate < 0 ? "closing" : "opening";
     return { ...base, currentGap: history.at(-1)!.gap, gapChange, rate, direction, quality: "valid" };
   }
+}
+
+function driverNameFor(stint: StintState | undefined, driverId: string | undefined): string | undefined {
+  if (!stint || !driverId) return undefined;
+  const normalized = driverId.startsWith("user:") || driverId.startsWith("name:") ? driverId : `user:${driverId}`;
+  if (stint.currentDriverId === normalized) return stint.currentDriverName;
+  if (stint.previousDriverId === normalized) return stint.previousDriverName;
+  if (stint.recentCompleted?.driverId === normalized) return stint.recentCompleted.driverName;
+  return undefined;
 }
 
 function pairKey(ahead: DriverState, chasing: DriverState): string {

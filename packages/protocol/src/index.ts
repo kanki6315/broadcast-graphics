@@ -402,6 +402,25 @@ export interface PitCycleSummary {
   quality: TimingQuality;
 }
 
+/** One pit-road visit retained for the full duration of the race session. */
+export interface PitStopSummary {
+  carIdx: number;
+  pitLap: number;
+  pitEntryTime: number;
+  pitExitTime?: number;
+  pitLaneTime: number;
+  boxTime: number;
+  unknownTime: number;
+  observedBoxTime: number;
+  inferredBoxTime: number;
+  driverChange: boolean;
+  entryDriverId?: string;
+  entryDriverName?: string;
+  exitDriverId?: string;
+  exitDriverName?: string;
+  quality: TimingQuality;
+}
+
 export type DriverChangeContext = "observed-box" | "inferred-box" | "unresolved" | "away-from-pits";
 
 export interface CompletedDriverStint {
@@ -448,6 +467,7 @@ export interface RaceIntelligenceSnapshot {
   battles: BattleSummary[];
   gapTrends: GapTrend[];
   pitCycles: PitCycleSummary[];
+  pitStops: PitStopSummary[];
   stints: DriverStintSummary[];
   qualityWarnings: TimingQualityWarning[];
 }

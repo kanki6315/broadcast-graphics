@@ -236,6 +236,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           stints={intelligence?.stints}
           gapTrends={intelligence?.gapTrends}
           pitCycles={intelligence?.pitCycles}
+          pitStops={intelligence?.pitStops}
           onToggleExpanded={toggleExpanded}
         />
       </main>
