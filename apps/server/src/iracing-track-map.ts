@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { TrackLayoutIdentity } from "@racecontrol/protocol";
+import { pointAtPathPct, prepareSvgPath, type PreparedPath } from "./track-map-geometry.js";
 
 const TOKEN_URL = "https://oauth.iracing.com/oauth2/token";
 const TRACK_ASSETS_URL = "https://members-ng.iracing.com/data/track/assets";
@@ -138,6 +139,59 @@ export function pathOnlyOfficialSvg(input: string): string {
   });
   if (!paths.length) throw new IracingTrackMapError("The iRacing SVG contains no path geometry.", "no-paths", 400);
   return `<svg xmlns="http://www.w3.org/2000/svg" ${dimensions}>${paths.join("")}</svg>`;
+}
+
+function splitSubpaths(pathData: string): string[] {
+  const starts = [...pathData.matchAll(/[Mm]/g)].map((match) => match.index ?? 0);
+  return starts.map((start, index) => pathData.slice(start, starts[index + 1] ?? pathData.length).trim()).filter(Boolean);
+}
+
+function alignedBoundaryPoints(first: PreparedPath, second: PreparedPath, count: number): { first: { x: number; y: number }[]; second: { x: number; y: number }[]; averageGap: number } {
+  const firstPoints = Array.from({ length: count }, (_, index) => pointAtPathPct(first, index / count));
+  const secondPoints = Array.from({ length: count }, (_, index) => pointAtPathPct(second, index / count));
+  let best = { score: Infinity, reverse: false, shift: 0 };
+  for (const reverse of [false, true]) {
+    for (let shift = 0; shift < count; shift++) {
+      let score = 0;
+      for (let index = 0; index < count; index++) {
+        const secondIndex = ((shift + (reverse ? -index : index)) % count + count) % count;
+        const dx = firstPoints[index]!.x - secondPoints[secondIndex]!.x;
+        const dy = firstPoints[index]!.y - secondPoints[secondIndex]!.y;
+        score += dx * dx + dy * dy;
+      }
+      if (score < best.score) best = { score, reverse, shift };
+    }
+  }
+  const alignedSecond = firstPoints.map((_, index) => secondPoints[((best.shift + (best.reverse ? -index : index)) % count + count) % count]!);
+  return { first: firstPoints, second: alignedSecond, averageGap: Math.sqrt(best.score / count) };
+}
+
+function coordinate(value: number): string { return Number(value.toFixed(3)).toString(); }
+
+/** Converts iRacing's filled track ribbon into one closed geometric centerline. */
+export function centerlineOnlyOfficialSvg(input: string): string {
+  const reduced = pathOnlyOfficialSvg(input);
+  const svgTag = /<svg\b[^>]*>/i.exec(reduced)?.[0];
+  const viewBoxValues = attribute(svgTag ?? "", "viewBox")?.trim().split(/[\s,]+/).map(Number);
+  const boundaries = (reduced.match(/<path\b[^>]*>/gi) ?? []).flatMap((tag) => {
+    const pathData = attribute(tag, "d");
+    return pathData ? splitSubpaths(pathData) : [];
+  }).flatMap((pathData) => {
+    try { return [prepareSvgPath(pathData)]; }
+    catch { return []; }
+  });
+  if (boundaries.length !== 2) return reduced;
+  const [first, second] = boundaries;
+  const aligned = alignedBoundaryPoints(first!, second!, 256);
+  const viewBoxScale = viewBoxValues?.length === 4 ? Math.min(viewBoxValues[2]!, viewBoxValues[3]!) : Infinity;
+  if (!Number.isFinite(aligned.averageGap) || aligned.averageGap <= 0 || aligned.averageGap > viewBoxScale * 0.15) return reduced;
+  const centerPoints = aligned.first.map((point, index) => ({
+    x: (point.x + aligned.second[index]!.x) / 2,
+    y: (point.y + aligned.second[index]!.y) / 2,
+  }));
+  const pathData = centerPoints.map((point, index) => `${index ? "L" : "M"}${coordinate(point.x)},${coordinate(point.y)}`).join("") + "Z";
+  const dimensions = svgTag?.slice(4, -1).trim() ?? "";
+  return `<svg ${dimensions}><path id="iracing-centerline" d="${pathData}"/></svg>`;
 }
 
 type Matrix = [number, number, number, number, number, number];
@@ -361,7 +415,7 @@ export class IracingTrackMapClient {
     } catch { startFinishSvg = undefined; }
     const basename = sourceUrl.pathname.split("/").pop() || `track-${trackId}.svg`;
     return {
-      svg: pathOnlyOfficialSvg(svg),
+      svg: centerlineOnlyOfficialSvg(svg),
       startFinishSvg,
       sourceUrl: sourceUrl.href,
       sourceVersion: createHash("sha256").update(svg).digest("hex").slice(0, 16),

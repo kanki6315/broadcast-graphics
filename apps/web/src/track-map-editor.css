@@ -71,7 +71,8 @@
 .calibration-line { stroke: var(--ink); stroke-width: 4; }
 .start-finish-reference { fill: none; stroke: var(--orange); stroke-width: 3; stroke-linecap: square; vector-effect: non-scaling-stroke; pointer-events: none; }
 .direction-marker { pointer-events: none; }
-.direction-marker path { fill: var(--orange); stroke: var(--ink); stroke-width: .28; stroke-linejoin: round; }
+.direction-marker circle { fill: var(--orange); stroke: var(--ink); stroke-width: .3; }
+.direction-marker path { fill: var(--ink); stroke: var(--stock); stroke-width: .12; stroke-linejoin: round; }
 .percentage-marker { pointer-events: none; }
 .percentage-marker line { stroke: var(--ink); stroke-width: .3; }
 .percentage-marker circle { fill: var(--orange); stroke: var(--ink); stroke-width: .28; }
