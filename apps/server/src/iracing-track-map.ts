@@ -100,9 +100,8 @@ function mapUrl(asset: TrackAsset): URL | null {
 }
 
 function validateOfficialImageUrl(url: URL): URL {
-  const officialHost = url.hostname === "iracing.com" || url.hostname.endsWith(".iracing.com");
-  if (url.protocol !== "https:" || !officialHost) {
-    throw new IracingTrackMapError("iRacing returned an invalid track-map asset URL.", "invalid-asset-url");
+  if (url.protocol !== "https:" || url.hostname !== "images-static.iracing.com") {
+    throw new IracingTrackMapError(`iRacing returned an invalid track-map asset host (${url.hostname || "missing"}).`, "invalid-asset-url");
   }
   return url;
 }
