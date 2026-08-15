@@ -93,6 +93,7 @@ public sealed class TrackTimingTrackerTests
         Observe(tracker, 16.5, Driver(0, 2, .75), ThreeSectors);
         var official = Driver(0, 3, .05, lastLap: 20);
         Observe(tracker, 19, official, ThreeSectors);
+        Observe(tracker, 21.1, official with { LapDistPct = .1 }, ThreeSectors);
 
         var sectors = tracker.GetCompletedSectorTimes(0).Where(sector => sector.LapNumber == 2).ToArray();
         Assert.All(sectors, sector =>
@@ -102,6 +103,28 @@ public sealed class TrackTimingTrackerTests
             Assert.Null(sector.Value);
         });
         Assert.Equal(20, official.LastLap);
+    }
+
+    [Fact]
+    public void LapReconciliationWaitsForLastLapTimeToCatchUpWithCompletedLapNumber()
+    {
+        var tracker = new TrackTimingTracker();
+        Observe(tracker, 10, Driver(0, 1, .95), ThreeSectors);
+        Observe(tracker, 11, Driver(0, 2, .05), ThreeSectors);
+        Observe(tracker, 13.5, Driver(0, 2, .35), ThreeSectors);
+        Observe(tracker, 16.5, Driver(0, 2, .75), ThreeSectors);
+
+        // At start/finish iRacing has advanced the completed-lap counter, but
+        // LastLap still belongs to the preceding lap for this one frame.
+        Observe(tracker, 19, Driver(0, 3, .05, lastLap: 7), ThreeSectors);
+        var waiting = tracker.GetCompletedSectorTimes(0).Where(sector => sector.LapNumber == 2).ToArray();
+        Assert.All(waiting, sector => Assert.Equal("valid", sector.Quality));
+
+        Observe(tracker, 19.1, Driver(0, 3, .06, lastLap: 8.0833), ThreeSectors);
+        var reconciled = tracker.GetCompletedSectorTimes(0).Where(sector => sector.LapNumber == 2).ToArray();
+        Assert.Equal(3, reconciled.Length);
+        Assert.All(reconciled, sector => Assert.Equal("valid", sector.Quality));
+        AssertClose(8.0833, reconciled.Sum(sector => sector.Value));
     }
 
     [Fact]

@@ -16,6 +16,10 @@ internal sealed class TrackTimingTracker
     private const double MaximumPlausibleLapsPerSecond = 0.25;
     private const double LapReconciliationMinimumSeconds = 0.5;
     private const double LapReconciliationFraction = 0.01;
+    // iRacing can increment CarIdxLapCompleted one telemetry frame before it
+    // refreshes CarIdxLastLapTime. Give that tuple time to settle before a
+    // mismatch is allowed to invalidate an otherwise complete derived lap.
+    private const double LapReconciliationGraceSeconds = 2;
     private readonly Dictionary<int, CarHistory> cars = [];
     private string? sessionId;
     private string? definitionRevision;
@@ -92,7 +96,7 @@ internal sealed class TrackTimingTracker
             history.Missing = false;
             history.LastDriver = driver;
             Trim(history.Samples, sessionTime.Value);
-            ReconcileCompletedLap(history, driver);
+            ReconcileCompletedLap(history, driver, sessionTime.Value);
         }
 
         RefreshComparisons(drivers);
@@ -207,15 +211,24 @@ internal sealed class TrackTimingTracker
         }
     }
 
-    private void ReconcileCompletedLap(CarHistory history, DriverState driver)
+    private void ReconcileCompletedLap(CarHistory history, DriverState driver, double sessionTime)
     {
         if (definition is null || driver.LastLapNumber is not { } lap || driver.LastLap is not { } official || official <= 0) return;
-        if (!history.ReconciledLaps.Add(lap)) return;
+        if (history.ReconciledLaps.Contains(lap)) return;
         var results = history.Completed.Where(result => result.LapNumber == lap && result.DefinitionRevision == definition.Revision).ToArray();
         if (results.Length != definition.Boundaries.Count || results.Any(result => result.Quality != "valid" || result.Value is null)) return;
         var sum = results.Sum(result => result.Value!.Value);
         var tolerance = Math.Max(LapReconciliationMinimumSeconds, official * LapReconciliationFraction);
-        if (Math.Abs(sum - official) <= tolerance) return;
+        if (Math.Abs(sum - official) <= tolerance)
+        {
+            history.ReconciledLaps.Add(lap);
+            return;
+        }
+
+        var completedAt = results.Max(result => result.CompletedAt ?? double.NegativeInfinity);
+        if (double.IsFinite(completedAt) && sessionTime - completedAt < LapReconciliationGraceSeconds) return;
+
+        history.ReconciledLaps.Add(lap);
         for (var index = 0; index < history.Completed.Count; index++)
         {
             var result = history.Completed[index];
