@@ -68,6 +68,19 @@ test("position change survives a disconnect, reconnect, and driver change", () =
   assert.equal(reconnected.drivers[0]?.classPositionChange, 2);
 });
 
+test("position baseline survives a projection restart", () => {
+  const before = new RaceStateProjection();
+  before.apply(session(driver()));
+  const checkpoint = before.checkpoint()!;
+  const after = new RaceStateProjection();
+  after.restore(checkpoint);
+  const resumed = after.apply(session(driver({ position: 2, classPosition: 1, lapsCompleted: 2, currentLap: 3 })));
+
+  assert.equal(resumed.drivers[0]?.startingPosition, 4);
+  assert.equal(resumed.drivers[0]?.startingClassPosition, 3);
+  assert.equal(resumed.drivers[0]?.positionChange, 2);
+});
+
 test("preserves explicit unavailable baselines from a late-joining telemetry client", () => {
   const projection = new RaceStateProjection();
   const late = projection.apply(session(driver({

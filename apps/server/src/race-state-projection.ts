@@ -5,9 +5,24 @@ interface PositionBaseline {
   class: number | null;
 }
 
+export interface RaceStateCheckpoint {
+  sessionId: string;
+  baselines: Array<[number, PositionBaseline]>;
+}
+
 export class RaceStateProjection {
   private sessionId: string | null = null;
   private readonly baselines = new Map<number, PositionBaseline>();
+
+  checkpoint(): RaceStateCheckpoint | null {
+    return this.sessionId ? structuredClone({ sessionId: this.sessionId, baselines: [...this.baselines] }) : null;
+  }
+
+  restore(checkpoint: RaceStateCheckpoint): void {
+    this.sessionId = checkpoint.sessionId;
+    this.baselines.clear();
+    for (const [carIdx, baseline] of checkpoint.baselines) this.baselines.set(carIdx, structuredClone(baseline));
+  }
 
   apply(session: SessionState): SessionState {
     if (this.sessionId !== session.id) {

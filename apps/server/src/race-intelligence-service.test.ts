@@ -93,6 +93,23 @@ test("driver changes retain stint and pit-cycle context for observed, inferred, 
   assert.equal(service.snapshot()!.pitCycles.find((cycle) => cycle.carIdx === 0)?.stopCount, 1);
 });
 
+test("restores stint and pit-cycle state without restoring transient gap history", () => {
+  const before = new RaceIntelligenceService(() => 100_000, 0);
+  const visit = { pitEntryTime: 90, pitExitTime: 98, pitLaneTime: 8, boxTime: 3, unknownTime: 0, observedBoxTime: 3, inferredBoxTime: 0, driverChange: false, quality: "valid" as const };
+  before.ingest(session(100, [driver(0, 1, 1, 0, { latestPitVisit: visit })]));
+  const checkpoint = before.checkpoint()!;
+
+  const after = new RaceIntelligenceService(() => 130_000, 0);
+  const resumed = session(130, [driver(0, 1, 1, 0, { lapsCompleted: 12, currentLap: 13 })]);
+  assert.equal(after.restore(resumed, checkpoint), true);
+  after.ingest(resumed);
+
+  assert.equal(after.snapshot()?.stints[0]?.duration, 30);
+  assert.equal(after.snapshot()?.stints[0]?.lapCount, 2);
+  assert.equal(after.snapshot()?.pitCycles[0]?.totalBoxTime, 3);
+  assert.equal(after.snapshot()?.gapTrends.length, 0);
+});
+
 test("a sector revision change resets the session cache instead of mixing comparisons", () => {
   let now = 0;
   const service = new RaceIntelligenceService(() => now, 0);

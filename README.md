@@ -117,7 +117,7 @@ The repository includes a multi-stage production `Dockerfile` and `railway.toml`
 
 Use `https://gantry.arjunakankipati.com` as the desktop telemetry client's production server URL.
 
-Railway deploys should be performed outside a live broadcast. The current live race state is held in one server process, so a deployment restarts the session and connected clients will reconnect automatically. PostgreSQL preserves administrator sessions and access keys across that restart.
+Railway deploys should still be performed outside a live broadcast. Connected clients reconnect automatically, and PostgreSQL restores administrator sessions, access keys, current driver stints, pit-cycle intelligence, and race-start position baselines. Short-window gap trends intentionally warm up again from live telemetry after a restart.
 
 ## Runtime graphic packages
 

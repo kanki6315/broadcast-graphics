@@ -13,7 +13,14 @@ import type {
 import { isExpectedUnavailableTimingField } from "@racecontrol/protocol";
 
 interface GapSample { at: number; gap: number; }
-interface StintState extends DriverStintSummary { startLap: number; }
+export interface StintState extends DriverStintSummary { startLap: number; }
+
+export interface RaceIntelligenceCheckpoint {
+  sessionId: string;
+  sectorDefinitionRevision: string | null;
+  stints: StintState[];
+  pitVisits: Array<{ carIdx: number; visits: Array<[number, PitCycleSummary]> }>;
+}
 
 const historyWindowSeconds = 30;
 const minimumTrendWindowSeconds = 5;
@@ -49,6 +56,25 @@ export class RaceIntelligenceService {
 
   snapshot(): RaceIntelligenceSnapshot | null {
     return this.cached;
+  }
+
+  checkpoint(): RaceIntelligenceCheckpoint | null {
+    if (!this.sessionId) return null;
+    return structuredClone({
+      sessionId: this.sessionId,
+      sectorDefinitionRevision: this.sectorDefinitionRevision,
+      stints: [...this.stints.values()],
+      pitVisits: [...this.pitVisits].map(([carIdx, visits]) => ({ carIdx, visits: [...visits] })),
+    });
+  }
+
+  restore(session: SessionState, checkpoint: RaceIntelligenceCheckpoint): boolean {
+    const revision = session.sectorDefinition?.revision ?? null;
+    if (checkpoint.sessionId !== session.id || checkpoint.sectorDefinitionRevision !== revision) return false;
+    this.reset(session.id, revision);
+    for (const stint of checkpoint.stints) this.stints.set(stint.carIdx, structuredClone(stint));
+    for (const item of checkpoint.pitVisits) this.pitVisits.set(item.carIdx, new Map(structuredClone(item.visits)));
+    return true;
   }
 
   private reset(sessionId: string, sectorDefinitionRevision: string | null): void {

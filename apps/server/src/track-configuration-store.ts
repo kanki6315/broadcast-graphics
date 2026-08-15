@@ -39,7 +39,7 @@ export interface TrackConfigurationRepository {
   saveCalibration(input: { mapDefinitionId: string; startFinishPathPct: number; direction: "forward" | "reverse"; rotationDegrees?: number; author?: string }): Promise<TrackMapCalibration>;
   activateCalibration(calibrationId: string, layout: TrackLayoutIdentity): Promise<TrackMapCalibration>;
   listCalibrations(mapDefinitionId: string): Promise<TrackMapCalibration[]>;
-  observeNativeDefinition(session: SessionState): Promise<void>;
+  observeNativeDefinition(session: SessionState): Promise<string[]>;
   saveSectorDraft(input: { layout: TrackLayoutIdentity; boundaries: SectorBoundary[]; mapCalibrationId?: string | null; author?: string; sessionId?: string }): Promise<SectorDefinitionRevision>;
   activateSectorRevision(revision: string, layout: TrackLayoutIdentity, session: SessionState | null): Promise<SectorDefinitionRevision>;
   listSectorRevisions(layout: TrackLayoutIdentity): Promise<SectorDefinitionRevision[]>;
@@ -182,7 +182,8 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
       .sort((a, b) => b.revision - a.revision).map((candidate) => structuredClone(candidate));
   }
 
-  async observeNativeDefinition(session: SessionState): Promise<void> {
+  async observeNativeDefinition(session: SessionState): Promise<string[]> {
+    const changed: string[] = [];
     const definition = session.sectorDefinition;
     const reportedLayout = normalizeLayout(definition?.layout ?? sessionLayout(session));
     const matchingMaps = [...this.maps.values()].filter((map) =>
@@ -191,9 +192,14 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
     // single imported layout is an unambiguous match for this exact track ID.
     const layout = matchingMaps.length === 1 ? matchingMaps[0]!.layout : reportedLayout;
     if (raceHasStarted(session)) {
-      for (const candidate of this.sectors.values()) if (candidate.active && layoutsMatch(candidate.layout!, layout)) candidate.locked = true;
+      for (const candidate of this.sectors.values()) {
+        if (candidate.active && !candidate.locked && layoutsMatch(candidate.layout!, layout)) {
+          candidate.locked = true;
+          changed.push(candidate.revision);
+        }
+      }
     }
-    if (!definition || this.sectors.has(definition.revision)) return;
+    if (!definition || this.sectors.has(definition.revision)) return changed;
     const now = new Date().toISOString();
     const activeForLayout = [...this.sectors.values()].some((candidate) => candidate.active && layoutsMatch(candidate.layout!, layout));
     this.sectors.set(definition.revision, {
@@ -201,6 +207,8 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
       active: !activeForLayout, draft: false, locked: raceHasStarted(session), effectiveSessionId: !activeForLayout ? session.id : null,
       effectiveAt: !activeForLayout ? now : null,
     });
+    changed.push(definition.revision);
+    return changed;
   }
 
   async saveSectorDraft(input: { layout: TrackLayoutIdentity; boundaries: SectorBoundary[]; mapCalibrationId?: string | null; author?: string; sessionId?: string }): Promise<SectorDefinitionRevision> {
@@ -337,14 +345,10 @@ export class PostgresTrackConfigurationRepository extends MemoryTrackConfigurati
       [definition.revision, layoutKey(definition.layout!), definition.source, definition.active, definition.draft, definition.locked, definition, definition.createdAt]);
   }
 
-  override async observeNativeDefinition(session: SessionState): Promise<void> {
-    await super.observeNativeDefinition(session);
-    const layout = sessionLayout(session);
-    for (const definition of this.sectors.values()) {
-      const sameReportedTrack = definition.layout?.trackId === layout.trackId
-        && definition.layout?.trackName.toLocaleLowerCase() === layout.trackName.toLocaleLowerCase();
-      if (definition.revision === session.sectorDefinition?.revision || (definition.active && sameReportedTrack)) await this.persistSector(definition);
-    }
+  override async observeNativeDefinition(session: SessionState): Promise<string[]> {
+    const changed = await super.observeNativeDefinition(session);
+    for (const revision of changed) await this.persistSector(this.sectors.get(revision)!);
+    return changed;
   }
 
   override async saveSectorDraft(input: Parameters<MemoryTrackConfigurationRepository["saveSectorDraft"]>[0]): Promise<SectorDefinitionRevision> {

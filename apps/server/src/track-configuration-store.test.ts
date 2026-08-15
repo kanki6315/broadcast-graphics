@@ -46,7 +46,10 @@ test("draft save is immutable, ordered, resettable to native facts, and activati
   const { repository, calibration } = await configured();
   await repository.activateCalibration(calibration.id, layout);
   const nativeBoundaries: SectorBoundary[] = [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: 0.33 }, { sectorNumber: 3, startPct: 0.66 }];
-  await repository.observeNativeDefinition(session({ sectorDefinition: { revision: "native-a", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: nativeBoundaries } }));
+  const firstObservation = await repository.observeNativeDefinition(session({ sectorDefinition: { revision: "native-a", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: nativeBoundaries } }));
+  const repeatedObservation = await repository.observeNativeDefinition(session({ sectorDefinition: { revision: "native-a", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: nativeBoundaries } }));
+  assert.deepEqual(firstObservation, ["native-a"]);
+  assert.deepEqual(repeatedObservation, []);
   const draft = await repository.saveSectorDraft({ layout, mapCalibrationId: calibration.id, boundaries: [{ sectorNumber: 9, startPct: 0.7 }, { sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: 0.35 }] });
   assert.equal(draft.source, "custom");
   assert.deepEqual(draft.boundaries.map((boundary) => boundary.sectorNumber), [1, 2, 3]);
@@ -62,7 +65,10 @@ test("race start locks activation while preserving a future draft", async () => 
   const { repository, calibration } = await configured();
   await repository.observeNativeDefinition(session({ sectorDefinition: { revision: "native-lock", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] } }));
   const draft = await repository.saveSectorDraft({ layout, mapCalibrationId: calibration.id, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: 0.5 }] });
-  await repository.observeNativeDefinition(session({ phase: "racing", startState: "go", lapsCompleted: 1, sectorDefinition: { revision: "native-lock", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] } }));
+  const lockTransition = await repository.observeNativeDefinition(session({ phase: "racing", startState: "go", lapsCompleted: 1, sectorDefinition: { revision: "native-lock", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] } }));
+  const repeatedRaceObservation = await repository.observeNativeDefinition(session({ phase: "racing", startState: "go", lapsCompleted: 1, sectorDefinition: { revision: "native-lock", source: "iracing", sessionId: "session-1", trackId: 101, trackName: layout.trackName, boundaries: [{ sectorNumber: 1, startPct: 0 }, { sectorNumber: 2, startPct: .5 }] } }));
+  assert.deepEqual(lockTransition, ["native-lock"]);
+  assert.deepEqual(repeatedRaceObservation, []);
   assert.equal((await repository.snapshot(layout)).activeSectorDefinition?.locked, true);
   await assert.rejects(
     () => repository.activateSectorRevision(draft.revision, layout, session({ phase: "racing", startState: "go", lapsCompleted: 1 })),
