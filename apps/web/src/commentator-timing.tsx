@@ -6,6 +6,7 @@ import {
   defaultCommentatorColumns,
   CommentatorTimingTable,
   sortByClassPosition,
+  sortByOverallPosition,
   type CommentatorColumn,
 } from "./timing-table";
 import { LinearTrackRibbon } from "./linear-track-ribbon";
@@ -66,9 +67,9 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const classes = state?.session?.classes ?? [];
   const filteredDrivers = useMemo(() => {
     const drivers = state?.session?.drivers ?? [];
-    return sortByClassPosition(preferences.classId === "all"
-      ? drivers
-      : drivers.filter((driver) => driver.classId === preferences.classId));
+    return preferences.classId === "all"
+      ? sortByOverallPosition(drivers)
+      : sortByClassPosition(drivers.filter((driver) => driver.classId === preferences.classId));
   }, [preferences.classId, state?.session?.drivers]);
 
   useEffect(() => {
@@ -133,6 +134,8 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const telemetryHealthy = socketConnected && state.connection === "connected";
   const session = state.session;
   const isSimulated = session?.sourceMode === "simulation";
+  const showClassGaps = classes.length > 1 || new Set(session?.drivers.map((driver) => driver.classId)).size > 1;
+  const displayedColumnCount = 2 + [...visibleColumns].filter((column) => showClassGaps || (column !== "gap" && column !== "interval")).length;
   const intelligence = state.intelligence;
   const warningCarIdxs = new Set(filteredDrivers.map((driver) => driver.carIdx));
   const driversByCarIdx = new Map(filteredDrivers.map((driver) => [driver.carIdx, driver]));
@@ -195,10 +198,12 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
             ))}
           </div>
           <details className="column-chooser">
-            <summary><Columns3 aria-hidden="true" />Columns <span>{visibleColumns.size + 2}</span></summary>
+            <summary><Columns3 aria-hidden="true" />Columns <span>{displayedColumnCount}</span></summary>
             <fieldset>
               <legend>Visible timing groups</legend>
-              {(Object.keys(commentatorColumnLabels) as CommentatorColumn[]).map((column) => (
+              {(Object.keys(commentatorColumnLabels) as CommentatorColumn[])
+                .filter((column) => showClassGaps || (column !== "gap" && column !== "interval"))
+                .map((column) => (
                 <label key={column}><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => toggleColumn(column)} />{commentatorColumnLabels[column]}</label>
               ))}
             </fieldset>
@@ -250,6 +255,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}
           groupByClass={false}
+          showClassGaps={showClassGaps}
           stints={intelligence?.stints}
           gapTrends={intelligence?.gapTrends}
           pitCycles={intelligence?.pitCycles}

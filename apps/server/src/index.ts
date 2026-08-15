@@ -19,6 +19,7 @@ import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
 import { canIssueControlCommands, helloMatchesAccess, parseSocketAccess } from "./socket-access.js";
 import { acceptTelemetry } from "./telemetry-ingestion.js";
 import { StateStore } from "./state-store.js";
+import { inferStartFinishPathPct } from "./track-map-geometry.js";
 import {
   configurationError,
   createTrackConfigurationRepository,
@@ -297,6 +298,11 @@ app.post<{ Body: { layout?: unknown } }>("/api/track-config/maps/iracing", async
       error: `The iRacing SVG contains ${preview.candidates.length} closed paths, so Gantry will not guess which one is the centerline. Download the official layer and use local SVG import to choose it explicitly.`,
       code: "ambiguous-centerline",
     });
+    let startFinish: ReturnType<typeof inferStartFinishPathPct> = null;
+    if (asset.startFinishSvg) {
+      try { startFinish = inferStartFinishPathPct(selected.pathData, asset.startFinishSvg); }
+      catch { startFinish = null; }
+    }
     const map = await trackConfiguration.importMap({
       svg: asset.svg,
       layout,
@@ -304,6 +310,8 @@ app.post<{ Body: { layout?: unknown } }>("/api/track-config/maps/iracing", async
       source: "iracing",
       sourceVersion: asset.sourceVersion,
       originalFilename: asset.originalFilename,
+      suggestedStartFinishPathPct: startFinish?.pathPct,
+      startFinishMarkerPaths: startFinish?.markerPaths,
       author: admin.username,
     });
     return reply.code(201).send(map);

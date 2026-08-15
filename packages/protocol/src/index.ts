@@ -90,6 +90,8 @@ export interface TrackMapDefinition {
   sanitizedSvg?: string;
   centerlinePath: string;
   centerlinePathId: string;
+  suggestedStartFinishPathPct?: number | null;
+  startFinishMarkerPaths?: string[];
   viewBox: [number, number, number, number];
   createdAt: string;
 }
@@ -161,6 +163,8 @@ export interface DriverSectorTiming {
   currentSectorNumber?: number;
   currentLap?: CompletedSector[];
   previousLap?: CompletedSector[];
+  /** Fastest valid completed sector for this car, independently selected per sector. */
+  bestSectors?: CompletedSector[];
 }
 
 export interface PitVisitTiming {

@@ -32,7 +32,7 @@ export interface MapImportPreview {
 export interface TrackConfigurationRepository {
   initialize(): Promise<void>;
   previewImport(svg: string): Promise<MapImportPreview>;
-  importMap(input: { svg: string; layout: TrackLayoutIdentity; selectedPathId: string; source?: TrackMapSource; sourceVersion?: string; originalFilename?: string; author?: string }): Promise<TrackMapDefinition>;
+  importMap(input: { svg: string; layout: TrackLayoutIdentity; selectedPathId: string; source?: TrackMapSource; sourceVersion?: string; originalFilename?: string; suggestedStartFinishPathPct?: number; startFinishMarkerPaths?: string[]; author?: string }): Promise<TrackMapDefinition>;
   listMaps(layout: TrackLayoutIdentity): Promise<TrackMapDefinition[]>;
   getMap(id: string): Promise<TrackMapDefinition | null>;
   getCalibration(id: string): Promise<TrackMapCalibration | null>;
@@ -119,11 +119,19 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
     return { ...preview, duplicateMapDefinitionId: duplicate?.id };
   }
 
-  async importMap(input: { svg: string; layout: TrackLayoutIdentity; selectedPathId: string; source?: TrackMapSource; sourceVersion?: string; originalFilename?: string }): Promise<TrackMapDefinition> {
+  async importMap(input: { svg: string; layout: TrackLayoutIdentity; selectedPathId: string; source?: TrackMapSource; sourceVersion?: string; originalFilename?: string; suggestedStartFinishPathPct?: number; startFinishMarkerPaths?: string[] }): Promise<TrackMapDefinition> {
     const preview = sanitizeTrackSvg(input.svg);
     const layout = normalizeLayout(input.layout);
+    if (input.suggestedStartFinishPathPct != null && (!Number.isFinite(input.suggestedStartFinishPathPct) || input.suggestedStartFinishPathPct < 0 || input.suggestedStartFinishPathPct >= 1))
+      throw new TrackConfigurationError("Suggested start/finish must be a finite position from zero up to one.", "invalid-calibration");
     const duplicate = [...this.maps.values()].find((map) => map.sourceChecksum === preview.checksum && layoutsMatch(map.layout, layout));
-    if (duplicate) return structuredClone(duplicate);
+    if (duplicate) {
+      if (Number.isFinite(input.suggestedStartFinishPathPct) && input.suggestedStartFinishPathPct! >= 0 && input.suggestedStartFinishPathPct! < 1) {
+        duplicate.suggestedStartFinishPathPct = input.suggestedStartFinishPathPct;
+        duplicate.startFinishMarkerPaths = input.startFinishMarkerPaths?.slice(0, 20) ?? [];
+      }
+      return structuredClone(duplicate);
+    }
     const selected = preview.candidates.find((candidate) => candidate.id === input.selectedPathId);
     if (!selected) throw new TrackConfigurationError("Select one of the validated centerline paths.", "invalid-centerline");
     prepareSvgPath(selected.pathData);
@@ -134,6 +142,8 @@ export class MemoryTrackConfigurationRepository implements TrackConfigurationRep
       originalFilename: input.originalFilename?.slice(0, 255) ?? null,
       importedAt: now, sanitizationStatus: input.source === "bundled" ? "bundled" : "sanitized",
       sanitizedSvg: preview.sanitizedSvg, centerlinePath: selected.pathData, centerlinePathId: selected.id,
+      suggestedStartFinishPathPct: Number.isFinite(input.suggestedStartFinishPathPct) ? input.suggestedStartFinishPathPct : null,
+      startFinishMarkerPaths: input.startFinishMarkerPaths?.slice(0, 20) ?? [],
       viewBox: preview.viewBox, createdAt: now,
     };
     this.maps.set(map.id, map);
@@ -315,6 +325,7 @@ export class PostgresTrackConfigurationRepository extends MemoryTrackConfigurati
     const map = await super.importMap(input);
     await this.pool.query(`INSERT INTO bg_track_map_definitions (id, layout_key, source_checksum, payload, created_at)
       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (layout_key, source_checksum) DO NOTHING`, [map.id, layoutKey(map.layout), map.sourceChecksum, map, map.createdAt]);
+    await this.pool.query("UPDATE bg_track_map_definitions SET payload=$2 WHERE id=$1", [map.id, map]);
     return map;
   }
 

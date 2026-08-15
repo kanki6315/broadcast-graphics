@@ -105,7 +105,7 @@ function arcPoints(from: Point, rxInput: number, ryInput: number, rotation: numb
   });
 }
 
-export function prepareSvgPath(pathData: string): PreparedPath {
+export function prepareSvgPath(pathData: string, requireClosed = true): PreparedPath {
   const tokens = tokenizePath(pathData);
   const points: Point[] = [];
   let index = 0;
@@ -182,7 +182,7 @@ export function prepareSvgPath(pathData: string): PreparedPath {
   if (!Number.isFinite(length) || length <= 1e-6) throw new TrackMapValidationError("The selected path has zero or non-finite length.", "zero-length-path");
   const endpointGap = distance(points[0]!, points.at(-1)!);
   const closed = endpointGap <= Math.max(1, length * 0.01);
-  if (!closed) throw new TrackMapValidationError("The selected centerline is open; its endpoints must be within 1% of path length.", "open-path");
+  if (requireClosed && !closed) throw new TrackMapValidationError("The selected centerline is open; its endpoints must be within 1% of path length.", "open-path");
   return { points, cumulativeLengths, length, closed };
 }
 
@@ -225,6 +225,62 @@ export function nearestPathPoint(path: PreparedPath, selected: Point): { point: 
     }
   }
   return best;
+}
+
+function segmentIntersection(a: Point, b: Point, c: Point, d: Point): Point | null {
+  const abX = b.x - a.x, abY = b.y - a.y;
+  const cdX = d.x - c.x, cdY = d.y - c.y;
+  const denominator = abX * cdY - abY * cdX;
+  if (Math.abs(denominator) < 1e-12) return null;
+  const acX = c.x - a.x, acY = c.y - a.y;
+  const firstT = (acX * cdY - acY * cdX) / denominator;
+  const secondT = (acX * abY - acY * abX) / denominator;
+  if (firstT < 0 || firstT > 1 || secondT < 0 || secondT > 1) return null;
+  return { x: a.x + abX * firstT, y: a.y + abY * firstT };
+}
+
+export interface StartFinishInference {
+  pathPct: number;
+  markerPaths: string[];
+}
+
+/** Locates the official start/finish marker where it crosses the selected closed centerline. */
+export function inferStartFinishPathPct(centerlinePathData: string, markerSvg: string): StartFinishInference | null {
+  const markerPaths = (markerSvg.match(/<path\b[^>]*>/gi) ?? []).flatMap((tag) => {
+    const pathData = attr(tag, "d");
+    return pathData ? [pathData] : [];
+  });
+  if (!markerPaths.length) return null;
+  const centerline = prepareSvgPath(centerlinePathData);
+  const intersections: number[] = [];
+  const markerPoints: Point[] = [];
+  for (const markerPath of markerPaths) {
+    let marker: PreparedPath;
+    try { marker = prepareSvgPath(markerPath, false); }
+    catch (error) {
+      if (error instanceof TrackMapValidationError) continue;
+      throw error;
+    }
+    markerPoints.push(...marker.points);
+    for (let centerIndex = 1; centerIndex < centerline.points.length; centerIndex++) {
+      const centerA = centerline.points[centerIndex - 1]!, centerB = centerline.points[centerIndex]!;
+      for (let markerIndex = 1; markerIndex < marker.points.length; markerIndex++) {
+        const crossing = segmentIntersection(centerA, centerB, marker.points[markerIndex - 1]!, marker.points[markerIndex]!);
+        if (!crossing) continue;
+        const along = centerline.cumulativeLengths[centerIndex - 1]! + distance(centerA, crossing);
+        intersections.push(wrap(along / centerline.length));
+      }
+    }
+  }
+  if (intersections.length) {
+    const reference = intersections[0]!;
+    const unwrapped = intersections.map((candidate) => reference + wrap(candidate - reference + 0.5) - 0.5);
+    return { pathPct: wrap(unwrapped.reduce((sum, candidate) => sum + candidate, 0) / unwrapped.length), markerPaths };
+  }
+  if (!markerPoints.length) return null;
+  const centroid = markerPoints.reduce((sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y }), { x: 0, y: 0 });
+  centroid.x /= markerPoints.length; centroid.y /= markerPoints.length;
+  return { pathPct: nearestPathPoint(centerline, centroid).pathPct, markerPaths };
 }
 
 function attr(tag: string, name: string): string | undefined {

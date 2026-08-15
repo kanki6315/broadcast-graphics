@@ -24,10 +24,11 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
       "509": {
         track_id: 509,
         track_map: "https://images-static.iracing.com/img/tracks/map/algarve/gp/track-map.svg",
-        track_map_layers: { active: "active.svg" },
+        track_map_layers: { active: "active.svg", "start-finish": "start-finish.svg" },
       },
     });
     if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg") return new Response(svg, { headers: { "Content-Type": "image/svg+xml" } });
+    if (url === "https://images-static.iracing.com/img/tracks/map/algarve/gp/start-finish.svg") return new Response(`<svg viewBox="0 0 100 100"><path d="M45 -10L45 10"/></svg>`);
     return new Response("not found", { status: 404 });
   };
   const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
@@ -35,12 +36,56 @@ test("authenticates, resolves the Data API link, and downloads the active SVG la
   assert.match(result.svg, /<path id="iracing-path-1"/);
   assert.doesNotMatch(result.svg, /Content-Type/);
   assert.equal(result.sourceUrl, "https://images-static.iracing.com/img/tracks/map/algarve/gp/active.svg");
+  assert.match(result.startFinishSvg ?? "", /M45 -10L45 10/);
   assert.match(result.originalFilename, /^iRacing-509-/);
   const tokenBody = requests[0]?.init?.body as URLSearchParams;
   assert.equal(tokenBody.get("grant_type"), "password_limited");
   assert.equal(tokenBody.get("client_secret"), maskIracingSecret(credentials.clientSecret, credentials.clientId));
   assert.equal(tokenBody.get("password"), maskIracingSecret(credentials.password, credentials.username));
   assert.equal(new Headers(requests[1]?.init?.headers).get("Authorization"), "Bearer access");
+});
+
+test("downloads a live-catalog layer from iRacing's members-assets CDN", async () => {
+  const activeUrl = "https://members-assets.iracing.com/public/track-maps/algarve/gp/active.svg";
+  const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
+    const url = input.toString();
+    if (url.includes("/oauth2/token")) return Response.json({ access_token: "access", expires_in: 600 });
+    if (url.endsWith("/data/track/assets")) return Response.json({
+      "509": {
+        track_id: 509,
+        track_map: "https://members-assets.iracing.com/public/track-maps/algarve/gp/track-map.svg",
+        track_map_layers: { active: "active.svg" },
+      },
+    });
+    if (url === activeUrl) return new Response(svg);
+    return new Response("not found", { status: 404 });
+  };
+  const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
+  const result = await client.getTrackMap({ trackId: 509, trackName: "Algarve" });
+  assert.equal(result.sourceUrl, activeUrl);
+});
+
+test("rejects a track-map layer from a lookalike domain", async () => {
+  const fakeFetch = async (input: string | URL | Request): Promise<Response> => {
+    const url = input.toString();
+    if (url.includes("/oauth2/token")) return Response.json({ access_token: "access", expires_in: 600 });
+    if (url.endsWith("/data/track/assets")) return Response.json({
+      "509": {
+        track_id: 509,
+        track_map: "https://images-static.iracing.com/tracks/algarve/track-map.svg",
+        track_map_layers: { active: "https://images-static.iracing.com.attacker.test/active.svg" },
+      },
+    });
+    return new Response(svg);
+  };
+  const client = new IracingTrackMapClient(credentials, fakeFetch as typeof fetch, () => 1_000);
+  await assert.rejects(
+    client.getTrackMap({ trackId: 509, trackName: "Algarve" }),
+    (error: unknown) => error instanceof Error
+      && "code" in error
+      && error.code === "invalid-asset-url"
+      && error.message.includes("images-static.iracing.com.attacker.test"),
+  );
 });
 
 test("reuses an unexpired access token", async () => {

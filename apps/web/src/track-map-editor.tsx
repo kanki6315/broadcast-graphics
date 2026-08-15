@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowLeft, Check, CircleDot, CloudDownload, GitBranch, LockKeyhole, MapPinned, MousePointer2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Check, CircleDot, CloudDownload, Crosshair, GitBranch, LockKeyhole, MapPinned, MousePointer2, Plus, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import type {
   SectorBoundary,
   SectorDefinitionRevision,
@@ -42,6 +42,7 @@ export function TrackMapEditor() {
   const [boundaries, setBoundaries] = useState<SectorBoundary[]>([]);
   const [dragSector, setDragSector] = useState<number | null>(null);
   const [addArmed, setAddArmed] = useState(false);
+  const [placingStartFinish, setPlacingStartFinish] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -75,9 +76,14 @@ export function TrackMapEditor() {
     void api<TrackMapCalibration[]>(`/api/track-config/calibrations?mapDefinitionId=${encodeURIComponent(selectedMapId)}`).then((items) => {
       setCalibrations(items);
       const active = items.find((item) => item.active) ?? items[0];
-      if (active) { setStartFinishPathPct(active.startFinishPathPct); setDirection(active.direction); setRotationDegrees(active.rotationDegrees ?? 0); }
+      const map = maps.find((item) => item.id === selectedMapId);
+      if (active) { setStartFinishPathPct(active.startFinishPathPct); setDirection(active.direction); setRotationDegrees(active.rotationDegrees ?? 0); setPlacingStartFinish(false); }
+      else {
+        setStartFinishPathPct(map?.suggestedStartFinishPathPct ?? 0); setDirection("forward"); setRotationDegrees(0);
+        setPlacingStartFinish(map?.suggestedStartFinishPathPct == null);
+      }
     }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Calibrations could not be loaded."));
-  }, [selectedMapId]);
+  }, [selectedMapId, maps]);
 
   async function selectFile(file: File | undefined) {
     if (!file) return;
@@ -111,7 +117,11 @@ export function TrackMapEditor() {
       const map = await api<TrackMapDefinition>("/api/track-config/maps/iracing", { method: "POST", body: JSON.stringify({ layout }) });
       setMaps((current) => current.some((item) => item.id === map.id) ? current : [map, ...current]);
       setSelectedMapId(map.id);
-      setMessage(`Official iRacing centerline stored as map ${map.id.slice(0, 8)}. Calibrate start/finish and direction before activation.`);
+      setStartFinishPathPct(map.suggestedStartFinishPathPct ?? 0);
+      setPlacingStartFinish(map.suggestedStartFinishPathPct == null);
+      setMessage(map.suggestedStartFinishPathPct == null
+        ? `Official centerline stored as map ${map.id.slice(0, 8)}. The S/F reference was unavailable; place it manually and confirm direction.`
+        : `Official iRacing S/F snapped to ${(map.suggestedStartFinishPathPct * 100).toFixed(3)}% of the source path. Confirm direction before activation.`);
     } catch (importError) { setError(importError instanceof Error ? importError.message : "The iRacing map could not be imported."); }
     finally { setBusy(false); }
   }
@@ -123,11 +133,11 @@ export function TrackMapEditor() {
 
   function mapPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     if (!pathRef.current || !svgRef.current) return;
-    if (!activeCalibration) {
+    if (placingStartFinish) {
       const length = pathRef.current.getTotalLength();
       const target = clientPointToViewBox(svgRef.current, event.clientX, event.clientY);
       const provisional = projectToPath(pathRef.current, target, { startFinishPathPct: 0, direction: "forward" });
-      setStartFinishPathPct(provisional.pathPct); setMessage(`Start/finish placed at ${(provisional.pathPct * 100).toFixed(3)}% of the source path.`);
+      setStartFinishPathPct(provisional.pathPct); setPlacingStartFinish(false); setMessage(`Manual start/finish placed at ${(provisional.pathPct * 100).toFixed(3)}% of the source path.`);
       return;
     }
     if (addArmed) {
@@ -195,8 +205,9 @@ export function TrackMapEditor() {
   if (!state) return <main className="loading-screen"><MapPinned aria-hidden="true" /><h1>Opening track configuration</h1><p>Waiting for the authorized control connection.</p></main>;
   if (!layout) return <main className="map-config-empty"><a href="/control"><ArrowLeft aria-hidden="true" />Control desk</a><h1>No active track layout</h1><p>Connect telemetry before importing or activating a circuit definition.</p></main>;
 
-  const percentageMarkers = activeCalibration && pathRef.current ? Array.from({ length: 10 }, (_, index) => {
-    const lapPct = index / 10; return { lapPct, point: pointForLapPct(pathRef.current!, lapPct, activeCalibration) };
+  const previewCalibration = { startFinishPathPct, direction };
+  const percentageMarkers = selectedMap && pathRef.current ? Array.from({ length: 10 }, (_, index) => {
+    const lapPct = index / 10; return { lapPct, point: pointForLapPct(pathRef.current!, lapPct, previewCalibration) };
   }) : [];
 
   return (
@@ -215,7 +226,8 @@ export function TrackMapEditor() {
 
           <section className="map-calibration-panel" aria-labelledby="calibration-title"><header><CircleDot aria-hidden="true" /><div><h2 id="calibration-title">Calibrate start and direction</h2><p>Path distance ↔ lap distance</p></div></header>
             <label className="config-field"><span>Stored map</span><select value={selectedMapId} onChange={(event) => setSelectedMapId(event.target.value)}><option value="">Choose a map</option>{maps.map((map) => <option key={map.id} value={map.id}>{map.originalFilename ?? map.id.slice(0, 8)} · {map.sourceChecksum.slice(0, 8)}</option>)}</select></label>
-            {selectedMap && <><div className="calibration-map"><svg ref={svgRef} viewBox={selectedMap.viewBox.join(" ")} onPointerDown={mapPointerDown} onPointerMove={mapPointerMove} onPointerUp={() => setDragSector(null)} onPointerLeave={() => setDragSector(null)} aria-label="Centerline calibration editor"><g transform={`rotate(${rotationDegrees} ${selectedMap.viewBox[0] + selectedMap.viewBox[2] / 2} ${selectedMap.viewBox[1] + selectedMap.viewBox[3] / 2})`}><path className="calibration-bed" d={selectedMap.centerlinePath} /><path ref={pathRef} className="calibration-line" d={selectedMap.centerlinePath} />{percentageMarkers.map(({ lapPct, point }) => <g key={lapPct} className="percentage-marker" transform={`translate(${point.x} ${point.y})`}><circle r={lapPct === 0 ? 5 : 3} /><text y="-7">{lapPct === 0 ? "S/F" : `${lapPct * 100}%`}</text></g>)}{activeCalibration && boundaries.map((boundary) => { const point = pointForLapPct(pathRef.current!, boundary.startPct, activeCalibration); return <g key={boundary.sectorNumber} className={`sector-editor-handle${boundary.sectorNumber === 1 ? " is-fixed" : ""}`} role="button" tabIndex={0} aria-label={`${boundary.sectorNumber === 1 ? "Fixed start finish" : `Move sector ${boundary.sectorNumber} boundary`} at ${(boundary.startPct * 100).toFixed(3)} percent`} transform={`translate(${point.x} ${point.y})`} onPointerDown={(event) => { event.stopPropagation(); if (boundary.sectorNumber !== 1) { setDragSector(boundary.sectorNumber); event.currentTarget.setPointerCapture(event.pointerId); } }} onKeyDown={(event) => { if (boundary.sectorNumber === 1) return; if (event.key === "Delete" || event.key === "Backspace") setBoundaries((current) => normalized(current.filter((item) => item.sectorNumber !== boundary.sectorNumber))); if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const delta = event.key === "ArrowLeft" ? -0.005 : 0.005; setBoundaries((current) => normalized(current.map((item) => item.sectorNumber === boundary.sectorNumber ? { ...item, startPct: Math.max(0.005, Math.min(0.995, item.startPct + delta)) } : item))); } }}><circle r="6" /><text y="-9">{boundary.sectorNumber === 1 ? "S/F" : `S${boundary.sectorNumber}`}</text></g>; })}</g></svg><span>{activeCalibration ? addArmed ? "Click the centerline to add a boundary" : "Drag sector handles; arrow keys move 0.5%" : "Click the path to place start/finish"}</span></div>
+            {selectedMap && <><div className={`calibration-map${placingStartFinish ? " is-placing-start" : ""}`}><svg ref={svgRef} viewBox={selectedMap.viewBox.join(" ")} onPointerDown={mapPointerDown} onPointerMove={mapPointerMove} onPointerUp={() => setDragSector(null)} onPointerLeave={() => setDragSector(null)} aria-label="Centerline calibration editor"><g transform={`rotate(${rotationDegrees} ${selectedMap.viewBox[0] + selectedMap.viewBox[2] / 2} ${selectedMap.viewBox[1] + selectedMap.viewBox[3] / 2})`}><path className="calibration-bed" d={selectedMap.centerlinePath} />{selectedMap.startFinishMarkerPaths?.map((path, index) => <path key={index} className="start-finish-reference" d={path} />)}<path ref={pathRef} className="calibration-line" d={selectedMap.centerlinePath} />{percentageMarkers.map(({ lapPct, point }) => <g key={lapPct} className="percentage-marker" transform={`translate(${point.x} ${point.y})`}><circle r={lapPct === 0 ? 5 : 3} /><text y="-7">{lapPct === 0 ? "S/F" : `${lapPct * 100}%`}</text></g>)}{activeCalibration && boundaries.map((boundary) => { const point = pointForLapPct(pathRef.current!, boundary.startPct, activeCalibration); return <g key={boundary.sectorNumber} className={`sector-editor-handle${boundary.sectorNumber === 1 ? " is-fixed" : ""}`} role="button" tabIndex={0} aria-label={`${boundary.sectorNumber === 1 ? "Fixed start finish" : `Move sector ${boundary.sectorNumber} boundary`} at ${(boundary.startPct * 100).toFixed(3)} percent`} transform={`translate(${point.x} ${point.y})`} onPointerDown={(event) => { event.stopPropagation(); if (boundary.sectorNumber !== 1) { setDragSector(boundary.sectorNumber); event.currentTarget.setPointerCapture(event.pointerId); } }} onKeyDown={(event) => { if (boundary.sectorNumber === 1) return; if (event.key === "Delete" || event.key === "Backspace") setBoundaries((current) => normalized(current.filter((item) => item.sectorNumber !== boundary.sectorNumber))); if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const delta = event.key === "ArrowLeft" ? -0.005 : 0.005; setBoundaries((current) => normalized(current.map((item) => boundary.sectorNumber === item.sectorNumber ? { ...item, startPct: Math.max(0.005, Math.min(0.995, item.startPct + delta)) } : item))); } }}><circle r="6" /><text y="-9">{boundary.sectorNumber === 1 ? "S/F" : `S${boundary.sectorNumber}`}</text></g>; })}</g></svg><span>{placingStartFinish ? "Click the centerline to override S/F" : addArmed ? "Click the centerline to add a boundary" : activeCalibration ? "Drag sector handles; arrow keys move 0.5%" : "Review the snapped S/F, then save calibration"}</span></div>
+              <div className={`start-finish-status${selectedMap.suggestedStartFinishPathPct == null ? " is-manual" : ""}`}><div><strong>{selectedMap.suggestedStartFinishPathPct == null ? "Manual S/F required" : "Official iRacing S/F detected"}</strong><span>{selectedMap.suggestedStartFinishPathPct == null ? "Click the centerline at the scoring line." : "The orange reference line is projected onto the centerline. Override only if visual inspection shows a mismatch."}</span></div><button type="button" className={placingStartFinish ? "is-armed" : ""} onClick={() => setPlacingStartFinish((value) => !value)}><Crosshair aria-hidden="true" />{placingStartFinish ? "Cancel placement" : "Place manually"}</button></div>
               <div className="calibration-controls"><label><span>Source path start</span><output>{(startFinishPathPct * 100).toFixed(3)}%</output></label><fieldset><legend>Travel direction</legend><label><input type="radio" checked={direction === "forward"} onChange={() => setDirection("forward")} />Forward</label><label><input type="radio" checked={direction === "reverse"} onChange={() => setDirection("reverse")} />Reverse</label></fieldset><label className="config-field"><span>Display rotation</span><input type="number" min="-360" max="360" step="1" value={rotationDegrees} onChange={(event) => setRotationDegrees(Number(event.target.value))} /></label></div>
               <div className="config-actions"><button className="config-primary" disabled={busy} onClick={() => void saveCalibration()}><Save aria-hidden="true" />Save new calibration</button>{calibrations.filter((item) => !item.active).slice(0, 1).map((item) => <button key={item.id} disabled={busy} onClick={() => void activateCalibration(item)}><Check aria-hidden="true" />Activate CAL {item.revision}</button>)}</div></>}
           </section>

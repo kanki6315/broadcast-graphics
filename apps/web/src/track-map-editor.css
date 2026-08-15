@@ -64,12 +64,23 @@
 .config-field select, .config-field input { width: 100%; height: 32px; border: 1px solid var(--ink); border-radius: 0; padding: 4px 7px; background: var(--stock); color: var(--ink); font: 600 11px "Source Sans 3", sans-serif; }
 .calibration-map { position: relative; height: 360px; border: 1px solid var(--ink); background-image: linear-gradient(var(--paper-line) 1px, transparent 1px), linear-gradient(90deg, var(--paper-line) 1px, transparent 1px); background-size: 24px 24px; overflow: hidden; }
 .calibration-map > svg { width: 100%; height: 100%; padding: 18px; touch-action: none; }
+.calibration-map.is-placing-start > svg { cursor: crosshair; }
 .calibration-map > span { position: absolute; inset: auto 6px 6px; padding: 3px 5px; background: var(--stock); color: var(--muted); font-size: 8px; }
 .calibration-bed, .calibration-line { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .calibration-bed { stroke: var(--stock); stroke-width: 11; }
 .calibration-line { stroke: var(--ink); stroke-width: 4; }
+.start-finish-reference { fill: none; stroke: var(--orange); stroke-width: 3; stroke-linecap: square; vector-effect: non-scaling-stroke; pointer-events: none; }
 .percentage-marker circle { fill: var(--stock); stroke: var(--muted); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .percentage-marker text { fill: var(--muted); font: 700 7px var(--display); text-anchor: middle; paint-order: stroke; stroke: var(--stock); stroke-width: 2px; }
+.start-finish-status { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border-bottom: 1px solid var(--ink); padding: 7px 0; }
+.start-finish-status > div { min-width: 0; }
+.start-finish-status strong, .start-finish-status span { display: block; }
+.start-finish-status strong { font: 700 10px var(--display); text-transform: uppercase; }
+.start-finish-status span { margin-top: 2px; color: var(--muted); font-size: 9px; line-height: 1.25; }
+.start-finish-status button { min-height: 32px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--ink); border-radius: 0; padding: 5px 8px; background: var(--stock); color: var(--ink); font: 700 9px var(--display); text-transform: uppercase; }
+.start-finish-status button svg { width: 13px; height: 13px; }
+.start-finish-status button:hover, .start-finish-status button:focus-visible { background: var(--inspection); outline: 2px solid var(--orange); outline-offset: 1px; }
+.start-finish-status button.is-armed { background: var(--orange); }
 .sector-editor-handle { cursor: grab; outline: none; }
 .sector-editor-handle circle { fill: var(--orange); stroke: var(--ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .sector-editor-handle text { fill: var(--ink); font: 700 8px var(--display); text-anchor: middle; paint-order: stroke; stroke: var(--stock); stroke-width: 3px; }

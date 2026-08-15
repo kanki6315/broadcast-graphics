@@ -32,8 +32,10 @@ async function configured() {
 
 test("map imports are checksum-deduplicated per exact layout and calibrations are revisioned", async () => {
   const { repository, map, calibration } = await configured();
-  const duplicate = await repository.importMap({ svg, layout, selectedPathId: "short" });
+  const duplicate = await repository.importMap({ svg, layout, selectedPathId: "short", suggestedStartFinishPathPct: 0.125, startFinishMarkerPaths: ["M45 -10L45 10"] });
   assert.equal(duplicate.id, map.id);
+  assert.equal(duplicate.suggestedStartFinishPathPct, 0.125);
+  assert.deepEqual(duplicate.startFinishMarkerPaths, ["M45 -10L45 10"]);
   const second = await repository.saveCalibration({ mapDefinitionId: map.id, startFinishPathPct: 0.3, direction: "forward" });
   assert.equal(calibration.revision, 1);
   assert.equal(second.revision, 2);
