@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DriverState, RaceIntelligenceSnapshot } from "@racecontrol/protocol";
-import { closingGapUrgency, CommentatorTimingTable, defaultCommentatorColumns, sortByClassPosition, sortByOverallPosition, type CommentatorColumn } from "./timing-table";
+import { CommentatorTimingTable, defaultCommentatorColumns, gapProximity, sortByClassPosition, sortByOverallPosition, type CommentatorColumn } from "./timing-table";
 import { BattleWatch } from "./battle-watch";
 
 function driver(overrides: Partial<DriverState> = {}): DriverState {
@@ -106,26 +106,42 @@ test("closing intervals receive proximity bands and quantitative trend context",
     }]}
   />);
 
-  assert.match(markup, /interval-cell is-closing-immediate/);
+  assert.match(markup, /interval-cell is-gap-immediate/);
   assert.match(markup, /closing · 0\.46s \/ 12s/);
   assert.match(markup, /lucide-arrow-down-right/);
 });
 
-test("closing-gap proximity bands use hysteresis and ignore non-closing trends", () => {
-  const trend = (currentGap: number, direction: "closing" | "opening" = "closing") => ({
+test("gap proximity bands persist across directions, use hysteresis, and ignore invalid trends", () => {
+  const trend = (currentGap: number, direction: "closing" | "stable" | "opening" = "closing", quality: "valid" | "invalid" = "valid") => ({
     id: "trend:1:7", referenceCarIdx: 1, chasingCarIdx: 7, classId: 1,
     currentGap, lapDeficit: 0, windowSeconds: 12, gapChange: -.2, rate: -.02,
-    direction, quality: "valid" as const,
+    direction, quality,
   });
 
-  assert.equal(closingGapUrgency(trend(.7)), "immediate");
-  assert.equal(closingGapUrgency(trend(.8), "immediate"), "immediate");
-  assert.equal(closingGapUrgency(trend(1.2)), "approaching");
-  assert.equal(closingGapUrgency(trend(1.58), "approaching"), "approaching");
-  assert.equal(closingGapUrgency(trend(2.4)), "developing");
-  assert.equal(closingGapUrgency(trend(3.08), "developing"), "developing");
-  assert.equal(closingGapUrgency(trend(3.2)), undefined);
-  assert.equal(closingGapUrgency(trend(.5, "opening")), undefined);
+  assert.equal(gapProximity(trend(.7)), "immediate");
+  assert.equal(gapProximity(trend(.8, "stable"), "immediate"), "immediate");
+  assert.equal(gapProximity(trend(1.2, "opening")), "approaching");
+  assert.equal(gapProximity(trend(1.58), "approaching"), "approaching");
+  assert.equal(gapProximity(trend(2.4, "stable")), "developing");
+  assert.equal(gapProximity(trend(3.08), "developing"), "developing");
+  assert.equal(gapProximity(trend(3.2)), undefined);
+  assert.equal(gapProximity(trend(.5, "closing", "invalid")), undefined);
+});
+
+test("stable and opening intervals retain their rendered proximity colour", () => {
+  const markupFor = (currentGap: number, direction: "stable" | "opening") => renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[driver({ classIntervalToAhead: currentGap })]}
+    expandedCarIdxs={new Set()} visibleColumns={new Set(["interval"])}
+    groupByClass={false} showClassGaps onToggleExpanded={() => {}}
+    gapTrends={[{
+      id: "trend:1:7", referenceCarIdx: 1, chasingCarIdx: 7, classId: 1,
+      currentGap, lapDeficit: 0, windowSeconds: 30, gapChange: .31,
+      rate: .01, direction, quality: "valid",
+    }]}
+  />);
+
+  assert.match(markupFor(.807, "stable"), /interval-cell is-gap-approaching/);
+  assert.match(markupFor(1.089, "opening"), /interval-cell is-gap-approaching/);
 });
 
 test("each sector has its own current, previous, and best column", () => {
