@@ -61,7 +61,7 @@
 .gap-visualizer-trigger:hover, .gap-visualizer-trigger:focus-visible { outline: 2px solid var(--orange); outline-offset: -3px; }
 .gap-visualizer-trigger.is-selected { box-shadow: inset 0 -3px var(--orange); background: var(--ink); color: var(--stock); }
 .gap-visualizer-trigger:disabled { cursor: not-allowed; color: var(--muted); opacity: .55; }
-.commentator-context-deck { min-width: 960px; min-height: 0; display: grid; grid-template-columns: minmax(520px, 38%) minmax(0, 1fr); border-bottom: 1px solid var(--ink); overflow: hidden; }
+.commentator-context-deck { min-width: 1240px; min-height: 0; display: grid; grid-template-columns: minmax(390px, 31%) minmax(510px, 1fr) minmax(320px, 24%); border-bottom: 1px solid var(--ink); overflow: hidden; }
 .commentator-position-instrument { min-width: 0; min-height: 0; border-right: 1px solid var(--ink); overflow: hidden; }
 .map-fallback-status { margin: 0; padding: 5px 9px; border-bottom: 1px dashed var(--paper-line); color: var(--muted); font-size: 10px; }
 .commentator-battle-context { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 34px; }
@@ -70,7 +70,7 @@
 .battle-watch > header strong { font: 700 18px/1 var(--display); text-transform: uppercase; }
 .battle-watch > header span { color: var(--muted); font: 700 9px/1 var(--display); text-transform: uppercase; letter-spacing: .06em; }
 .battle-watch > div { min-width: 0; min-height: 0; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); }
-.battle-candidate { min-width: 0; display: grid; grid-template-columns: 104px minmax(110px, 1fr) minmax(110px, 1fr) 88px 80px; align-items: center; gap: 10px; border-bottom: 1px solid var(--paper-line); padding: 5px 12px; }
+.battle-candidate { min-width: 0; display: grid; grid-template-columns: 90px minmax(80px, 1fr) minmax(80px, 1fr) 72px 64px; align-items: center; gap: 8px; border-bottom: 1px solid var(--paper-line); padding: 5px 10px; }
 .battle-candidate:last-child { border-bottom: 0; }
 .battle-car-pair { display: grid; grid-template-columns: 36px 20px 36px; align-items: center; gap: 3px; }
 .battle-car-pair b { height: 27px; display: grid; place-items: center; border-top: 2px solid var(--inspection); background: var(--ink); color: var(--stock); font: 700 13px/1 var(--display); }
@@ -93,6 +93,50 @@
 .quality-watch strong, .quality-watch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quality-watch strong { font: 700 11px var(--display); text-transform: uppercase; }
 .quality-watch span { font-size: 9px; line-height: 1.2; }
+.race-event-tracker { min-width: 0; min-height: 0; display: grid; grid-template-rows: 40px minmax(0, 1fr); border-left: 1px solid var(--ink); }
+.race-event-tracker > header { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--ink); padding: 5px 9px 5px 11px; }
+.race-event-heading { min-width: 0; }
+.race-event-heading strong, .race-event-heading span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.race-event-heading strong { font: 700 18px/1 var(--display); text-transform: uppercase; }
+.race-event-heading span { margin-top: 3px; color: var(--muted); font: 700 8px/1 var(--display); text-transform: uppercase; letter-spacing: .055em; }
+.race-event-actions { flex: none; display: flex; align-items: center; gap: 7px; }
+.race-event-actions dl { display: flex; gap: 7px; margin: 0; }
+.race-event-tracker dl > div { display: grid; grid-template-columns: auto 16px; align-items: baseline; gap: 3px; }
+.race-event-tracker dt { color: var(--muted); font: 700 8px/1 var(--display); text-transform: uppercase; }
+.race-event-tracker dd { margin: 0; color: var(--ink); text-align: right; font: 700 14px/1 var(--display); }
+.race-event-actions button, .race-event-log header button { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid var(--ink); border-radius: 0; padding: 0; background: transparent; color: var(--ink); }
+.race-event-actions button:hover, .race-event-actions button:focus-visible, .race-event-log header button:hover, .race-event-log header button:focus-visible { outline: 2px solid var(--orange); outline-offset: -3px; background: var(--ink); color: var(--stock); }
+.race-event-actions button svg, .race-event-log header button svg { width: 14px; height: 14px; }
+.race-event-feed { min-height: 0; overflow-y: auto; scrollbar-color: var(--ink) var(--stock); scrollbar-width: thin; }
+.race-event-feed > p { margin: 0; padding: 8px 12px; }
+.race-event-feed > p strong, .race-event-feed > p span { display: block; }
+.race-event-feed > p strong { font: 700 12px/1 var(--display); text-transform: uppercase; }
+.race-event-feed > p span { max-width: 35ch; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.2; }
+.race-event { min-width: 0; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 6px; border-bottom: 1px solid var(--paper-line); padding: 4px 8px; }
+.race-event:last-child { border-bottom: 0; }
+.race-event-icon { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid currentColor; color: #177344; }
+.race-event-icon svg { width: 13px; height: 13px; stroke-width: 2.4; }
+.race-event-crash .race-event-icon { color: #8d211b; }
+.race-event > div { min-width: 0; }
+.race-event > div strong, .race-event > div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.race-event > div strong { font: 700 11px/1 var(--display); text-transform: uppercase; }
+.race-event > div span { margin-top: 3px; color: var(--muted); font-size: 8px; line-height: 1; }
+.race-event time { color: var(--orange); font: 700 9px/1 var(--display); text-transform: uppercase; white-space: nowrap; }
+.race-event-log { position: fixed; z-index: 40; top: 68px; right: 20px; bottom: 10px; width: min(540px, calc(100vw - 40px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border: 2px solid var(--ink); border-top-width: 4px; background: var(--stock); color: var(--ink); }
+.race-event-log > header { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--ink); padding: 9px 11px; }
+.race-event-log h2 { margin: 0; font: 700 27px/1 var(--display); text-transform: uppercase; letter-spacing: .015em; }
+.race-event-log header p { margin: 4px 0 0; color: var(--muted); font: 700 10px/1 var(--display); text-transform: uppercase; letter-spacing: .055em; }
+.race-event-log header button { width: 40px; height: 40px; }
+.race-event-log header button svg { width: 20px; height: 20px; }
+.race-event-log-list { min-height: 0; overflow-y: auto; scrollbar-color: var(--ink) var(--stock); }
+.race-event-log-list > p { margin: 0; padding: 18px 12px; color: var(--muted); }
+.race-event.is-expanded { min-height: 58px; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; padding: 8px 11px; }
+.race-event.is-expanded .race-event-icon { width: 28px; height: 28px; }
+.race-event.is-expanded .race-event-icon svg { width: 17px; height: 17px; }
+.race-event.is-expanded > div strong { font-size: 15px; }
+.race-event.is-expanded > div span { margin-top: 5px; font-size: 11px; }
+.race-event.is-expanded time { font-size: 11px; }
+.race-event-log > footer { display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--ink); padding: 7px 11px; color: var(--muted); font: 700 10px/1 var(--display); text-transform: uppercase; letter-spacing: .045em; }
 
 .session-review { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); border-bottom: 2px solid var(--ink); }
 .session-review-header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 3px solid var(--ink); padding: 7px 10px; }
@@ -315,7 +359,7 @@
   .commentator-workspace { padding-inline: 12px; }
   .commentator-heading p { max-width: 55ch; }
   .commentator-key { display: none; }
-  .commentator-context-deck { grid-template-columns: minmax(470px, 42%) minmax(0, 1fr); }
+  .commentator-context-deck { grid-template-columns: minmax(390px, 31%) minmax(510px, 1fr) 320px; }
   .battle-candidate { grid-template-columns: 98px minmax(100px, 1fr) minmax(100px, 1fr) 78px 70px; gap: 7px; padding-inline: 9px; }
 }
 

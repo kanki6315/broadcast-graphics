@@ -612,6 +612,25 @@ export interface EventRecord {
   message: string;
 }
 
+export type RaceEventKind = "pass" | "crash";
+export type RaceEventConfidence = "likely" | "possible";
+
+/** A commentator cue inferred from successive normalized telemetry snapshots. */
+export interface RaceEvent {
+  id: string;
+  sessionId: string;
+  at: string;
+  sessionTime: number | null;
+  lap: number;
+  kind: RaceEventKind;
+  confidence: RaceEventConfidence;
+  primaryCarIdx: number;
+  secondaryCarIdx?: number;
+  classId: number;
+  summary: string;
+  detail: string;
+}
+
 export interface LiveState {
   revision: number;
   connection: ConnectionStatus;
@@ -620,6 +639,8 @@ export interface LiveState {
   graphics: GraphicsState;
   camera: CameraControlState;
   events: EventRecord[];
+  /** Newest-first commentator cues inferred from live race telemetry. */
+  raceEvents: RaceEvent[];
   /** Shared session-scoped cache; absent until the server has normalized live evidence. */
   intelligence?: RaceIntelligenceSnapshot | null;
   /** Compact, low-frequency identifiers. Full sanitized geometry is fetched over HTTP. */

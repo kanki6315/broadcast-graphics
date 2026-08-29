@@ -17,6 +17,7 @@ import { useTrackMap } from "./use-track-map";
 import { useGapHistory } from "./use-gap-history";
 import { GapVisualizer } from "./gap-visualizer";
 import { SessionReview } from "./session-review";
+import { EventTracker } from "./event-tracker";
 import { timingJson } from "./timing-api";
 import "./commentator-timing.css";
 
@@ -305,6 +306,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
               <span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span>
             </div>
           </div>
+          <EventTracker events={state.raceEvents ?? []} classId={preferences.classId} />
         </section>
 
         <CommentatorTimingTable

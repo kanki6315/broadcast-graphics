@@ -316,6 +316,8 @@ These measured roles reproduce the Weather smart object and remain package-local
 
 The operator application has two synchronized production desks. `/timing` is graphics-free: a compact session masthead gives way to a full-width scrollable timing ledger where every driver row is an immediate take on the selected camera group. A persistent bottom camera dock keeps the selected driver, requested group, command delivery, and observed driver/group visible together; every available camera group must fit in its center bank without horizontal scrolling. `/graphics` uses a fixed four-column board: race context and timing controls lead, Driver Info and position-based Battle occupy the main working band, planned widgets remain visibly disabled, and the guarded global clear closes the board. Direct Show/Hide actions replace the armed-cue workflow on Graphics Director.
 
+The commentator `/timing` workspace keeps its timing ledger dominant. Its compact race-intelligence deck places circuit position first, Battle Watch second, and a narrow inferred-event feed beside Battle Watch; the feed must not displace, resize, or visually outrank the timing table. Keep the compact feed three rows high while retaining every cue for the active class selection in newest-first order and scrolling that viewport vertically. A square `OPEN FULL EVENT LOG` action may open a fixed right-side inspection ledger, but the ledger remains non-modal and must leave the timing workspace visible.
+
 Spacing is compact and multiples cluster around `4`, `8`, `12`, `16`, and `24px`. A faint `32px` vertical registration grid and `8px` horizontal baseline texture make the stock feel measured without competing with data. Major divisions use `2–3px` rules; internal divisions use `1px` rules.
 
 The operator routes are intentionally desktop-only and may keep their dense fixed compositions without a narrow-screen alternative. Do not treat mobile breakpoints, touch ergonomics, keyboard-only operation, screen-reader behavior, reduced motion, or formal contrast conformance as design-review or acceptance requirements for these private surfaces. Responsive or accessible behavior already present may remain, but changes to `/timing`, `/graphics`, or `/control` do not need to preserve or validate it.
@@ -372,6 +374,15 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - Timing Director rows are a compact `47px` high. Each row is the camera action itself: clicking it, or pressing Enter or Space while it has focus, requests that driver on the currently selected camera group.
 - Keep requested and observed state distinct. The selected/requested row uses an inspection wash with a `4px` orange leading rule and orange position stamp; the row observed on camera becomes an inverse ink plate. The persistent key names both states.
 - Best-lap emphasis uses tabular numerals and purple ink, reinforced by the persistent `FASTEST LAP` key rather than a dashboard-style badge in every row.
+
+### Commentator Event Tracker
+
+- This component belongs only to the commentator `/timing` surface. It is a compact, read-only heuristic feed beside Battle Watch. Its only local actions open and close the full inspection ledger; it has no event acknowledgement, event dismissal, mutation, replay, or internal filtering controls.
+- Keep the header's written `HEURISTIC CUES · VERIFY ON REPLAY` warning visible. Every row pairs summary and evidence copy with a distinct pass-arrow or crash-alert symbol; green pass and validation-red crash color reinforce those symbols but never carry the distinction alone.
+- Use approval orange only for the lap/session timestamp, making recency easy to scan without turning the whole cue into an alert plate. Preserve newest-first ordering and the active class filter. The compact viewport stays three rows high, retains the full filtered event history, and scrolls vertically so timing remains the primary instrument.
+- The square `OPEN FULL EVENT LOG` action opens a fixed ledger on the right side of the viewport. The ledger shows the same live-updating, class-filtered, newest-first event history at inspection scale and scrolls independently from the timing workspace.
+- Treat the full ledger as non-modal: do not add a backdrop, focus trap, or page replacement. Keep timing visible behind and beside it, and provide both a visible close button and `Escape` dismissal.
+- Incident-point changes may appear as supporting evidence in crash detail, but they do not trigger a crash cue and do not raise its confidence. The written `POSSIBLE` or `LIKELY` label remains heuristic and always requires replay verification.
 
 ### Persistent Camera Dock
 
@@ -477,6 +488,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 ### Do:
 
 - **Do** keep live timing dominant on Timing Director and keep Graphics Director fixed, dense, ordered, and operational.
+- **Do** keep the commentator event tracker secondary, newest-first, class-filtered, read-only, and explicitly labeled as heuristic evidence that requires replay verification; retain all filtered cues in the three-row-high scroll viewport and its independently scrollable right-side inspection ledger.
 - **Do** use `1px` rules for measurement, `2px` rules for sections/actions, and `3–4px` orange marks for selected or live state.
 - **Do** keep package selection and manifest-defined fields inside the stable Scrutineering Ledger control grammar.
 - **Do** use text, icons, borders, patterns, and shape together so color never carries state by itself.
@@ -503,6 +515,8 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 
 - **Don't** include `/timing`, `/graphics`, or compatibility `/control` in accessibility audits or mobile/responsive review; they are private desktop-only operator surfaces.
 - **Don't** add a program-video preview; vMix/OBS remains the source of visual confirmation. Keep direct camera-group actions in the persistent bottom dock with written requested, observed-active, and delivery states.
+- **Don't** present inferred pass or crash cues as verified race truth, add mutation, acknowledgement, replay, or internal filter controls to the commentator event feed, or use incident points as a crash trigger or confidence input.
+- **Don't** make the full event ledger modal, add a backdrop or focus trap, replace the timing workspace, or prevent the compact feed and inspection ledger from receiving live updates.
 - **Don't** turn semantic graphic slots into client-specific styling controls.
 - **Don't** use rounded cards, pills, gradients, or ambient shadows on the operator desk.
 - **Don't** spend orange on passive decoration; reserve it for focus, armed/live progression, time-critical log marks, and decisive actions.
