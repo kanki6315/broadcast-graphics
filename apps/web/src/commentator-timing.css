@@ -188,6 +188,13 @@
 .change-cell, .paired-value, .single-value { text-align: right; white-space: nowrap; }
 .change-cell > span, .paired-value > span { display: inline-grid; width: 50%; min-width: 0; line-height: 1; }
 .single-value > span { display: grid; line-height: 1; }
+.interval-cell { transition: background-color 180ms ease-out, box-shadow 180ms ease-out; }
+.interval-cell.is-closing-developing { background: #d7ded8; box-shadow: inset 0 -2px #177344; color: var(--ink); }
+.interval-cell.is-closing-approaching { background: #f1c933; box-shadow: inset 0 -2px var(--ink); color: #17150a; }
+.interval-cell.is-closing-immediate { background: var(--orange); box-shadow: inset 0 -3px var(--ink); color: var(--ink); }
+.interval-trend { display: flex !important; align-items: center; justify-content: flex-end; gap: 2px; color: inherit !important; }
+.interval-trend svg { width: 11px; height: 11px; flex: none; stroke-width: 2.5; }
+.interval-trend span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quality-value, .position-change { white-space: nowrap; font: 600 15px/1 "Source Sans 3", sans-serif; }
 .quality-value.has-marker::first-letter { color: var(--orange); }
 .quality-value.is-unavailable, .position-change.is-unknown { color: var(--muted); }

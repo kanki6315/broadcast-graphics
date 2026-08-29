@@ -13,7 +13,7 @@ import {
 } from "@racecontrol/protocol";
 import React from "react";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
-import { RefreshCw } from "lucide-react";
+import { ArrowDownRight, RefreshCw } from "lucide-react";
 import type { RecentLapHistoryResource } from "./use-gap-history";
 
 export interface TimingTableProps {
@@ -201,6 +201,36 @@ function intervalValue(driver: DriverState, classValue: boolean) {
   return qualityValue(driver[field], timingQuality(driver, field), formatSeconds);
 }
 
+type ClosingGapUrgency = "developing" | "approaching" | "immediate";
+
+const closingGapThresholds = {
+  immediate: .75,
+  approaching: 1.5,
+  developing: 3,
+  hysteresis: .12,
+} as const;
+
+export function closingGapUrgency(trend: GapTrend | undefined, previous?: ClosingGapUrgency): ClosingGapUrgency | undefined {
+  if (trend?.quality !== "valid" || trend.direction !== "closing" || trend.currentGap == null || trend.currentGap < 0) return undefined;
+  const gap = trend.currentGap;
+  if (previous === "immediate" && gap <= closingGapThresholds.immediate + closingGapThresholds.hysteresis) return "immediate";
+  if (gap <= closingGapThresholds.immediate) return "immediate";
+  if (previous === "approaching" && gap <= closingGapThresholds.approaching + closingGapThresholds.hysteresis) return "approaching";
+  if (gap <= closingGapThresholds.approaching) return "approaching";
+  if (previous === "developing" && gap <= closingGapThresholds.developing + closingGapThresholds.hysteresis) return "developing";
+  if (gap <= closingGapThresholds.developing) return "developing";
+  return undefined;
+}
+
+function gapTrendLabel(trend: GapTrend | undefined, fallback: string) {
+  if (trend?.quality !== "valid" || trend.direction == null) return <small>{fallback}</small>;
+  const change = trend.gapChange == null ? null : Math.abs(trend.gapChange);
+  return <small className="interval-trend">
+    {trend.direction === "closing" && <ArrowDownRight aria-hidden="true" />}
+    <span>{trend.direction}{change == null ? "" : ` · ${change.toFixed(2)}s / ${Math.round(trend.windowSeconds)}s`}</span>
+  </small>;
+}
+
 function lapTimeValue(driver: DriverState, field: "lastLap" | "bestLap") {
   return qualityValue(driver[field], timingQuality(driver, field), formatLapTime);
 }
@@ -379,11 +409,16 @@ export function CommentatorTimingTable({
   lapHistoryByCarIdx = new Map(),
   onToggleExpanded,
 }: CommentatorTimingTableProps) {
+  const urgencyByCarIdx = React.useRef(new Map<number, ClosingGapUrgency>());
   let previousClassId: number | null = null;
   const sectorNumbers = sectorNumbersForDrivers(drivers);
   const visibleSectorNumbers = sectorNumbers.length > 0 ? sectorNumbers : [1];
   const baseColumnCount = [...visibleColumns].filter((column) => column !== "sectors").length;
   const columnCount = 2 + baseColumnCount + (visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0);
+  const nextUrgencyByCarIdx = new Map<number, ClosingGapUrgency>();
+  React.useEffect(() => {
+    urgencyByCarIdx.current = nextUrgencyByCarIdx;
+  });
 
   return (
     <div className="commentator-table-wrap" style={{ "--sector-count": visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0 } as CSSProperties}>
@@ -409,6 +444,8 @@ export function CommentatorTimingTable({
             const status = driverStatus(driver);
             const stint = stints.find((candidate) => candidate.carIdx === driver.carIdx);
             const trend = gapTrends.find((candidate) => candidate.chasingCarIdx === driver.carIdx && candidate.quality === "valid");
+            const gapUrgency = closingGapUrgency(trend, urgencyByCarIdx.current.get(driver.carIdx));
+            if (gapUrgency) nextUrgencyByCarIdx.set(driver.carIdx, gapUrgency);
             const pitCycle = pitCycles.find((candidate) => candidate.carIdx === driver.carIdx);
             const latestPitStop = pitStops
               .filter((candidate) => candidate.carIdx === driver.carIdx)
@@ -429,7 +466,7 @@ export function CommentatorTimingTable({
                 {visibleColumns.has("change") && <td className="change-cell"><span>{positionDelta(driver.positionChange)}<small>overall</small></span><span>{positionDelta(driver.classPositionChange)}<small>class</small></span></td>}
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
                 {visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, showClassGaps)}<small>{trend?.direction ?? (showClassGaps ? "class" : "overall")}</small></span></td>}
-                {visibleColumns.has("interval") && <td className="single-value"><span>{intervalValue(driver, showClassGaps)}<small>{showClassGaps ? "class" : "overall"}</small></span></td>}
+                {visibleColumns.has("interval") && <td className={`single-value interval-cell${gapUrgency ? ` is-closing-${gapUrgency}` : ""}`}><span>{intervalValue(driver, showClassGaps)}{gapTrendLabel(trend, showClassGaps ? "class" : "overall")}</span></td>}
                 {visibleColumns.has("lapTimes") && <td className="paired-value lap-time-pair"><span className={lastLapState.className} title={lastLapState.title}>{lapTimeValue(driver, "lastLap")}<small>{lastLapState.label}</small></span><span className={bestLapState.className} title={bestLapState.title}>{lapTimeValue(driver, "bestLap")}<small>{bestLapState.label}</small></span></td>}
                 {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <td className="sector-cell" key={sectorNumber}>{sectorColumnSummary(driver, sectorNumber)}</td>)}
                 {visibleColumns.has("stint") && <td className="stint-cell">{stintSummary(stint)}</td>}

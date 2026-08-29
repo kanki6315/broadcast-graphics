@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DriverState, RaceIntelligenceSnapshot } from "@racecontrol/protocol";
-import { CommentatorTimingTable, defaultCommentatorColumns, sortByClassPosition, sortByOverallPosition, type CommentatorColumn } from "./timing-table";
+import { closingGapUrgency, CommentatorTimingTable, defaultCommentatorColumns, sortByClassPosition, sortByOverallPosition, type CommentatorColumn } from "./timing-table";
 import { BattleWatch } from "./battle-watch";
 
 function driver(overrides: Partial<DriverState> = {}): DriverState {
@@ -89,6 +89,43 @@ test("class gaps replace overall gaps in multi-class races", () => {
   assert.match(singleClassMarkup, /0\.750s/);
   assert.match(singleClassMarkup, /overall/);
   assert.doesNotMatch(singleClassMarkup, /Class gap|Class interval|1\.250s|0\.500s/);
+});
+
+test("closing intervals receive proximity bands and quantitative trend context", () => {
+  const current = driver({
+    classIntervalToAhead: .62,
+    timingQuality: { classIntervalToAhead: { source: "derived", quality: "valid" } },
+  });
+  const markup = renderToStaticMarkup(<CommentatorTimingTable
+    drivers={[current]} expandedCarIdxs={new Set()} visibleColumns={new Set(["interval"])}
+    groupByClass={false} showClassGaps onToggleExpanded={() => {}}
+    gapTrends={[{
+      id: "trend:1:7", referenceCarIdx: 1, chasingCarIdx: 7, classId: 1,
+      currentGap: .62, lapDeficit: 0, windowSeconds: 12.4, gapChange: -.46,
+      rate: -.037, direction: "closing", quality: "valid",
+    }]}
+  />);
+
+  assert.match(markup, /interval-cell is-closing-immediate/);
+  assert.match(markup, /closing · 0\.46s \/ 12s/);
+  assert.match(markup, /lucide-arrow-down-right/);
+});
+
+test("closing-gap proximity bands use hysteresis and ignore non-closing trends", () => {
+  const trend = (currentGap: number, direction: "closing" | "opening" = "closing") => ({
+    id: "trend:1:7", referenceCarIdx: 1, chasingCarIdx: 7, classId: 1,
+    currentGap, lapDeficit: 0, windowSeconds: 12, gapChange: -.2, rate: -.02,
+    direction, quality: "valid" as const,
+  });
+
+  assert.equal(closingGapUrgency(trend(.7)), "immediate");
+  assert.equal(closingGapUrgency(trend(.8), "immediate"), "immediate");
+  assert.equal(closingGapUrgency(trend(1.2)), "approaching");
+  assert.equal(closingGapUrgency(trend(1.58), "approaching"), "approaching");
+  assert.equal(closingGapUrgency(trend(2.4)), "developing");
+  assert.equal(closingGapUrgency(trend(3.08), "developing"), "developing");
+  assert.equal(closingGapUrgency(trend(3.2)), undefined);
+  assert.equal(closingGapUrgency(trend(.5, "opening")), undefined);
 });
 
 test("each sector has its own current, previous, and best column", () => {
