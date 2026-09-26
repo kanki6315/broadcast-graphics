@@ -14,8 +14,8 @@ import { PackageRegistry } from "./package-registry.js";
 import { createRaceHistoryRepository, RaceHistoryService } from "./race-history-store.js";
 import { createRaceIntelligenceCheckpointRepository, RaceIntelligencePersistence } from "./race-intelligence-persistence.js";
 import { RaceIntelligenceService } from "./race-intelligence-service.js";
-import { startSimulator } from "./simulator.js";
-import { broadcastStateSnapshot, type SocketRole } from "./socket-broadcast.js";
+import { simulatorEnabled, startSimulator } from "./simulator.js";
+import { broadcastStateSnapshot, SNAPSHOT_COMPRESSION, ViewerBroadcastScheduler, ViewerStateBroadcaster, type SocketRole } from "./socket-broadcast.js";
 import { canIssueControlCommands, helloMatchesAccess, parseSocketAccess } from "./socket-access.js";
 import { acceptTelemetry } from "./telemetry-ingestion.js";
 import { StateStore } from "./state-store.js";
@@ -537,6 +537,7 @@ const wss = new WebSocketServer({
   server: app.server,
   path: "/socket",
   maxPayload: 1_048_576,
+  perMessageDeflate: SNAPSHOT_COMPRESSION,
   verifyClient: ({ req }: { req: IncomingMessage }, done) => {
     void authorizeSocket(req)
       .then((authorized) => done(authorized, authorized ? undefined : 401, authorized ? undefined : "Unauthorized"))
@@ -559,19 +560,23 @@ async function sendActiveSectorIfChanged(socket: WebSocket): Promise<void> {
   send(socket, message);
 }
 
+const viewerStates = new ViewerStateBroadcaster();
 function broadcast(): void {
-  const message: ServerMessage = { type: "state.snapshot", payload: store.snapshot() };
-  broadcastStateSnapshot(sockets, message);
+  viewerStates.broadcast(sockets, store.snapshot());
 }
 
-store.subscribe(broadcast);
+const viewerBroadcasts = new ViewerBroadcastScheduler(broadcast);
+const unsubscribeBroadcast = store.subscribe((_state, delivery) => viewerBroadcasts.request(delivery));
 
 wss.on("connection", (socket, request) => {
   const access = parseSocketAccess(request.url);
   if (!access) return socket.close(1008, "Invalid socket access mode.");
   const role: SocketRole = access.role;
   sockets.set(socket, role);
-  if (role !== "telemetry") send(socket, { type: "state.snapshot", payload: store.snapshot() });
+  if (role !== "telemetry") {
+    if (new URL(request.url!, "http://localhost").searchParams.get("state") === "delta-v1") viewerStates.enable(socket);
+    viewerStates.broadcast([[socket, role]], store.snapshot());
+  }
 
   socket.on("message", async (data) => {
     try {
@@ -643,7 +648,7 @@ wss.on("connection", (socket, request) => {
   });
 });
 
-const stopSimulator = process.env.DISABLE_SIMULATOR ? undefined : startSimulator(store, (session) => {
+const stopSimulator = !simulatorEnabled(process.env) ? undefined : startSimulator(store, (session) => {
   void trackConfiguration.observeNativeDefinition(session).then(refreshTrackConfiguration)
     .catch((error) => app.log.error({ err: error }, "Failed to refresh simulated track configuration"));
   history.ingest(session);
@@ -661,6 +666,8 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   app.log.info({ signal }, "Shutting down");
   stopSimulator?.();
+  unsubscribeBroadcast();
+  viewerBroadcasts.cancel();
   for (const socket of sockets.keys()) socket.close(1012, "Server restarting");
   await app.close();
   await history.close();

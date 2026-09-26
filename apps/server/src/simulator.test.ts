@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { simulatedDrivers } from "./simulator.js";
+import { simulatedDrivers, simulatorEnabled } from "./simulator.js";
+
+test("production simulation requires explicit opt-in and disable takes precedence", () => {
+  assert.equal(simulatorEnabled({ NODE_ENV: "production" }), false);
+  assert.equal(simulatorEnabled({ NODE_ENV: "production", ENABLE_SIMULATOR: "1" }), true);
+  assert.equal(simulatorEnabled({ NODE_ENV: "production", ENABLE_SIMULATOR: "1", DISABLE_SIMULATOR: "1" }), false);
+  assert.equal(simulatorEnabled({ NODE_ENV: "development" }), true);
+  assert.equal(simulatorEnabled({ DISABLE_SIMULATOR: "1" }), false);
+});
 
 test("simulator includes multiclass baselines and both inferred and unknown pit gaps", () => {
   const missing = simulatedDrivers(9);

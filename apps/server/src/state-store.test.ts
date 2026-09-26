@@ -2,6 +2,66 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { GraphicPackageManifest, SessionState } from "@racecontrol/protocol";
 import { StateStore } from "./state-store.js";
+import { ViewerBroadcastScheduler } from "./socket-broadcast.js";
+import { acceptTelemetry } from "./telemetry-ingestion.js";
+
+test("viewer snapshots coalesce at one second while analysis receives every sample", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const store = new StateStore();
+  const sent: ReturnType<StateStore["snapshot"]>[] = [];
+  const scheduler = new ViewerBroadcastScheduler(() => sent.push(store.snapshot()));
+  store.subscribe((_state, delivery) => scheduler.request(delivery));
+  let historySamples = 0;
+  let intelligenceSamples = 0;
+  for (let sample = 0; sample < 10; sample++) {
+    acceptTelemetry({ type: "telemetry.update", sequence: sample + 1, payload: { ...session, timeElapsed: 10 + sample / 10 } }, store,
+      { ingest: () => { historySamples++; } },
+      { ingest: () => { intelligenceSamples++; }, snapshot: () => null });
+    if (sample < 9) t.mock.timers.tick(100);
+  }
+  assert.equal(sent.length, 0);
+  assert.equal(historySamples, 10);
+  assert.equal(intelligenceSamples, 10);
+  t.mock.timers.tick(100);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].session?.timeElapsed, 10.9);
+
+  store.telemetry({ ...session, timeElapsed: 11 });
+  t.mock.timers.tick(999);
+  assert.equal(sent.length, 1);
+  t.mock.timers.tick(1);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].session?.timeElapsed, 11);
+  t.mock.timers.tick(1_000);
+  assert.equal(sent.length, 2, "idle state does not generate traffic");
+});
+
+test("operator commands and connection changes bypass pending viewer updates", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const store = new StateStore();
+  const sent: ReturnType<StateStore["snapshot"]>[] = [];
+  const scheduler = new ViewerBroadcastScheduler(() => sent.push(store.snapshot()));
+  store.subscribe((_state, delivery) => scheduler.request(delivery));
+  store.telemetry(session);
+  t.mock.timers.tick(100);
+  store.command({ type: "graphics.take", slot: "timing-tower" }, packages);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].graphics.activeSlots, ["timing-tower"]);
+  assert.equal(sent[0].session?.id, session.id);
+  t.mock.timers.tick(900);
+  assert.equal(sent.length, 1, "immediate send cancels the redundant pending snapshot");
+  store.setCameraController(true, true);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].camera.controller, "ready");
+  t.mock.timers.tick(4_000);
+  assert.equal(sent.length, 3);
+  assert.equal(sent[2].connection, "stale");
+
+  store.telemetry(session);
+  scheduler.cancel();
+  t.mock.timers.tick(1_000);
+  assert.equal(sent.length, 3, "shutdown cancels pending traffic");
+});
 
 const packages = [{ id: "pri-hoosier-500" }] as GraphicPackageManifest[];
 const session: SessionState = {
