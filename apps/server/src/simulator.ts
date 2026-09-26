@@ -1,6 +1,11 @@
 import type { DriverState, SessionState } from "@racecontrol/protocol";
 import type { StateStore } from "./state-store.js";
 
+export function simulatorEnabled(environment: NodeJS.ProcessEnv): boolean {
+  if (environment.DISABLE_SIMULATOR) return false;
+  return environment.NODE_ENV !== "production" || environment.ENABLE_SIMULATOR === "1";
+}
+
 const namedEntries: readonly [string, string, string][] = [
   ["23", "Maya Anderson", "Northline Racing"],
   ["17", "Jon Bell", "Bellworks Motorsport"],

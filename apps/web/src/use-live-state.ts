@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClientMessage, ControlCommand, LiveState, ServerMessage, TimingWorkspaceMode } from "@racecontrol/protocol";
+import { liveStateFromViewer, receiveViewerState, type ViewerState } from "@racecontrol/protocol";
 
 export function useLiveState(role: "control" | "overlay", mode: TimingWorkspaceMode = "operator") {
   const [state, setState] = useState<LiveState | null>(null);
@@ -12,7 +13,8 @@ export function useLiveState(role: "control" | "overlay", mode: TimingWorkspaceM
 
     const connect = () => {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const query = new URLSearchParams({ role });
+      const query = new URLSearchParams({ role, state: "delta-v1" });
+      let viewer: ViewerState | null = null;
       if (role === "control") query.set("mode", mode);
       let socketProtocols: string[] | undefined;
       if (role === "overlay") {
@@ -30,8 +32,18 @@ export function useLiveState(role: "control" | "overlay", mode: TimingWorkspaceM
         socket.send(JSON.stringify(hello));
       });
       socket.addEventListener("message", (event) => {
+        if (stopped || socketRef.current !== socket) return;
         const message = JSON.parse(event.data as string) as ServerMessage;
         if (message.type === "state.snapshot") setState(message.payload);
+        if (message.type === "state.init" || message.type === "state.delta") {
+          try {
+            viewer = receiveViewerState(viewer, message);
+            setState(liveStateFromViewer(viewer));
+          } catch {
+            // Reconnect for a fresh baseline rather than displaying partial state.
+            socket.close(1000, "State resynchronization required");
+          }
+        }
       });
       socket.addEventListener("close", () => {
         setSocketConnected(false);

@@ -92,6 +92,8 @@ Official track-map import uses iRacing's headless OAuth **Password Limited** flo
 
 ## Railway deployment
 
+Viewer WebSockets negotiate compression and coalesce routine state updates to once per second. The web app requests `state=delta-v1`: each connection receives an initial state, followed by field-level changes against its last delivered revision. Historical session results and event lists are separate from live fields and are transmitted only when they change. The active session is sent once; the browser derives its current results locally. Reconnects receive a fresh baseline, and older web clients continue receiving full snapshots. Incoming telemetry, analysis, and history still process every sample. Operator commands, camera results, and connection-status changes broadcast immediately, and newly connected viewers receive the current state immediately. Clients that do not negotiate compression remain supported. The demo simulator is disabled by default when `NODE_ENV=production`; set `ENABLE_SIMULATOR=1` to explicitly enable it for a demo. `DISABLE_SIMULATOR` always takes precedence.
+
 The repository includes a multi-stage production `Dockerfile` and `railway.toml`. The container tests and publishes the Windows telemetry client, then builds the control panel, overlays, protocol package, and server into one deployment so downloads, HTTP, authentication, and WebSocket traffic share the same origin.
 
 1. Create a Railway project from this GitHub repository and deploy the application service.

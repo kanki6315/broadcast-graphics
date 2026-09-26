@@ -671,6 +671,7 @@ export type ClientMessage =
   | { type: "control.command"; command: ControlCommand };
 
 export type ServerMessage =
+  | import("./state-stream.js").ViewerStateMessage
   | { type: "state.snapshot"; payload: LiveState }
   | { type: "telemetry.ack"; sequence: number }
   | { type: "camera.command"; command: CameraSwitchCommand }
@@ -678,6 +679,8 @@ export type ServerMessage =
   | { type: "lap.completed"; payload: CompletedLap }
   | { type: "lap.history"; payload: CompletedLap[] }
   | { type: "error"; message: string };
+
+export * from "./state-stream.js";
 
 export function formatLapTime(seconds: number | null): string {
   if (seconds == null || !Number.isFinite(seconds)) return "—";

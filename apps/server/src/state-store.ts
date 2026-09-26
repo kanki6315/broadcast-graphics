@@ -13,7 +13,7 @@ import { RaceStateProjection } from "./race-state-projection.js";
 import type { RaceStateCheckpoint } from "./race-state-projection.js";
 import { RaceEventTracker } from "./race-event-tracker.js";
 
-type Listener = (state: LiveState) => void;
+type Listener = (state: LiveState, delivery: "routine" | "immediate") => void;
 
 export class StateStore {
   private state: LiveState;
@@ -96,7 +96,7 @@ export class StateStore {
     }
 
     if (wasDisconnected) this.pushEvent("telemetry", `Telemetry connected — ${session.trackName}`);
-    this.bump();
+    this.bump("routine");
     this.armStaleTimer();
   }
 
@@ -253,10 +253,10 @@ export class StateStore {
     this.state.events = [this.event(kind, message), ...this.state.events].slice(0, 40);
   }
 
-  private bump(): void {
+  private bump(delivery: "routine" | "immediate" = "immediate"): void {
     this.state.revision += 1;
     const snapshot = this.snapshot();
-    for (const listener of this.listeners) listener(snapshot);
+    for (const listener of this.listeners) listener(snapshot, delivery);
   }
 
   private armStaleTimer(): void {

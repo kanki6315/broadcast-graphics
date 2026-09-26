@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { WebSocket } from "ws";
 import type { LiveState, ServerMessage } from "@racecontrol/protocol";
+import { liveStateFromViewer, receiveViewerState, type ViewerState } from "@racecontrol/protocol";
+import { startSimulator } from "./simulator.js";
+import type { StateStore } from "./state-store.js";
 
 const baseUrl = process.env.E2E_URL ?? "http://127.0.0.1:8787";
 const adminUsername = process.env.E2E_ADMIN_USERNAME ?? "admin";
@@ -45,13 +48,6 @@ const commentatorKeyResponse = await fetch(`${baseUrl}/api/auth/keys`, {
 });
 assert.equal(commentatorKeyResponse.status, 201);
 const commentatorKey = await commentatorKeyResponse.json() as { secret: string };
-for (const path of ["/api/history/events", "/api/history/laps?carIdx=0&limit=25"]) {
-  assert.equal((await fetch(`${baseUrl}${path}`)).status, 401);
-  assert.equal((await fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${commentatorKey.secret}` } })).status, 200);
-}
-assert.equal((await fetch(`${baseUrl}/api/history/events?sessionId=wrong-session`, {
-  headers: { Authorization: `Bearer ${commentatorKey.secret}` },
-})).status, 409);
 
 interface SocketHarness {
   socket: WebSocket;
@@ -61,7 +57,14 @@ interface SocketHarness {
 async function connectSocket(path: string, headers: Record<string, string>): Promise<SocketHarness> {
   const socket = new WebSocket(baseUrl.replace(/^http/, "ws") + path, { headers });
   const messages: ServerMessage[] = [];
-  socket.on("message", (data) => messages.push(JSON.parse(data.toString()) as ServerMessage));
+  let viewer: ViewerState | null = null;
+  socket.on("message", (data) => {
+    const message = JSON.parse(data.toString()) as ServerMessage;
+    if (message.type === "state.init" || message.type === "state.delta") {
+      viewer = receiveViewerState(viewer, message);
+      messages.push({ type: "state.snapshot", payload: liveStateFromViewer(viewer) });
+    } else messages.push(message);
+  });
   await new Promise<void>((resolve, reject) => {
     socket.once("open", resolve);
     socket.once("error", reject);
@@ -85,7 +88,17 @@ async function waitForMessage<T extends ServerMessage>(
 
 const telemetry = await connectSocket("/socket?role=telemetry", { Authorization: `Bearer ${createdKey.secret}` });
 telemetry.socket.send(JSON.stringify({ type: "hello", role: "telemetry", clientId: "integration", capabilities: { cameraControl: true } }));
-const operator = await connectSocket("/socket?role=control&mode=operator", { Cookie: cookie });
+// With DISABLE_SIMULATOR=1, seed once so the background demo cannot overwrite
+// an integration frame before the one-second viewer flush.
+if (process.env.E2E_SEED_TELEMETRY === "1") {
+  const stop = startSimulator({ telemetry(payload) {
+    telemetry.socket.send(JSON.stringify({ type: "telemetry.update", sequence: 90, payload }));
+  } } as StateStore);
+  stop();
+  await waitForMessage(telemetry, (message): message is Extract<ServerMessage, { type: "telemetry.ack" }> =>
+    message.type === "telemetry.ack" && message.sequence === 90);
+}
+const operator = await connectSocket("/socket?role=control&mode=operator&state=delta-v1", { Cookie: cookie });
 operator.socket.send(JSON.stringify({ type: "hello", role: "control", mode: "operator" }));
 const commentator = await connectSocket("/socket?role=control&mode=commentator", { Cookie: cookie });
 commentator.socket.send(JSON.stringify({ type: "hello", role: "control", mode: "commentator" }));
@@ -93,6 +106,14 @@ commentator.socket.send(JSON.stringify({ type: "hello", role: "control", mode: "
 const initialMessage = await waitForMessage(operator, (message): message is Extract<ServerMessage, { type: "state.snapshot" }> =>
   message.type === "state.snapshot" && message.payload.session != null && message.payload.camera.controller === "ready");
 const initial = initialMessage.payload;
+for (const path of ["/api/history/events", "/api/history/laps?carIdx=0&limit=25"]) {
+  assert.equal((await fetch(`${baseUrl}${path}`)).status, 401);
+  assert.equal((await fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${commentatorKey.secret}` } })).status, 200);
+}
+assert.equal((await fetch(`${baseUrl}/api/history/events?sessionId=wrong-session`, {
+  headers: { Authorization: `Bearer ${commentatorKey.secret}` },
+})).status, 409);
+
 const fixtureSvg = '<svg viewBox="0 0 200 120"><path id="centerline" d="M20 20 C80 0 160 10 180 55 C190 100 110 118 45 100 C5 85 0 40 20 20 Z"/></svg>';
 const layout = { trackId: initial.session!.trackId, trackName: initial.session!.trackName };
 const importPreview = await fetch(`${baseUrl}/api/track-config/import-preview`, {

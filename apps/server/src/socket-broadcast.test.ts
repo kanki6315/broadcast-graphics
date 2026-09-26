@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { WebSocket } from "ws";
+import { once } from "node:events";
+import { createServer } from "node:http";
+import type { Socket } from "node:net";
+import { WebSocket, WebSocketServer } from "ws";
 import type { ServerMessage } from "@racecontrol/protocol";
-import { broadcastStateSnapshot, MAX_BROADCAST_BUFFER_BYTES, type BroadcastSocket, type SocketRole } from "./socket-broadcast.js";
+import { broadcastStateSnapshot, MAX_BROADCAST_BUFFER_BYTES, SNAPSHOT_COMPRESSION, type BroadcastSocket, type SocketRole } from "./socket-broadcast.js";
+import { StateStore } from "./state-store.js";
+import { startSimulator } from "./simulator.js";
 
 class RecordingSocket implements BroadcastSocket {
   readonly sent: string[] = [];
@@ -12,6 +17,52 @@ class RecordingSocket implements BroadcastSocket {
   send(data: string): void {
     this.sent.push(data);
   }
+}
+
+for (const compressed of [true, false]) {
+  test(`viewer transport preserves snapshots with compression ${compressed ? "enabled" : "declined"}`, { timeout: 10_000 }, async (t) => {
+    const server = createServer();
+    const wss = new WebSocketServer({ server, perMessageDeflate: SNAPSHOT_COMPRESSION });
+    let transport: Socket | undefined;
+    server.on("connection", (socket) => { transport = socket; });
+    t.after(() => {
+      for (const socket of wss.clients) socket.terminate();
+      wss.close();
+      server.close();
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    const connected = once(wss, "connection");
+    const client = new WebSocket(`ws://127.0.0.1:${address.port}`, { perMessageDeflate: compressed });
+    t.after(() => client.terminate());
+    await once(client, "open");
+    const [viewer] = await connected as [WebSocket];
+    assert.equal(client.extensions.includes("permessage-deflate"), compressed);
+
+    const store = new StateStore();
+    // Populate the same full 41-car state used by the live demo, without arming
+    // the store's telemetry-staleness timer in this transport test.
+    let message: ServerMessage = { type: "state.snapshot", payload: store.snapshot() };
+    const stop = startSimulator({ telemetry(session) {
+      const state = store.snapshot();
+      state.session = session;
+      state.sessionResults[session.type] = session;
+      message = { type: "state.snapshot", payload: state };
+    } } as StateStore);
+    stop();
+    const rawBytes = Buffer.byteLength(JSON.stringify(message));
+    const before = transport!.bytesWritten;
+    const received = once(client, "message");
+    broadcastStateSnapshot(new Map([[viewer, "overlay" as const]]), message);
+    const [data] = await received;
+    assert.equal(data.toString(), JSON.stringify(message));
+    const wireBytes = transport!.bytesWritten - before;
+    if (compressed) assert.ok(wireBytes < rawBytes * 0.25, `${wireBytes} wire bytes / ${rawBytes} JSON bytes`);
+    else assert.ok(wireBytes >= rawBytes);
+    t.diagnostic(`${rawBytes} JSON bytes -> ${wireBytes} WebSocket bytes`);
+  });
 }
 
 test("state snapshots are sent to viewers but never echoed to telemetry ingestion sockets", () => {
