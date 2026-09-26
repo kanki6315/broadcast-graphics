@@ -5,6 +5,21 @@ namespace RaceControl.TelemetryClient;
 
 public sealed class TelemetrySnapshotMapperTests
 {
+    [Theory]
+    [InlineData(" Porsche 963 ", "Porsche", "Porsche 963")]
+    [InlineData(" ", " Porsche 963 ", "Porsche 963")]
+    [InlineData(null, null, null)]
+    public void MapsCarModelWithoutReplacingClass(string? fullName, string? shortName, string? expected)
+    {
+        var driver = Driver(0, 10, "GTP");
+        driver.CarScreenName = fullName;
+        driver.CarScreenNameShort = shortName;
+        var state = TelemetrySnapshotMapper.Map(
+            Telemetry([1], [1], [4], [0]), SessionInfo("Race", [driver]));
+        Assert.Equal(expected, state.Drivers[0].CarModel);
+        Assert.Equal("GTP", state.Drivers[0].ClassName);
+    }
+
     [Fact]
     public void RaceUsesLeaderCompletedLapsAndDerivesGapsAndIntervals()
     {
