@@ -201,6 +201,8 @@ export interface DriverState {
   carNumber: string;
   name: string;
   team: string;
+  /** Car model reported by the telemetry producer; absent in older captures. */
+  carModel?: string | null;
   className: string;
   /** @deprecated Use gapToLeader. Retained for format-1 diagnostic replay compatibility. */
   interval: number | null;
