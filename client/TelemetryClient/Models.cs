@@ -99,7 +99,8 @@ public sealed record DriverState(
     [property: JsonPropertyName("positionChange")] int? PositionChange = null,
     [property: JsonPropertyName("classPositionChange")] int? ClassPositionChange = null,
     [property: JsonPropertyName("timingQuality")] IReadOnlyDictionary<string, TimingQualityMetadata>? TimingQuality = null,
-    [property: JsonPropertyName("sectors")] DriverSectorTiming? Sectors = null);
+    [property: JsonPropertyName("sectors")] DriverSectorTiming? Sectors = null,
+    [property: JsonPropertyName("carModel")] string? CarModel = null);
 
 public sealed record CarClassState(
     [property: JsonPropertyName("id")] int Id,

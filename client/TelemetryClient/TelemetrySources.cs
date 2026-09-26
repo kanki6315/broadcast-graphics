@@ -511,6 +511,8 @@ internal static class TelemetrySnapshotMapper
             hasMatchingResult && string.Equals(sessionType, "race", StringComparison.Ordinal) ? NormalizeGap(result!.Time) : null);
         return mapped with
         {
+            CarModel = !string.IsNullOrWhiteSpace(driver.CarScreenName) ? driver.CarScreenName.Trim()
+                : !string.IsNullOrWhiteSpace(driver.CarScreenNameShort) ? driver.CarScreenNameShort.Trim() : null,
             PitState = pitState,
             TimingQuality = new Dictionary<string, TimingQualityMetadata>
             {

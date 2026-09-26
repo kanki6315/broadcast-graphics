@@ -429,8 +429,20 @@ export function CommentatorTimingTable({
   return (
     <div className="commentator-table-wrap" style={{ "--sector-count": visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0 } as CSSProperties}>
       <table className="commentator-table">
+        <colgroup>
+          <col style={{ width: 72 }} />
+          <col style={{ width: columnCount > 2 + Number(visibleColumns.has("lapTimes")) ? "23%" : undefined }} />
+          {visibleColumns.has("lap") && <col />}
+          {visibleColumns.has("gap") && <col />}
+          {visibleColumns.has("interval") && <col />}
+          {visibleColumns.has("lapTimes") && <col style={{ width: 150 }} />}
+          {visibleColumns.has("sectors") && <col span={visibleSectorNumbers.length} />}
+          {visibleColumns.has("stint") && <col />}
+          {visibleColumns.has("pit") && <col />}
+          {visibleColumns.has("status") && <col />}
+        </colgroup>
         <thead><tr>
-          <th className="position-column">{showClassGaps ? "Class pos." : "Position"}<small>change since start</small></th>
+          <th className="position-column">{showClassGaps ? "Class" : "Pos."}</th>
           <th className="driver-column">Driver / team</th>
           {visibleColumns.has("lap") && <th className="lap-column">Lap</th>}
           {visibleColumns.has("gap") && <th className="gap-column">{showClassGaps ? "Class gap" : "Gap"} <small>to {showClassGaps ? "class " : ""}leader</small></th>}
@@ -469,7 +481,7 @@ export function CommentatorTimingTable({
                 data-car-idx={driver.carIdx}
               >
                 <td className="position-cell"><button aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} timing detail for ${driver.name}`} onClick={() => onToggleExpanded(driver.carIdx)}><span className="position-primary"><strong>P{showClassGaps ? driver.classPosition : driver.position}</strong>{visibleColumns.has("change") && <span title="Places gained or lost since race start">{positionDelta(showClassGaps ? driver.classPositionChange : driver.positionChange)}</span>}</span>{showClassGaps && <small className="class-position" style={{ "--class-color": driver.classColor } as CSSProperties}>Overall {driver.position}</small>}</button></td>
-                <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small><span className="team-name">{driver.team}</span><span className="driver-class-name">{driver.className}</span></small></span></td>
+                <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small><span className="team-name" title={driver.team}>{driver.team}</span>{driver.carModel && <span className="driver-car-model" title={driver.carModel}>{driver.team && "· "}{driver.carModel}</span>}<span className="driver-class-name">{driver.className}</span></small></span></td>
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
                 {visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, showClassGaps)}<small>{trend?.direction ?? (showClassGaps ? "class" : "overall")}</small></span></td>}
                 {visibleColumns.has("interval") && <td className={`single-value interval-cell${proximity ? ` is-gap-${proximity}` : ""}`}><span>{intervalValue(driver, showClassGaps)}{gapTrendLabel(trend, showClassGaps ? "class" : "overall")}</span></td>}

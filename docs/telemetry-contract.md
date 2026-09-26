@@ -127,3 +127,7 @@ The next useful SDK fields should be added only with a graphic or production dec
 `ClassGapHistoryPoint.lapTime` is optional and expressed in seconds. The server adds it from the same completed-lap record as the scoring gap in both memory and PostgreSQL history repositories. Older responses may omit it; a missing lap time cannot support a lap-time comparison. This is a server history projection and requires no Windows telemetry producer change.
 
 The read-only laps and inferred-event history HTTP routes accept administrator sessions or commentator keys. Live race events carry only the latest 30 heuristic cues; the paged event endpoint exposes the active in-memory server-session archive, not persistent telemetry history. See [Race history](race-history.md#inferred-event-archive) for cursor, reset, and detection semantics.
+
+### Car model names
+
+Client `0.6.10` adds optional `DriverState.carModel`, using iRacing’s full car screen name with the short screen name as fallback. Blank or unavailable names are `null`; older captures and clients may omit the field. The commentator table shows the model beside the team and retains the separate class label.

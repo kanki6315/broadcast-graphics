@@ -445,10 +445,10 @@
 .timing-quality-summary ul { position: absolute; top: 100%; right: 0; z-index: 20; width: 480px; max-height: 280px; overflow: auto; margin: 0; padding: 12px 28px; border: 1px solid var(--ink); background: var(--stock); }
 .commentator-table { min-width: calc(1040px + var(--sector-count, 0) * 125px); }
 .commentator-table th.sector-column { width: 125px; }
-.commentator-table .position-column { width: 98px; }
+.commentator-table .position-column { width: 72px; }
 .commentator-table .driver-column { width: 235px; }
 .commentator-table th.pit-column { width: 105px; }
-.commentator-table thead th:nth-child(2), .commentator-table tbody > tr:not(.class-divider):not(.commentator-detail-row) > td:nth-child(2) { left: 98px; }
+.commentator-table thead th:nth-child(2), .commentator-table tbody > tr:not(.class-divider):not(.commentator-detail-row) > td:nth-child(2) { left: 72px; }
 .commentator-table td { height: 32px; padding-block: 6px; }
 .commentator-table .driver-cell strong { font-size: 18px; }
 .position-cell button { display: grid; width: 100%; gap: 3px; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--ink); }
@@ -504,3 +504,9 @@
 .pit-history-head, .pit-history-row { display: grid; grid-template-columns: 36px 38px 70px 62px 74px minmax(100px, 1fr); gap: 8px; align-items: start; padding: 7px 0; border-bottom: 1px solid var(--paper-line); font-size: 12px; font-variant-numeric: tabular-nums; }
 .pit-history-head { position: sticky; top: 0; background: #e9e7df; font: 700 12px var(--display); text-transform: uppercase; }
 .pit-history-row small { display: block; font-size: 10px; color: var(--muted); }
+
+.driver-car-model { flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; color: #3f4946; font: 600 11px/1 "Source Sans 3", sans-serif; }
+.commentator-table .position-primary { gap: 3px; }
+
+/* Leave data columns flexible so the fixed position col never absorbs surplus width. */
+.commentator-table thead th[class] { width: auto; }
