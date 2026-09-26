@@ -63,7 +63,7 @@ After a successful insert, connected control panels and overlays receive a `lap.
 { "type": "lap.history.request", "carIdx": 7, "limit": 20 }
 ```
 
-The response is a `lap.history` message ordered from oldest to newest. An authenticated control-panel session can inspect the same active-session data with:
+The response is a `lap.history` message ordered from oldest to newest. An authenticated administrator session or commentator key can inspect the same active-session data with:
 
 ```text
 GET /api/history/laps?carIdx=7&limit=20
@@ -71,9 +71,17 @@ GET /api/history/laps?carIdx=7&limit=20
 
 Derived values such as gap gained/lost, average pace, consistency, and fastest-lap rankings should be calculated from these immutable records rather than stored as independent facts.
 
-Commentator timing also exposes compact, on-demand class gap history at `GET /api/history/class-gaps?classId=…`. The first request returns all recorded scoring-line gaps for that class. Later requests may send comma-separated `carIdx:lapNumber` watermarks through `after`, allowing the browser to merge only laps newer than each cached car. The Gap Visualizer refreshes this cache before opening and then freezes its displayed snapshot; it never joins the high-frequency live-state broadcast. Expanded timing rows independently request at most ten recent completed laps for the selected car.
+Commentator timing also exposes compact, on-demand class gap history at `GET /api/history/class-gaps?classId=…`. The first request returns all recorded scoring-line gaps for that class, including optional `lapTime` in seconds for completed-lap comparisons. Later requests may send comma-separated `carIdx:lapNumber` watermarks through `after`, allowing the browser to merge only laps newer than each cached car. The Gap Visualizer refreshes this cache before opening and then freezes its displayed snapshot; it never joins the high-frequency live-state broadcast. Expanded timing rows also load a class-history snapshot for scoring-gap or lap-time-difference comparison against a same-class car or the class leader at each lap. They match observations by completed lap number and offer last 10/25/50, all recorded, or a custom lap range. `Refresh history` explicitly replaces the snapshot. Missing and lapped scoring gaps stay unavailable; lap-time comparisons require both recorded lap times. Pit and driver-change markers come from the available pit-stop summaries; gap gained/lost includes pit effects. The separate recent-lap request remains limited to ten laps.
 
 The session-review selector reads completed sessions through `GET /api/history/sessions?eventId=…`, loads frozen classifications and revision-scoped best sectors from `GET /api/history/sessions/:id`, and fetches one entry's lap-by-lap sectors on demand from `GET /api/history/sessions/:id/sectors?carIdx=…&revision=…`. These routes accept administrator sessions or commentator keys and never combine fastest-sector comparisons across definition revisions.
+
+## Inferred event archive
+
+`RaceEventTracker` retains heuristic pass/crash cues for the active session in server memory. Live state carries only the newest 30 cues. The full commentator log reads the archive through `GET /api/history/events?sessionId=…&classId=…&before=…`, authorized for administrator sessions and commentator keys. `classId` and `before` are optional. Responses contain `sessionId`, newest-first `events` (up to 50), filtered `total`, and `nextBefore`; use that returned cursor to load older cues. A requested session that no longer matches returns HTTP 409.
+
+The archive resets on session identity or source-mode change, backwards session time (including replay rewind), and server restart. It is not stored in PostgreSQL and cannot be recovered from durable lap history. The log retains already loaded older pages while refreshing new cues; changing class or session clears its loaded pages.
+
+Detection compares consecutive race/racing samples under green or white flags, even after start lamps become hidden. Timestamps must advance by no more than five seconds. Near-stop progress is scaled by the sample interval, avoiding a fixed per-frame threshold. These guards do not turn inferred cues into verified race events; replay verification remains necessary, and incident-point changes do not trigger or strengthen crash cues.
 
 ## Replaying an endurance diagnostic capture
 

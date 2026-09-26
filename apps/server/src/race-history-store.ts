@@ -211,6 +211,7 @@ export class MemoryRaceHistoryRepository implements RaceHistoryRepository {
         lapNumber: lap.lapNumber,
         classPosition: lap.classPosition,
         gapToClassLeader: lap.gapToClassLeader,
+        lapTime: lap.lapTime,
         lapsBehindClassLeader: lap.lapsBehindClassLeader,
       }));
   }
@@ -752,8 +753,8 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
   async listClassGaps(session: SessionState, classId: number, afterLapByCar: ReadonlyMap<number, number>): Promise<ClassGapHistoryPoint[]> {
     const watermarks = Object.fromEntries([...afterLapByCar].map(([carIdx, lapNumber]) => [String(carIdx), lapNumber]));
     const result = await this.pool.query<Pick<LapRow,
-      "car_idx" | "lap_number" | "class_position" | "scoring_gap_to_class_leader_ms" | "laps_behind_class_leader">>(`
-      SELECT entry.car_idx, lap.lap_number, lap.class_position,
+      "car_idx" | "lap_number" | "class_position" | "scoring_gap_to_class_leader_ms" | "laps_behind_class_leader" | "lap_time_ms">>(`
+      SELECT entry.car_idx, lap.lap_number, lap.class_position, lap.lap_time_ms,
              lap.scoring_gap_to_class_leader_ms, lap.laps_behind_class_leader
       FROM bg_completed_laps lap
       JOIN bg_broadcast_sessions session ON session.id = lap.session_id
@@ -766,6 +767,7 @@ export class PostgresRaceHistoryRepository implements RaceHistoryRepository {
     `, [session.source, session.sourceMode, session.id, classId, JSON.stringify(watermarks)]);
     return result.rows.map((row) => ({
       carIdx: row.car_idx,
+      lapTime: row.lap_time_ms / 1000,
       lapNumber: row.lap_number,
       classPosition: row.class_position,
       gapToClassLeader: seconds(row.scoring_gap_to_class_leader_ms),

@@ -237,7 +237,7 @@ The control palette is mostly paper and ink; color is scarce, semantic, and alwa
 - **Caution Yellow** (`#f1c933`): yellow-flag and pit-status plates, always with dark `#17150a` text.
 - **Stop Red** (`#c53127`): red-flag state with explicit label text.
 - **Fastest Purple** (`#7e3bd1`): fastest-lap data and its written `FASTEST` tag.
-- **Connected Green** (`#177344`): healthy-feed icon only; the adjacent `CONNECTED` and `DATA FEED CURRENT` copy carries the meaning.
+- **Connected Green** (`#177344`): healthy-feed icons with adjacent status copy, and the commentator comparison trace and rival-row underline. Comparison axes and signed numeric readings carry the measurement meaning.
 - **Validation Red** (`#8d211b` on `rgba(197, 49, 39, 0.08)`): authentication, key-creation, key-register, revoke, and sign-out failures, always paired with explicit error copy and alert semantics.
 - **PRI Results Number Red** (`#d71d24`): car numbers in the results list only. This is the literal PSD-derived result-number red, distinct from the package's general racing-red accent.
 
@@ -316,7 +316,7 @@ These measured roles reproduce the Weather smart object and remain package-local
 
 The operator application has two synchronized production desks. `/timing` is graphics-free: a compact session masthead gives way to a full-width scrollable timing ledger where every driver row is an immediate take on the selected camera group. A persistent bottom camera dock keeps the selected driver, requested group, command delivery, and observed driver/group visible together; every available camera group must fit in its center bank without horizontal scrolling. `/graphics` uses a fixed four-column board: race context and timing controls lead, Driver Info and position-based Battle occupy the main working band, planned widgets remain visibly disabled, and the guarded global clear closes the board. Direct Show/Hide actions replace the armed-cue workflow on Graphics Director.
 
-The commentator `/timing` workspace keeps its timing ledger dominant. Its compact race-intelligence deck places circuit position first, Battle Watch second, and a narrow inferred-event feed beside Battle Watch; the feed must not displace, resize, or visually outrank the timing table. Keep the compact feed three rows high while retaining every cue for the active class selection in newest-first order and scrolling that viewport vertically. A square `OPEN FULL EVENT LOG` action may open a fixed right-side inspection ledger, but the ledger remains non-modal and must leave the timing workspace visible.
+The commentator `/timing` workspace keeps its timing ledger dominant beneath three independently collapsible or detachable instruments: Track Position, Battle Watch, and Events. The deck uses `12px` gutters and `145px` scrollable tool bodies. Each square ruled header keeps its title, shared class context, pop-out action, and collapse control together. Browser pop-outs retain the parent workspace's live state and class selection. Local layout preferences survive reload; a saved pop-out shows explicit `REOPEN WINDOW` and `DOCK` actions rather than opening a window automatically. Closing a pop-out docks it again; a blocked popup exposes inline recovery copy, including in the saved-layout placeholder. The full event ledger remains a non-modal, independently scrollable right-side inspection surface.
 
 Spacing is compact and multiples cluster around `4`, `8`, `12`, `16`, and `24px`. A faint `32px` vertical registration grid and `8px` horizontal baseline texture make the stock feel measured without competing with data. Major divisions use `2–3px` rules; internal divisions use `1px` rules.
 
@@ -375,12 +375,20 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 - Keep requested and observed state distinct. The selected/requested row uses an inspection wash with a `4px` orange leading rule and orange position stamp; the row observed on camera becomes an inverse ink plate. The persistent key names both states.
 - Best-lap emphasis uses tabular numerals and purple ink, reinforced by the persistent `FASTEST LAP` key rather than a dashboard-style badge in every row.
 
+### Commentator Timing and Comparisons
+
+- Integrate class movement since start into the Position cell beside the prominent class position, with overall position beneath. Keep overall movement in expanded detail. The main ledger uses `42px` cells and shows current/best sector pairs; expanded detail restores current/previous/best values and timing confidence.
+- Battle Watch leads with class and the large position pair (for example `P9–P10`), then a written trend and direction icon. Expand `Evidence` for car identities, gap, quality, and observation window. Selecting the pair opens the chasing car's comparison against the car ahead.
+- Expanded rows lead with a completed-lap comparison. Keep Reference, Measure, and Laps controls together: class leader at each lap or another same-class car; scoring gap or lap-time difference; last 10/25/50, all recorded, or custom lap range. Default to the last 25 laps and scoring gap.
+- Label the comparison as a snapshot with the last recorded lap and an explicit `REFRESH HISTORY` action. Use a green trace, neutral grid/zero line, and dashed pit markers labeled with car number and `PIT` or `CHANGE`. Show signed seconds and explain positive/negative meaning; keep missing and lapped scoring gaps unavailable and break the line across missing observations. Lap-time difference may still be available for lapped cars.
+- Keep lap values, pit/driver-change evidence, timing confidence, previous sectors, overall movement, and stint intelligence available in expanded detail. Pit effects remain included in gap gained/lost, with written disclosure.
+
 ### Commentator Event Tracker
 
-- This component belongs only to the commentator `/timing` surface. It is a compact, read-only heuristic feed beside Battle Watch. Its only local actions open and close the full inspection ledger; it has no event acknowledgement, event dismissal, mutation, replay, or internal filtering controls.
-- Keep the header's written `HEURISTIC CUES · VERIFY ON REPLAY` warning visible. Every row pairs summary and evidence copy with a distinct pass-arrow or crash-alert symbol; green pass and validation-red crash color reinforce those symbols but never carry the distinction alone.
-- Use approval orange only for the lap/session timestamp, making recency easy to scan without turning the whole cue into an alert plate. Preserve newest-first ordering and the active class filter. The compact viewport stays three rows high, retains the full filtered event history, and scrolls vertically so timing remains the primary instrument.
-- The square `OPEN FULL EVENT LOG` action opens a fixed ledger on the right side of the viewport. The ledger shows the same live-updating, class-filtered, newest-first event history at inspection scale and scrolls independently from the timing workspace.
+- This component belongs only to the commentator `/timing` surface. It is a compact, read-only heuristic feed beside Battle Watch. Local actions manage its dock/pop-out/collapse state, open or close the full inspection ledger, and load older events; it has no event acknowledgement, event dismissal, mutation, replay, or internal class-filter controls.
+- Keep the header's written `HEURISTIC CUES · VERIFY ON REPLAY` warning visible during detection; replace it with explicit waiting-for-green or feed-unavailable/detection-paused copy when appropriate. Every row pairs summary and evidence copy with a distinct pass-arrow or crash-alert symbol; green pass and validation-red crash color reinforce those symbols but never carry the distinction alone.
+- Use approval orange only for the lap/session timestamp, making recency easy to scan without turning the whole cue into an alert plate. Preserve newest-first ordering and the active class filter. The compact viewport shows the recent feed, class-filtered from the latest 30 server cues, and scrolls vertically within the fixed tool body so timing remains the primary instrument. Counts are explicitly labeled `RECENT`.
+- The square `OPEN FULL EVENT LOG` action opens a fixed ledger on the right side of the viewport. The ledger loads the active server-session archive in 50-cue pages, class-filtered and newest-first, with `LOAD OLDER EVENTS`, loaded/total counts, and inline loading/error/empty states. New cues refresh its latest page while preserving loaded older cues. This in-memory archive resets on session/source changes, replay rewind, or server restart; do not imply durable event retention.
 - Treat the full ledger as non-modal: do not add a backdrop, focus trap, or page replacement. Keep timing visible behind and beside it, and provide both a visible close button and `Escape` dismissal.
 - Incident-point changes may appear as supporting evidence in crash detail, but they do not trigger a crash cue and do not raise its confidence. The written `POSSIBLE` or `LIKELY` label remains heuristic and always requires replay verification.
 
@@ -488,7 +496,7 @@ Overlay geometry belongs to the package. The shared layout accepts `--gfx-cut`, 
 ### Do:
 
 - **Do** keep live timing dominant on Timing Director and keep Graphics Director fixed, dense, ordered, and operational.
-- **Do** keep the commentator event tracker secondary, newest-first, class-filtered, read-only, and explicitly labeled as heuristic evidence that requires replay verification; retain all filtered cues in the three-row-high scroll viewport and its independently scrollable right-side inspection ledger.
+- **Do** keep the commentator event tracker secondary, newest-first, class-filtered, read-only, and explicitly labeled as heuristic evidence that requires replay verification; distinguish the recent 30-cue feed from the paged active-session archive in its independently scrollable right-side inspection ledger.
 - **Do** use `1px` rules for measurement, `2px` rules for sections/actions, and `3–4px` orange marks for selected or live state.
 - **Do** keep package selection and manifest-defined fields inside the stable Scrutineering Ledger control grammar.
 - **Do** use text, icons, borders, patterns, and shape together so color never carries state by itself.

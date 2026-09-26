@@ -121,3 +121,9 @@ The next useful SDK fields should be added only with a graphic or production dec
 5. Radio-transmitting car for an automatic radio identifier.
 
 `cameraGroups`, `activeCameraCarIdx`, `activeCameraGroup`, and `activeCamera` report the current session's available camera inventory and observed camera selection. They are optional so older diagnostic captures remain replay-compatible. Camera changes still travel through the separate command path: `focus.set`, `camera.group.take`, `camera.driver.take`, and the compatibility `camera.take` action produce a server-to-client `camera.command`; the telemetry client returns a `camera.result` after handing the request to the SDK. `camera.driver.take` carries both `carIdx` and `cameraGroup` so a timing-row context-menu choice updates shared focus and dispatches one atomic camera request.
+
+## Commentator history projections
+
+`ClassGapHistoryPoint.lapTime` is optional and expressed in seconds. The server adds it from the same completed-lap record as the scoring gap in both memory and PostgreSQL history repositories. Older responses may omit it; a missing lap time cannot support a lap-time comparison. This is a server history projection and requires no Windows telemetry producer change.
+
+The read-only laps and inferred-event history HTTP routes accept administrator sessions or commentator keys. Live race events carry only the latest 30 heuristic cues; the paged event endpoint exposes the active in-memory server-session archive, not persistent telemetry history. See [Race history](race-history.md#inferred-event-archive) for cursor, reset, and detection semantics.

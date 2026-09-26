@@ -57,6 +57,10 @@ export class StateStore {
     return structuredClone(this.state);
   }
 
+  raceEventHistory(classId?: number, before?: string, limit = 50) {
+    return this.raceEvents.history(classId, before, limit);
+  }
+
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

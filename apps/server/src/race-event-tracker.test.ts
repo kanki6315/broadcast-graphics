@@ -74,3 +74,42 @@ test("detects a spin-like loss from multiple lost positions and near-zero progre
   assert.equal(events[0]?.confidence, "likely");
   assert.match(events[0]?.detail ?? "", /little forward progress/);
 });
+
+test("continues detecting after the start lights disappear on lap one", () => {
+  const tracker = new RaceEventTracker();
+  tracker.update(session("2026-01-01T00:00:00.000Z", [driver(7, 2, .50), driver(8, 1, .515)], { startState: "go", lap: 1 }));
+  tracker.update(session("2026-01-01T00:00:01.000Z", [driver(7, 2, .51), driver(8, 1, .525)], { startState: "hidden", lap: 1 }));
+  const events = tracker.update(session("2026-01-01T00:00:02.000Z", [driver(7, 1, .53), driver(8, 2, .535)], { startState: "hidden", lap: 2 }));
+  assert.equal(events[0]?.kind, "pass");
+  assert.equal(events[0]?.lap, 2);
+});
+
+test("retains events beyond the live feed and pages by stable event cursor", () => {
+  const tracker = new RaceEventTracker();
+  for (let i = 0; i < 65; i++) {
+    const a = i * 2, b = a + 1;
+    tracker.update(session(new Date(Date.UTC(2026, 0, 1, 0, 0, i * 2)).toISOString(), [driver(a, 2, .50), driver(b, 1, .515)]));
+    tracker.update(session(new Date(Date.UTC(2026, 0, 1, 0, 0, i * 2 + 1)).toISOString(), [driver(a, 1, .52), driver(b, 2, .525)]));
+  }
+  const first = tracker.history(1);
+  assert.equal(first.total, 65);
+  assert.equal(first.events.length, 50);
+  assert.ok(first.nextBefore);
+  const older = tracker.history(1, first.nextBefore!);
+  assert.equal(older.events.length, 15);
+  assert.equal(new Set([...first.events, ...older.events].map((event) => event.id)).size, 65);
+  assert.equal(older.nextBefore, null);
+  assert.equal(tracker.history(99).total, 0);
+});
+
+test("does not infer a pass across a telemetry outage", () => {
+  const tracker = new RaceEventTracker();
+  tracker.update(session("2026-01-01T00:00:00.000Z", [driver(7, 2, .50), driver(8, 1, .515)]));
+  assert.deepEqual(tracker.update(session("2026-01-01T00:00:20.000Z", [driver(7, 1, .52), driver(8, 2, .525)])), []);
+});
+
+test("normal progress at high sample rates is not mistaken for being nearly stopped", () => {
+  const tracker = new RaceEventTracker();
+  tracker.update(session("2026-01-01T00:00:00.000Z", [driver(7, 2, .50)]));
+  assert.deepEqual(tracker.update(session("2026-01-01T00:00:00.100Z", [driver(7, 5, .501)])), []);
+});

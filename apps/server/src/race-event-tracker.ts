@@ -36,7 +36,7 @@ export class RaceEventTracker {
   private readonly lastEmittedAt = new Map<string, number>();
 
   update(session: SessionState): RaceEvent[] {
-    if (session.id !== this.sessionId) {
+    if (session.id !== this.sessionId || (this.previous && (session.sourceMode !== this.previous.sourceMode || (session.timeElapsed ?? 0) < (this.previous.timeElapsed ?? 0)))) {
       this.sessionId = session.id;
       this.previous = structuredClone(session);
       this.events = [];
@@ -47,14 +47,27 @@ export class RaceEventTracker {
 
     const previous = this.previous;
     this.previous = structuredClone(session);
-    if (!previous || !this.canDetect(previous, session)) return structuredClone(this.events);
+    if (!previous || !this.canDetect(previous, session)) return structuredClone(this.events.slice(-30).reverse());
 
     const detected = [
       ...this.detectCrashes(previous, session),
       ...this.detectPasses(previous, session),
     ];
-    if (detected.length > 0) this.events = [...detected, ...this.events].slice(0, 30);
-    return structuredClone(this.events);
+    if (detected.length > 0) this.events.push(...detected);
+    return structuredClone(this.events.slice(-30).reverse());
+  }
+
+  history(classId?: number, before?: string, limit = 50) {
+    const matching = this.events.filter((event) => classId == null || event.classId === classId);
+    const cursor = before == null ? matching.length : matching.findIndex((event) => event.id === before);
+    const end = cursor < 0 ? 0 : cursor;
+    const events = matching.slice(Math.max(0, end - limit), end).reverse();
+    return structuredClone({
+      sessionId: this.sessionId,
+      events,
+      total: matching.length,
+      nextBefore: end > limit ? events.at(-1)?.id ?? null : null,
+    });
   }
 
   private canDetect(previous: SessionState, current: SessionState): boolean {
@@ -62,8 +75,8 @@ export class RaceEventTracker {
       && current.type === "race"
       && previous.phase === "racing"
       && current.phase === "racing"
-      && previous.startState === "go"
-      && current.startState === "go"
+      && eventTime(current) > eventTime(previous)
+      && eventTime(current) - eventTime(previous) <= 5_000
       && (previous.flag === "green" || previous.flag === "white")
       && (current.flag === "green" || current.flag === "white");
   }
@@ -115,7 +128,7 @@ export class RaceEventTracker {
       const priorProgress = validLapProgress(prior);
       const currentProgress = validLapProgress(driver);
       const progressDelta = priorProgress != null && currentProgress != null ? currentProgress - priorProgress : null;
-      const nearlyStopped = progressDelta != null && progressDelta >= -0.01 && progressDelta <= 0.003;
+      const nearlyStopped = progressDelta != null && progressDelta >= -0.01 && progressDelta <= 0.003 * ((eventTime(current) - eventTime(previous)) / 1000);
       if (positionLoss < 2 || (!leftRacingSurface && !nearlyStopped)) continue;
 
       const now = eventTime(current);
