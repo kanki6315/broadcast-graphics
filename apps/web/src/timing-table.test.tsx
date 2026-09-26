@@ -20,10 +20,10 @@ function driver(overrides: Partial<DriverState> = {}): DriverState {
   };
 }
 
-function render(current: DriverState): string {
+function render(current: DriverState, expanded = false): string {
   return renderToStaticMarkup(<CommentatorTimingTable
     drivers={[current]}
-    expandedCarIdxs={new Set()}
+    expandedCarIdxs={new Set(expanded ? [current.carIdx] : [])}
     visibleColumns={new Set([...defaultCommentatorColumns, "lap"])}
     groupByClass={false}
     onToggleExpanded={() => {}}
@@ -35,7 +35,7 @@ test("missing optional commentator timing renders as double hyphens", () => {
   assert.match(markup, /Quality not reported[^>]*>--</);
   assert.match(markup, /position-change is-unknown[^>]*>--</);
   assert.match(markup, /producer does not report pit summaries[^>]*>--</);
-  assert.match(markup, /class="position-cell" aria-expanded="false" title="Show timing detail"/);
+  assert.match(markup, /class="position-cell"><button aria-expanded="false" aria-label="Show timing detail for Driver"/);
   assert.doesNotMatch(markup, /expand-control/);
   assert.doesNotMatch(markup, /is-selected|aria-current|Follow Driver/);
   assert.doesNotMatch(markup, />—</);
@@ -77,7 +77,7 @@ test("class gaps replace overall gaps in multi-class races", () => {
   assert.match(multiClassMarkup, /Class interval/);
   assert.match(multiClassMarkup, /1\.250s/);
   assert.match(multiClassMarkup, /0\.500s/);
-  assert.doesNotMatch(multiClassMarkup, /2\.750s|0\.750s|overall/i);
+  assert.doesNotMatch(multiClassMarkup, /2\.750s|0\.750s/i);
 
   const singleClassMarkup = renderToStaticMarkup(<CommentatorTimingTable
     drivers={[current]} expandedCarIdxs={new Set()}
@@ -144,7 +144,7 @@ test("stable and opening intervals retain their rendered proximity colour", () =
   assert.match(markupFor(1.089, "opening"), /interval-cell is-gap-approaching/);
 });
 
-test("each sector has its own current, previous, and best column", () => {
+test("each sector shows current and best in the table and preserves previous in details", () => {
   const sector = (lapNumber: number, sectorNumber: number, value: number) => ({
     carIdx: 7, lapNumber, sectorNumber, value, definitionRevision: "r1", source: "derived" as const, quality: "valid" as const,
   });
@@ -159,10 +159,10 @@ test("each sector has its own current, previous, and best column", () => {
   assert.match(markup, /Sector 1/);
   assert.match(markup, /Sector 2/);
   assert.match(markup, /Current/);
-  assert.match(markup, /Prev/);
+  assert.doesNotMatch(markup, /<span>Prev<\/span>/);
   assert.match(markup, /Best/);
   assert.match(markup, /30\.100/);
-  assert.match(markup, /31\.400/);
+  assert.doesNotMatch(markup, /31\.400/);
   assert.match(markup, /29\.900/);
   assert.match(markup, /sector-column-summary/);
   assert.equal((markup.match(/class="sector-column"/g) ?? []).length, 2);
@@ -227,7 +227,7 @@ test("pit summary preserves tracker totals and marks only inferred box time", ()
   assert.match(markup, /contains-inference[^>]*><small>Box<\/small>~19\.000s/);
   assert.match(markup, /Lap<\/small>L5/);
   assert.match(markup, /Total<\/small>28\.000s/);
-  assert.match(markup, /lane \/ box \/ lap \/ total/);
+  assert.match(markup, /total \/ lap/);
   assert.match(markup, /pit-driver-change/);
   assert.match(markup, /aria-label="Driver change"/);
   assert.doesNotMatch(markup, /<small>Lane<\/small>~/);
@@ -245,7 +245,7 @@ test("pit summary total includes unresolved time so commentators do not need to 
       observedBoxTime: 15, inferredBoxTime: 0, driverChange: false,
       entryDriverId: "41", exitDriverId: "41", quality: "incomplete",
     },
-  }));
+  }), true);
   assert.match(markup, /Total<\/small>28\.000s/);
   assert.match(markup, /4\.000s unresolved time included/);
   assert.doesNotMatch(markup, /<small>Unknown<\/small>/);
@@ -284,7 +284,7 @@ test("dirty and inferred sectors never receive fastest styling", () => {
         { carIdx: 7, lapNumber: 4, sectorNumber: 2, definitionRevision: "r1", source: "derived", quality: "inferred", value: 31.2, comparisons: ["overall-fastest"] },
       ],
     },
-  }));
+  }), true);
   assert.match(markup, /telemetry gap[^>]*>--/);
   assert.match(markup, /inferred[^>]*>~31\.200/);
   assert.doesNotMatch(markup, /is-overall-fastest/);
@@ -337,6 +337,7 @@ test("Battle Watch filters shared candidates by class and contains no control co
   assert.match(markup, /#3/);
   assert.match(markup, /#4/);
   assert.doesNotMatch(markup, /#1/);
-  assert.doesNotMatch(markup, /<button|is-selected/);
+  assert.match(markup, /battle-position-pair/);
+  assert.match(markup, /<summary>Evidence<\/summary>/);
   assert.doesNotMatch(markup, /camera\.command|control\.command|graphics\./);
 });

@@ -18,6 +18,7 @@ import { useGapHistory } from "./use-gap-history";
 import { GapVisualizer } from "./gap-visualizer";
 import { SessionReview } from "./session-review";
 import { EventTracker } from "./event-tracker";
+import { CommentatorTool } from "./commentator-tool";
 import { timingJson } from "./timing-api";
 import "./commentator-timing.css";
 
@@ -55,6 +56,7 @@ function loadPreferences(): CommentatorPreferences {
 export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> }) {
   const { state, socketConnected } = useLiveState("control", "commentator");
   const [preferences, setPreferences] = useState<CommentatorPreferences>(loadPreferences);
+  const [comparisonRivals, setComparisonRivals] = useState<ReadonlyMap<number, number>>(new Map());
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [historySessions, setHistorySessions] = useState<HistorySessionSummary[]>([]);
@@ -67,7 +69,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const gapHistory = useGapHistory(state?.session?.id);
 
   useEffect(() => {
-    if (state?.session?.id) setSelectedSessionId("live");
+    if (state?.session?.id) { setSelectedSessionId("live"); setComparisonRivals(new Map()); }
   }, [state?.session?.id]);
 
   useEffect(() => {
@@ -117,10 +119,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   const expandedCarIdxs = useMemo(() => new Set(preferences.expandedCarIdxs), [preferences.expandedCarIdxs]);
   const visibleColumns = useMemo(() => new Set(preferences.visibleColumns), [preferences.visibleColumns]);
 
-  useEffect(() => {
-    if (!state?.session?.id) return;
-    for (const carIdx of preferences.expandedCarIdxs) void gapHistory.loadRecentLaps(carIdx);
-  }, [gapHistory.loadRecentLaps, preferences.expandedCarIdxs, state?.session?.id]);
+
 
   async function logout() {
     setLoggingOut(true);
@@ -138,7 +137,6 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   }
 
   function toggleExpanded(carIdx: number) {
-    if (!preferences.expandedCarIdxs.includes(carIdx)) void gapHistory.loadRecentLaps(carIdx);
     setPreferences((current) => ({
       ...current,
       expandedCarIdxs: current.expandedCarIdxs.includes(carIdx)
@@ -195,7 +193,8 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
   }, undefined)?.carIdx;
   const isSimulated = session?.sourceMode === "simulation";
   const showClassGaps = classes.length > 1 || new Set(session?.drivers.map((driver) => driver.classId)).size > 1;
-  const displayedColumnCount = 2 + visibleColumns.size;
+  const displayedColumnCount = 2 + [...visibleColumns].filter((column) => column !== "change").length;
+  const toolContext = `${telemetryHealthy ? (isSimulated ? "Simulation" : session?.sourceMode === "replay" ? "Replay" : "Live") : "Feed unavailable"} · ${preferences.classId === "all" ? "All classes" : classes.find((carClass) => carClass.id === preferences.classId)?.name ?? "Class"}`;
   const intelligence = state.intelligence;
   const warningCarIdxs = new Set(filteredDrivers.map((driver) => driver.carIdx));
   const driversByCarIdx = new Map(filteredDrivers.map((driver) => [driver.carIdx, driver]));
@@ -279,7 +278,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
 
         {reviewingHistory ? <SessionReview review={sessionReview} loading={reviewLoading} error={reviewError} classId={preferences.classId} onRevisionChange={(revision) => void selectSectorRevision(revision)} /> : <>
         <section className="commentator-context-deck" aria-label="Circuit position and live race intelligence">
-          <div className="commentator-position-instrument">
+          <CommentatorTool id="track" title="Track position" context={toolContext}><div className="commentator-position-instrument">
           {mapResource.definition && mapResource.calibration ? (
             <CircuitMap
               definition={mapResource.definition}
@@ -298,19 +297,22 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
             </>
           )}
           </div>
-          <div className="commentator-battle-context">
-            <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} />
-            <div className={`quality-watch${warnings.length > 0 ? " has-warnings" : ""}`}>
-              <TriangleAlert aria-hidden="true" />
-              <strong>{warnings.length > 0 ? `${warnings.length} timing warning${warnings.length === 1 ? "" : "s"}` : "Timing quality clear"}</strong>
-              <span>{warnings[0]?.message ?? "No uncertain normalized values in this view."}</span>
-            </div>
-          </div>
-          <EventTracker events={state.raceEvents ?? []} classId={preferences.classId} />
+          </CommentatorTool>
+          <CommentatorTool id="battles" title="Battle Watch" context={toolContext}><div className="commentator-battle-context">
+            <BattleWatch intelligence={intelligence} drivers={session?.drivers ?? []} classId={preferences.classId} onSelectBattle={(ahead, chasing) => {
+              setComparisonRivals((current) => new Map(current).set(chasing, ahead));
+              setPreferences((current) => ({ ...current, expandedCarIdxs: [...new Set([...current.expandedCarIdxs, chasing])] }));
+              window.setTimeout(() => document.querySelector(`[data-car-idx="${chasing}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 50);
+            }} />
+          </div></CommentatorTool>
+          <CommentatorTool id="events" title="Events" context={toolContext}><EventTracker events={state.raceEvents ?? []} classId={preferences.classId} sessionId={session?.id} healthy={telemetryHealthy} detecting={session?.type === "race" && session.phase === "racing" && (session.flag === "green" || session.flag === "white")} /></CommentatorTool>
         </section>
 
+        <details className={`timing-quality-summary${warnings.length ? " has-warnings" : ""}`}><summary><TriangleAlert />{warnings.length ? `${warnings.length} timing warnings` : "Timing quality clear"}<span>Movement since start · ~ inferred · ? unavailable quality</span></summary><ul>{warnings.map((warning, index) => <li key={index}>{warning.message}</li>)}</ul></details>
         <CommentatorTimingTable
           drivers={filteredDrivers}
+          sessionId={session?.id}
+          comparisonRivals={comparisonRivals}
           overallFastestCarIdx={overallFastestCarIdx}
           expandedCarIdxs={expandedCarIdxs}
           visibleColumns={visibleColumns}

@@ -12,6 +12,7 @@ import {
   isExpectedUnavailableTimingField,
 } from "@racecontrol/protocol";
 import React from "react";
+import { CarComparison } from "./car-comparison";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ArrowDownRight, RefreshCw } from "lucide-react";
 import type { RecentLapHistoryResource } from "./use-gap-history";
@@ -96,7 +97,7 @@ export function TimingTable({
 export type CommentatorColumn = "change" | "lap" | "gap" | "interval" | "lapTimes" | "sectors" | "stint" | "pit" | "status";
 
 export const commentatorColumnLabels: Record<CommentatorColumn, string> = {
-  change: "Position change",
+  change: "Movement beside position",
   lap: "Lap progress",
   gap: "Gaps",
   interval: "Intervals",
@@ -150,6 +151,8 @@ export interface CommentatorTimingTableProps {
   pitStops?: PitStopSummary[];
   lapHistoryByCarIdx?: ReadonlyMap<number, RecentLapHistoryResource>;
   onToggleExpanded: (carIdx: number) => void;
+  sessionId?: string;
+  comparisonRivals?: ReadonlyMap<number, number>;
 }
 
 function formatSeconds(value: number): string {
@@ -279,15 +282,15 @@ function sectorValue(sector: CompletedSector | undefined) {
   return <span className={`sector-time${fastest ? " is-overall-fastest" : personal ? " is-personal-best" : ""}`} title={title}>{unavailable ? "--" : `${marker}${sector.value!.toFixed(3)}`}</span>;
 }
 
-function sectorColumnSummary(driver: DriverState, sectorNumber: number) {
+function sectorColumnSummary(driver: DriverState, sectorNumber: number, includePrevious = false) {
   const supported = Object.hasOwn(driver, "sectors");
   const current = driver.sectors?.currentLap?.find((sector) => sector.sectorNumber === sectorNumber);
   const previous = driver.sectors?.previousLap?.find((sector) => sector.sectorNumber === sectorNumber);
   const best = driver.sectors?.bestSectors?.find((sector) => sector.sectorNumber === sectorNumber);
   return (
-    <span className="sector-column-summary" title={supported ? undefined : "This producer does not report derived sectors"}>
+    <span className={`sector-column-summary${includePrevious ? " with-previous" : ""}`} title={supported ? undefined : "This producer does not report derived sectors"}>
       <span>{sectorValue(current)}</span>
-      <span>{sectorValue(previous)}</span>
+      {includePrevious && <span>{sectorValue(previous)}</span>}
       <span>{sectorValue(best)}</span>
     </span>
   );
@@ -354,7 +357,7 @@ function LapGapHistory({ resource }: { resource: RecentLapHistoryResource | unde
   </div>;
 }
 
-function PitVisitDetail({ driver, pitStops, lapHistory }: { driver: DriverState; pitStops: PitStopSummary[]; lapHistory?: RecentLapHistoryResource }) {
+function PitVisitDetail({ driver, pitStops, lapHistory, showLegacyHistory = true }: { driver: DriverState; pitStops: PitStopSummary[]; lapHistory?: RecentLapHistoryResource; showLegacyHistory?: boolean }) {
   const visit = driver.latestPitVisit;
   const pitSummarySupported = Object.hasOwn(driver, "latestPitVisit");
   const warnings = qualityWarnings(driver);
@@ -383,10 +386,11 @@ function PitVisitDetail({ driver, pitStops, lapHistory }: { driver: DriverState;
           </div>
         ) : <p>{pitSummarySupported ? (visit ? "Pit history is waiting for race intelligence." : "No pit stop has been reported for this car.") : "This telemetry producer does not support pit-stop summaries."}</p>}
       </section>
-      <section>
+      {showLegacyHistory && <section>
         <span className="detail-kicker">Last 10 lap gaps · seconds to class leader</span>
         <LapGapHistory resource={lapHistory} />
-      </section>
+      </section>}
+      <section><h3>Sectors · current / previous / best</h3>{sectorNumbersForDrivers([driver]).map((number) => <div className="detail-sector" key={number}><strong>S{number}</strong>{sectorColumnSummary(driver, number, true)}</div>)}<p>Overall movement: {positionDelta(driver.positionChange)} · Class movement: {positionDelta(driver.classPositionChange)}</p><h3>Latest pit visit</h3>{pitVisitSummary(driver, orderedStops[0])}</section>
       <section>
         <span className="detail-kicker">Timing confidence</span>
         {warnings.length > 0 ? <ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : <p>All reported timing fields are valid.</p>}
@@ -408,12 +412,14 @@ export function CommentatorTimingTable({
   pitStops = [],
   lapHistoryByCarIdx = new Map(),
   onToggleExpanded,
+  sessionId,
+  comparisonRivals,
 }: CommentatorTimingTableProps) {
   const proximityByCarIdx = React.useRef(new Map<number, GapProximity>());
   let previousClassId: number | null = null;
   const sectorNumbers = sectorNumbersForDrivers(drivers);
   const visibleSectorNumbers = sectorNumbers.length > 0 ? sectorNumbers : [1];
-  const baseColumnCount = [...visibleColumns].filter((column) => column !== "sectors").length;
+  const baseColumnCount = [...visibleColumns].filter((column) => column !== "sectors" && column !== "change").length;
   const columnCount = 2 + baseColumnCount + (visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0);
   const nextProximityByCarIdx = new Map<number, GapProximity>();
   React.useEffect(() => {
@@ -424,16 +430,15 @@ export function CommentatorTimingTable({
     <div className="commentator-table-wrap" style={{ "--sector-count": visibleColumns.has("sectors") ? visibleSectorNumbers.length : 0 } as CSSProperties}>
       <table className="commentator-table">
         <thead><tr>
-          <th className="position-column">Position</th>
+          <th className="position-column">{showClassGaps ? "Class pos." : "Position"}<small>change since start</small></th>
           <th className="driver-column">Driver / team</th>
-          {visibleColumns.has("change") && <th className="change-column">Change</th>}
           {visibleColumns.has("lap") && <th className="lap-column">Lap</th>}
           {visibleColumns.has("gap") && <th className="gap-column">{showClassGaps ? "Class gap" : "Gap"} <small>to {showClassGaps ? "class " : ""}leader</small></th>}
           {visibleColumns.has("interval") && <th className="interval-column">{showClassGaps ? "Class interval" : "Interval"} <small>to car ahead</small></th>}
           {visibleColumns.has("lapTimes") && <th className="lap-times-column">Lap times <small>last / best</small></th>}
-          {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <th className="sector-column" key={sectorNumber}>Sector {sectorNumber}<small className="sector-column-head"><span>Current</span><span>Prev</span><span>Best</span></small></th>)}
+          {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <th className="sector-column" key={sectorNumber}>Sector {sectorNumber}<small className="sector-column-head"><span>Current</span><span>Best</span></small></th>)}
           {visibleColumns.has("stint") && <th className="stint-column">Stint <small>time / laps</small></th>}
-          {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>lane / box / lap / total</small></th>}
+          {visibleColumns.has("pit") && <th className="pit-column">Pit visit <small>total / lap</small></th>}
           {visibleColumns.has("status") && <th className="status-column">Status</th>}
         </tr></thead>
         <tbody>
@@ -460,20 +465,21 @@ export function CommentatorTimingTable({
               ) : null,
               <tr
                 key={driver.carIdx}
+                className={expanded ? "is-expanded-car" : [...(comparisonRivals?.values() ?? [])].includes(driver.carIdx) ? "is-comparison-rival" : undefined}
+                data-car-idx={driver.carIdx}
               >
-                <td className="position-cell" aria-expanded={expanded} title={`${expanded ? "Hide" : "Show"} timing detail`} onClick={() => onToggleExpanded(driver.carIdx)}><span><strong>{driver.position}</strong><small className="class-position" style={{ "--class-color": driver.classColor } as CSSProperties}>C{driver.classPosition}</small></span></td>
+                <td className="position-cell"><button aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} timing detail for ${driver.name}`} onClick={() => onToggleExpanded(driver.carIdx)}><span className="position-primary"><strong>P{showClassGaps ? driver.classPosition : driver.position}</strong>{visibleColumns.has("change") && <span title="Places gained or lost since race start">{positionDelta(showClassGaps ? driver.classPositionChange : driver.positionChange)}</span>}</span>{showClassGaps && <small className="class-position" style={{ "--class-color": driver.classColor } as CSSProperties}>Overall {driver.position}</small>}</button></td>
                 <td className="driver-cell"><span className="commentator-car-number" style={{ "--class-color": driver.classColor } as CSSProperties}>{driver.carNumber}</span><span><strong>{driver.name}</strong><small><span className="team-name">{driver.team}</span><span className="driver-class-name">{driver.className}</span></small></span></td>
-                {visibleColumns.has("change") && <td className="change-cell"><span>{positionDelta(driver.positionChange)}<small>overall</small></span><span>{positionDelta(driver.classPositionChange)}<small>class</small></span></td>}
                 {visibleColumns.has("lap") && <td className="lap-cell"><strong>L{driver.currentLap}</strong>{qualityValue(driver.lapDistPct, timingQuality(driver, "lapDistPct"), (value) => `${Math.round(value * 100)}%`)}</td>}
                 {visibleColumns.has("gap") && <td className="single-value"><span>{gapValue(driver, showClassGaps)}<small>{trend?.direction ?? (showClassGaps ? "class" : "overall")}</small></span></td>}
                 {visibleColumns.has("interval") && <td className={`single-value interval-cell${proximity ? ` is-gap-${proximity}` : ""}`}><span>{intervalValue(driver, showClassGaps)}{gapTrendLabel(trend, showClassGaps ? "class" : "overall")}</span></td>}
                 {visibleColumns.has("lapTimes") && <td className="paired-value lap-time-pair"><span className={lastLapState.className} title={lastLapState.title}>{lapTimeValue(driver, "lastLap")}<small>{lastLapState.label}</small></span><span className={bestLapState.className} title={bestLapState.title}>{lapTimeValue(driver, "bestLap")}<small>{bestLapState.label}</small></span></td>}
                 {visibleColumns.has("sectors") && visibleSectorNumbers.map((sectorNumber) => <td className="sector-cell" key={sectorNumber}>{sectorColumnSummary(driver, sectorNumber)}</td>)}
                 {visibleColumns.has("stint") && <td className="stint-cell">{stintSummary(stint)}</td>}
-                {visibleColumns.has("pit") && <td className="pit-cell">{pitVisitSummary(driver, latestPitStop)}</td>}
+                {visibleColumns.has("pit") && <td className="pit-cell"><span className="compact-pit">{driver.latestPitVisit ? <><strong>{driver.latestPitVisit.inferredBoxTime > 0 || driver.latestPitVisit.unknownTime > 0 ? "~" : ""}{formatSeconds(totalPitVisitTime(driver.latestPitVisit))}</strong><small>{latestPitStop ? `L${latestPitStop.pitLap}` : "Lap unavailable"}{driver.latestPitVisit.driverChange ? " · driver change" : ""}</small></> : pitVisitSummary(driver, latestPitStop)}</span></td>}
                 {visibleColumns.has("status") && <td><span className={`commentator-status status-${driver.pitState ?? driver.trackStatus}`}>{status}</span></td>}
               </tr>,
-              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}><div className="expanded-intelligence"><PitVisitDetail driver={driver} pitStops={pitStops} lapHistory={lapHistoryByCarIdx.get(driver.carIdx)} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous stint</dt><dd>{stint?.recentCompleted ? `${stint.recentCompleted.driverName} · ${formatDuration(stint.recentCompleted.duration)} · ${stint.recentCompleted.lapCount} laps` : stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
+              expanded ? <tr className="commentator-detail-row" key={`detail-${driver.carIdx}`}><td colSpan={columnCount}>{sessionId && <CarComparison key={`${sessionId}:${driver.carIdx}`} sessionId={sessionId} driver={driver} drivers={drivers} pitStops={pitStops} initialRival={comparisonRivals?.get(driver.carIdx)} />}<div className="expanded-intelligence"><PitVisitDetail showLegacyHistory={!sessionId} driver={driver} pitStops={pitStops} lapHistory={lapHistoryByCarIdx.get(driver.carIdx)} /><section><span className="detail-kicker">Race intelligence</span><dl><div><dt>Current stint</dt><dd>{stint ? `${formatDuration(stint.duration)} · ${stint.lapCount} laps` : "Unavailable"}</dd></div><div><dt>Previous stint</dt><dd>{stint?.recentCompleted ? `${stint.recentCompleted.driverName} · ${formatDuration(stint.recentCompleted.duration)} · ${stint.recentCompleted.lapCount} laps` : stint?.previousDriverName ?? "Unavailable"}</dd></div><div><dt>Pit cycle</dt><dd>{pitCycle ? `${pitCycle.stopCount} stops · ${formatSeconds(pitCycle.totalBoxTime)} box` : "Unavailable"}</dd></div><div><dt>Gap trend</dt><dd>{trend?.direction ?? "Insufficient clean history"}</dd></div></dl></section></div></td></tr> : null,
             ];
           })}
         </tbody>

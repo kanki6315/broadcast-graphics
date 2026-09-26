@@ -386,3 +386,121 @@
   .expanded-intelligence { grid-template-columns: 1fr; }
   .expanded-intelligence > section { border-left: 0; border-top: 1px solid var(--ink); }
 }
+
+/* Commentary desk: steady timing ledger with independently docked instruments. */
+.commentator-workspace { grid-template-rows: auto auto auto minmax(0, 1fr); }
+.commentator-commandbar { grid-template-columns: minmax(300px, .8fr) minmax(0, 1.7fr); }
+.commentator-heading p, .commentator-commandbar > .commentator-key { display: none; }
+.commentator-heading h1 { font-size: 23px; }
+.session-selector { width: 190px; min-width: 150px; }
+.commentator-context-deck { min-width: 0; grid-template-columns: minmax(320px, 1.2fr) minmax(280px, 1fr) minmax(310px, 1fr); gap: 12px; padding-block: 10px; align-items: start; overflow: visible; }
+.commentator-tool { min-width: 0; border: 1px solid var(--ink); background: var(--stock); }
+.tool-heading { min-height: 39px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 9px; border-bottom: 1px solid var(--ink); }
+.tool-heading > div:first-child { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.tool-heading strong { font: 700 18px/1 var(--display); text-transform: uppercase; }
+.tool-heading span { font-size: 11px; color: var(--muted); }
+.tool-actions { display: flex; gap: 6px; flex: none; }
+.tool-actions button, .tool-detached button, .car-comparison button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--paper-line); background: transparent; color: var(--ink); padding: 4px 7px; font: 600 12px "Source Sans 3", sans-serif; cursor: pointer; }
+.tool-actions svg { width: 13px; height: 13px; }
+.tool-actions button:hover, .tool-detached button:hover, .car-comparison button:hover { background: var(--inspection); }
+.tool-content { height: 145px; overflow: auto; }
+.commentator-tool.is-collapsed .tool-heading { border-bottom: 0; }
+.tool-detached { min-height: 40px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px dashed var(--muted); padding: 6px 9px; font-size: 12px; }
+.tool-detached strong { font: 700 17px var(--display); }
+.tool-detached span { color: var(--muted); }
+.commentator-position-instrument { border-right: 0; height: 100%; }
+.commentator-battle-context { display: block; }
+.tool-content .battle-watch { display: block; }
+.tool-content .battle-watch > header { display: none; }
+.tool-content .battle-watch > div { display: block; }
+.tool-content .battle-candidate { display: block; padding: 5px 10px; }
+.battle-position-pair { width: 100%; display: grid; grid-template-columns: 85px 1fr auto; align-items: center; gap: 10px; border: 0; padding: 4px 0; color: var(--ink); background: transparent; text-align: left; cursor: pointer; }
+.battle-position-pair strong { font: 700 23px/1 var(--display); }
+.battle-position-pair > span:first-child { font: 600 13px var(--display); }
+.battle-position-pair .battle-trend { font-size: 12px; }
+.battle-position-pair:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.battle-candidate details { font-size: 11px; color: var(--muted); }
+.battle-candidate summary { cursor: pointer; }
+.battle-candidate details p { padding: 6px 0; font-size: 12px; }
+.tool-content .race-event-tracker { height: 100%; border: 0; grid-template-rows: 30px minmax(0, 1fr); }
+.tool-content .race-event-heading > strong { display: none; }
+.tool-content .race-event-tracker > header { padding: 4px 9px; }
+.tool-content .race-event-heading > span { font-size: 10px; }
+.tool-content .race-event { min-height: 46px; }
+.tool-content .race-event strong { font-size: 13px; }
+.tool-content .race-event-feed { max-height: none; }
+.commentator-popout { margin: 0; height: 100vh; overflow: hidden; background: var(--stock); color: var(--ink); }
+.commentator-popout > div { height: 100%; }
+.commentator-popout .commentator-tool { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.commentator-popout .tool-content { height: auto; }
+.commentator-popout .race-event-log { width: 100%; }
+.commentator-popout .tool-content .race-event { min-height: 60px; }
+.commentator-popout .tool-content .race-event strong { font-size: 18px; }
+.commentator-popout .tool-content .race-event span { font-size: 13px; }
+.timing-quality-summary { position: relative; font-size: 12px; }
+.timing-quality-summary > summary { display: flex; align-items: center; gap: 6px; padding: 5px 0; cursor: pointer; color: var(--muted); }
+.timing-quality-summary.has-warnings > summary { color: #695115; }
+.timing-quality-summary svg { width: 14px; height: 14px; }
+.timing-quality-summary summary > span { margin-left: auto; color: var(--muted); font-size: 11px; }
+.timing-quality-summary ul { position: absolute; top: 100%; right: 0; z-index: 20; width: 480px; max-height: 280px; overflow: auto; margin: 0; padding: 12px 28px; border: 1px solid var(--ink); background: var(--stock); }
+.commentator-table { min-width: calc(1040px + var(--sector-count, 0) * 125px); }
+.commentator-table th.sector-column { width: 125px; }
+.commentator-table .position-column { width: 98px; }
+.commentator-table .driver-column { width: 235px; }
+.commentator-table th.pit-column { width: 105px; }
+.commentator-table thead th:nth-child(2), .commentator-table tbody > tr:not(.class-divider):not(.commentator-detail-row) > td:nth-child(2) { left: 98px; }
+.commentator-table td { height: 32px; padding-block: 6px; }
+.commentator-table .driver-cell strong { font-size: 18px; }
+.position-cell button { display: grid; width: 100%; gap: 3px; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--ink); }
+.position-primary { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.position-cell .position-change { font-size: 13px; }
+.position-cell .class-position { border: 0; border-bottom: 1px solid var(--class-color); padding: 2px 0; text-align: left; font-size: 11px; background: transparent; color: var(--muted); }
+.sector-column-head, .sector-column-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.sector-column-summary.with-previous { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.compact-pit { display: grid; gap: 4px; text-align: right; }
+.compact-pit strong { font: 600 14px/1 "Source Sans 3", sans-serif; }
+.compact-pit small { color: var(--muted); font: 600 10px/1 "Source Sans 3", sans-serif; }
+.commentator-status.status-not-in-pits { border-color: transparent; color: var(--muted); }
+.commentator-table tr.is-expanded-car > td { background: var(--inspection) !important; }
+.commentator-table .commentator-detail-row > td { padding: 0; font-size: 14px; line-height: 1.4; }
+.expanded-intelligence { grid-template-columns: minmax(0, 3fr) minmax(200px, 1fr); }
+.commentator-detail-grid { grid-template-columns: minmax(320px, 1.4fr) minmax(230px, 1fr) minmax(160px, .8fr); }
+.commentator-detail-grid h3 { margin: 0 0 8px; font: 700 15px var(--display); text-transform: uppercase; }
+.commentator-detail-grid h3:not(:first-child) { margin-top: 12px; }
+.detail-sector { display: grid; grid-template-columns: 35px 1fr; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--paper-line); }
+.detail-sector > strong { font: 700 13px var(--display); }
+.car-comparison { padding: 14px 18px; border-bottom: 1px solid var(--ink); font: 400 13px/1.4 "Source Sans 3", sans-serif; }
+.car-comparison header { display: flex; align-items: center; gap: 16px; }
+.car-comparison h3 { margin: 0; font: 700 22px/1 var(--display); text-transform: uppercase; }
+.car-comparison header > span { color: var(--muted); }
+.car-comparison header > button { margin-left: auto; }
+.comparison-controls { display: flex; gap: 12px; align-items: end; margin: 12px 0; }
+.comparison-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+.comparison-controls select, .comparison-controls input { height: 32px; border: 1px solid var(--muted); padding: 3px 8px; border-radius: 0; background: var(--stock); color: var(--ink); font: 600 13px "Source Sans 3", sans-serif; }
+.comparison-controls input { width: 85px; }
+.comparison-reading { display: flex; align-items: baseline; gap: 18px; }
+.comparison-reading strong { font-size: 18px; }
+.comparison-reading span { color: var(--muted); }
+.comparison-chart { display: block; width: 100%; height: 220px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.comparison-chart line { stroke: var(--paper-line); }
+.comparison-chart .comparison-zero { stroke: var(--muted); }
+.comparison-chart .comparison-pit { stroke: var(--muted); stroke-dasharray: 3 4; }
+.comparison-chart text { fill: var(--muted); font-size: 11px; }
+.comparison-chart path { fill: none; stroke: #177344; stroke-width: 2; }
+.comparison-chart circle { fill: #177344; }
+.car-comparison p { margin: 6px 0; color: var(--muted); }
+.car-comparison summary { cursor: pointer; font-weight: 600; }
+.comparison-values { display: flex; flex-wrap: wrap; gap: 0; max-height: 170px; overflow: auto; margin-top: 8px; }
+.comparison-values > span { display: grid; min-width: 72px; padding: 6px 10px; border: 1px solid var(--paper-line); font-variant-numeric: tabular-nums; }
+.comparison-values small { color: var(--muted); }
+.commentator-shell, .commentator-popout { scrollbar-color: var(--muted) var(--stock); }
+.commentator-shell ::selection, .commentator-popout ::selection { background: var(--ink); color: var(--stock); }
+.commentator-table tr.is-comparison-rival > td { box-shadow: inset 0 -2px #177344; }
+.commentator-table td { height: 42px; padding-block: 4px; }
+.position-cell button { gap: 1px; }
+.position-cell strong { font-size: 21px; }
+.position-cell .class-position { padding-block: 0; font-size: 10px; }
+.pit-history-wrap { max-height: 220px; overflow: auto; }
+.pit-history-head, .pit-history-row { display: grid; grid-template-columns: 36px 38px 70px 62px 74px minmax(100px, 1fr); gap: 8px; align-items: start; padding: 7px 0; border-bottom: 1px solid var(--paper-line); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pit-history-head { position: sticky; top: 0; background: #e9e7df; font: 700 12px var(--display); text-transform: uppercase; }
+.pit-history-row small { display: block; font-size: 10px; color: var(--muted); }

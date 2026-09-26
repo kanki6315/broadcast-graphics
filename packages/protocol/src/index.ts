@@ -352,6 +352,7 @@ export interface CompletedLap {
 }
 
 export interface ClassGapHistoryPoint {
+  lapTime?: number;
   carIdx: number;
   lapNumber: number;
   classPosition: number | null;

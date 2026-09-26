@@ -249,8 +249,16 @@ app.get("/api/state", async (request, reply) => {
   if (!await requireAdmin(request, reply)) return;
   return store.snapshot();
 });
+app.get<{ Querystring: { classId?: string; before?: string; sessionId?: string } }>("/api/history/events", async (request, reply) => {
+  if (!await requireTimingReader(request, reply)) return;
+  const classId = request.query.classId == null ? undefined : Number(request.query.classId);
+  if (classId != null && !Number.isInteger(classId)) return reply.code(400).send({ error: "Invalid class id." });
+  const page = store.raceEventHistory(classId, request.query.before);
+  if (request.query.sessionId && page.sessionId !== request.query.sessionId) return reply.code(409).send({ error: "The active session changed. Reopen the event log." });
+  return page;
+});
 app.get<{ Querystring: { carIdx?: string; limit?: string } }>("/api/history/laps", async (request, reply) => {
-  if (!await requireAdmin(request, reply)) return;
+  if (!await requireTimingReader(request, reply)) return;
   const session = store.snapshot().session;
   const carIdx = Number(request.query.carIdx);
   const limit = request.query.limit == null ? 20 : Number(request.query.limit);

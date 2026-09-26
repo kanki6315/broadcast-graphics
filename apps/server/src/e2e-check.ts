@@ -38,6 +38,21 @@ const keyResponse = await fetch(`${baseUrl}/api/auth/keys`, {
 if (!keyResponse.ok) throw new Error(`Integration ingestion key creation failed with status ${keyResponse.status}.`);
 const createdKey = await keyResponse.json() as { key: { id: string }; secret: string };
 
+// Commentator keys must read investigation data without gaining control access.
+const commentatorKeyResponse = await fetch(`${baseUrl}/api/auth/keys`, {
+  method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+  body: JSON.stringify({ kind: "commentator", label: "Timing history integration" }),
+});
+assert.equal(commentatorKeyResponse.status, 201);
+const commentatorKey = await commentatorKeyResponse.json() as { secret: string };
+for (const path of ["/api/history/events", "/api/history/laps?carIdx=0&limit=25"]) {
+  assert.equal((await fetch(`${baseUrl}${path}`)).status, 401);
+  assert.equal((await fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${commentatorKey.secret}` } })).status, 200);
+}
+assert.equal((await fetch(`${baseUrl}/api/history/events?sessionId=wrong-session`, {
+  headers: { Authorization: `Bearer ${commentatorKey.secret}` },
+})).status, 409);
+
 interface SocketHarness {
   socket: WebSocket;
   messages: ServerMessage[];
