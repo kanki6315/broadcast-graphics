@@ -111,6 +111,7 @@ function semanticSignature(checkpoint: RaceRecoveryCheckpoint): string {
     sessionId: checkpoint.intelligence.sessionId,
     sectorDefinitionRevision: checkpoint.intelligence.sectorDefinitionRevision,
     stints: checkpoint.intelligence.stints.map(({ duration: _, lapCount: __, ...stint }) => stint),
+    pitStints: checkpoint.intelligence.pitStints?.map(({ duration: _, lapCount: __, ...stint }) => stint),
     pitVisits: checkpoint.intelligence.pitVisits.map(({ carIdx, visits }) => ({
       carIdx,
       visits: visits.map(([entry, visit]) => [entry, visit.pitExitTime, visit.pitLap, visit.driverChange, visit.exitDriverId, visit.quality]),

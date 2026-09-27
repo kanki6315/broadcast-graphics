@@ -143,3 +143,57 @@ test("does not warn for timing fields that are unavailable by position or lap de
   const warnings = service.snapshot()!.qualityWarnings;
   assert.deepEqual(warnings.map((warning) => warning.field), ["lastLap"]);
 });
+
+test("pit stints reset on every exit while driver stints survive same-driver stops and recovery", () => {
+  const service = new RaceIntelligenceService(() => 0, 0);
+  const visit = { pitEntryTime: 200, pitLaneTime: 20, boxTime: 30, unknownTime: 0, observedBoxTime: 30, inferredBoxTime: 0, driverChange: false, quality: "valid" as const };
+  const ingest = (at: number, laps: number, overrides: Partial<DriverState> = {}) => service.ingest(session(at, [driver(0, 1, 1, 0, { lapsCompleted: laps, currentLap: laps + 1, ...overrides })]));
+  ingest(100, 10);
+  assert.equal(service.snapshot()?.pitStints?.[0]?.quality, "incomplete");
+  ingest(200, 12, { onPitRoad: true, latestPitVisit: visit });
+  assert.equal(service.snapshot()?.pitStints?.[0]?.inPits, true);
+  ingest(240, 12, { isConnected: false, pitState: "unobserved" });
+  assert.equal(service.snapshot()?.pitStints?.[0]?.inPits, true);
+  ingest(250, 13, { latestPitVisit: { ...visit, pitExitTime: 250 } });
+  assert.deepEqual(service.snapshot()?.pitStints?.[0], { carIdx: 0, startedAt: 250, duration: 0, lapCount: 0, inPits: false, quality: "valid" });
+  ingest(340, 14, { latestPitVisit: { ...visit, pitExitTime: 250 } });
+  assert.equal(service.snapshot()?.pitStints?.[0]?.duration, 90);
+  assert.equal(service.snapshot()?.pitStints?.[0]?.lapCount, 1);
+  assert.equal(service.snapshot()?.stints[0]?.duration, 240);
+  assert.equal(service.snapshot()?.stints[0]?.lapCount, 4);
+
+  const restored = new RaceIntelligenceService(() => 0, 0);
+  const resumed = session(430, [driver(0, 1, 1, 0, { lapsCompleted: 15 })]);
+  assert.equal(restored.restore(resumed, service.checkpoint()!), true);
+  restored.ingest(resumed);
+  assert.equal(restored.snapshot()?.pitStints?.[0]?.duration, 180);
+  assert.equal(restored.snapshot()?.pitStints?.[0]?.lapCount, 2);
+
+  ingest(450, 15, { onPitRoad: true, latestPitVisit: { ...visit, pitEntryTime: 450 } });
+  ingest(460, 15, { onPitRoad: true, userId: 2000, latestPitVisit: { ...visit, pitEntryTime: 450, driverChange: true } });
+  ingest(500, 15, { userId: 2000, latestPitVisit: { ...visit, pitEntryTime: 450, pitExitTime: 500, driverChange: true } });
+  assert.equal(service.snapshot()?.pitStints?.[0]?.duration, 0);
+  assert.equal(service.snapshot()?.stints[0]?.duration, 40);
+  const nextSession = session(0, [driver(0, 1, 1, 0)]);
+  nextSession.id = "new-race";
+  service.ingest(nextSession);
+  assert.equal(service.snapshot()?.pitStints?.[0]?.quality, "incomplete");
+  assert.equal(service.snapshot()?.pitStints?.[0]?.duration, 0);
+});
+
+test("legacy checkpoints and missed pit visits do not claim an observed stint baseline", () => {
+  const service = new RaceIntelligenceService(() => 0, 0);
+  service.ingest(session(100, [driver(0, 1, 1, 0)]));
+  const checkpoint = service.checkpoint()!;
+  delete checkpoint.pitStints;
+  const restored = new RaceIntelligenceService(() => 0, 0);
+  const resumed = session(200, [driver(0, 1, 1, 0)]);
+  assert.equal(restored.restore(resumed, checkpoint), true);
+  restored.ingest(resumed);
+  assert.equal(restored.snapshot()?.pitStints?.[0]?.quality, "incomplete");
+  resumed.timeElapsed = 300;
+  resumed.drivers[0]!.latestPitVisit = { pitEntryTime: 230, pitExitTime: 280, pitLaneTime: 20, boxTime: 30, unknownTime: 0, observedBoxTime: 30, inferredBoxTime: 0, driverChange: false, quality: "valid" };
+  restored.ingest(resumed);
+  assert.equal(restored.snapshot()?.pitStints?.[0]?.duration, 20);
+  assert.equal(restored.snapshot()?.pitStints?.[0]?.quality, "inferred");
+});

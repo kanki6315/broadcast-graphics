@@ -6,6 +6,7 @@ import type {
   GapTrend,
   PitCycleSummary,
   PitStopSummary,
+  PitStintSummary,
   RaceIntelligenceSnapshot,
   SessionState,
   TimingQualityWarning,
@@ -15,11 +16,13 @@ import { isExpectedUnavailableTimingField } from "@racecontrol/protocol";
 
 interface GapSample { at: number; gap: number; }
 export interface StintState extends DriverStintSummary { startLap: number; }
+export interface PitStintState extends PitStintSummary { startLap: number; lastPitEntryTime?: number; }
 
 export interface RaceIntelligenceCheckpoint {
   sessionId: string;
   sectorDefinitionRevision: string | null;
   stints: StintState[];
+  pitStints?: PitStintState[];
   pitVisits: Array<{ carIdx: number; visits: Array<[number, PitStopSummary]> }>;
 }
 
@@ -32,6 +35,7 @@ export class RaceIntelligenceService {
   private sectorDefinitionRevision: string | null = null;
   private readonly histories = new Map<string, GapSample[]>();
   private readonly stints = new Map<number, StintState>();
+  private readonly pitStints = new Map<number, PitStintState>();
   private readonly pitVisits = new Map<number, Map<number, PitStopSummary>>();
   private cached: RaceIntelligenceSnapshot | null = null;
   private lastPublishedAt = Number.NEGATIVE_INFINITY;
@@ -46,6 +50,7 @@ export class RaceIntelligenceService {
     if (this.sessionId !== session.id || this.sectorDefinitionRevision !== revision) this.reset(session.id, revision);
     const at = session.timeElapsed ?? this.clock() / 1_000;
     this.ingestStints(session, at);
+    this.ingestPitStints(session, at);
     this.ingestPitCycles(session);
     this.ingestGapSamples(session, at);
     const now = this.clock();
@@ -65,6 +70,7 @@ export class RaceIntelligenceService {
       sessionId: this.sessionId,
       sectorDefinitionRevision: this.sectorDefinitionRevision,
       stints: [...this.stints.values()],
+      pitStints: [...this.pitStints.values()],
       pitVisits: [...this.pitVisits].map(([carIdx, visits]) => ({ carIdx, visits: [...visits] })),
     });
   }
@@ -74,6 +80,7 @@ export class RaceIntelligenceService {
     if (checkpoint.sessionId !== session.id || checkpoint.sectorDefinitionRevision !== revision) return false;
     this.reset(session.id, revision);
     for (const stint of checkpoint.stints) this.stints.set(stint.carIdx, structuredClone(stint));
+    for (const stint of checkpoint.pitStints ?? []) this.pitStints.set(stint.carIdx, structuredClone(stint));
     for (const item of checkpoint.pitVisits) this.pitVisits.set(item.carIdx, new Map(structuredClone(item.visits)));
     return true;
   }
@@ -83,6 +90,7 @@ export class RaceIntelligenceService {
     this.sectorDefinitionRevision = sectorDefinitionRevision;
     this.histories.clear();
     this.stints.clear();
+    this.pitStints.clear();
     this.pitVisits.clear();
     this.cached = null;
     this.lastPublishedAt = Number.NEGATIVE_INFINITY;
@@ -144,6 +152,41 @@ export class RaceIntelligenceService {
         changeContext: context, associatedPitEntryTime: driver.latestPitVisit?.pitEntryTime,
         quality, startLap: driver.lapsCompleted,
       });
+    }
+  }
+
+  private ingestPitStints(session: SessionState, at: number): void {
+    for (const driver of session.drivers) {
+      const visit = driver.latestPitVisit;
+      const inPits = driver.onPitRoad || driver.pitState === "pit-lane" || driver.pitState === "pit-stall"
+        || (visit != null && visit.pitExitTime == null);
+      let current = this.pitStints.get(driver.carIdx);
+      if (!current) {
+        // A mid-session observation cannot recover the lap baseline of an earlier exit.
+        current = { carIdx: driver.carIdx, startedAt: at, startLap: driver.lapsCompleted,
+          duration: 0, lapCount: 0, inPits, quality: "incomplete", lastPitEntryTime: visit?.pitEntryTime };
+        this.pitStints.set(driver.carIdx, current);
+      }
+      if (inPits) {
+        current.inPits = true;
+        current.lastPitEntryTime = visit?.pitEntryTime ?? current.lastPitEntryTime;
+        current.duration = 0;
+        current.lapCount = 0;
+        continue;
+      }
+      if (!driver.isConnected || driver.pitState === "unobserved") continue;
+      if (current.inPits || (visit?.pitExitTime != null && visit.pitEntryTime !== current.lastPitEntryTime)) {
+        // A late reconnect can supply an old exit; its current lap is only an inferred baseline.
+        const observedExit = current.inPits && visit?.pitExitTime != null
+          && at >= visit.pitExitTime && at - visit.pitExitTime <= 2;
+        current.startedAt = visit?.pitExitTime ?? at;
+        current.startLap = driver.lapsCompleted;
+        current.lastPitEntryTime = visit?.pitEntryTime;
+        current.inPits = false;
+        current.quality = observedExit && visit.quality === "valid" ? "valid" : "inferred";
+      }
+      current.duration = Math.max(0, at - current.startedAt);
+      current.lapCount = Math.max(0, driver.lapsCompleted - current.startLap);
     }
   }
 
@@ -227,6 +270,7 @@ export class RaceIntelligenceService {
       pitCycles,
       pitStops,
       stints: [...this.stints.values()].map(({ startLap: _, ...stint }) => ({ ...stint })),
+      pitStints: [...this.pitStints.values()].map(({ startLap: _, lastPitEntryTime: __, ...stint }) => ({ ...stint })),
       qualityWarnings: qualityWarnings(session, at, byCar),
     };
   }

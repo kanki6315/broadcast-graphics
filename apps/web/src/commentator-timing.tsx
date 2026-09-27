@@ -319,6 +319,7 @@ export function CommentatorTiming({ onLogout }: { onLogout: () => Promise<void> 
           groupByClass={false}
           showClassGaps={showClassGaps}
           stints={intelligence?.stints}
+          pitStints={intelligence?.pitStints}
           gapTrends={intelligence?.gapTrends}
           pitCycles={intelligence?.pitCycles}
           pitStops={intelligence?.pitStops}

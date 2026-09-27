@@ -308,6 +308,7 @@
 .expanded-intelligence > section { padding: 9px 12px; border-left: 1px solid var(--ink); }
 .expanded-intelligence dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; margin: 0; }
 .expanded-intelligence dt { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.expanded-intelligence .stint-summary { text-align: left; }
 .expanded-intelligence dd { margin: 3px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 14px var(--display); text-transform: capitalize; }
 
 .gap-visualizer-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(21, 25, 28, .56); }

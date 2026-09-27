@@ -100,6 +100,8 @@ Only an unobserved interval bracketed by `pit-stall` on both sides contributes t
 
 The server adds an optional, session-scoped `LiveState.intelligence` snapshot. It contains stabilized same-class battles, bounded-window gap trends, pit cycles, driver stints, and quality warnings. This snapshot is calculated once from normalized telemetry and shared by all viewers; browser filters never change its canonical quality or conclusions.
 
+The optional `intelligence.pitStints` contains time and completed-lap counts since each car's latest pit exit, independently of driver changes. The timing table displays this as **Pit stint** and shows **In pits** while a visit is open. Expanded details retain the current and previous **driver stints**. Pit-stint baselines survive server restarts through the race checkpoint. Initial observations without a known exit baseline are marked incomplete; missed exits are inferred. Older snapshots without `pitStints` display an unavailable value rather than substituting driver-stint data.
+
 ## Circuit-map configuration
 
 `CarIdxLapDistPct` describes normalized distance around a lap. It has no X/Y coordinates and cannot reconstruct a circuit. Gantry therefore imports a verified SVG centerline and stores its exact track-layout identity, checksum, source, filename, import time, inert sanitized representation, selected path, and calibration revisions. The optional compact `LiveState.trackConfiguration` identifies the active map/calibration and sector revision; the browser fetches the full definition separately over authenticated HTTP and caches it by immutable IDs.

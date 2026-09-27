@@ -53,6 +53,8 @@ test("hydrates a restarted service from one bounded session checkpoint", async (
 
   assert.equal(restoredIntelligence.snapshot()?.stints[0]?.duration, 30);
   assert.equal(restoredIntelligence.snapshot()?.stints[0]?.lapCount, 2);
+  assert.equal(restoredIntelligence.snapshot()?.pitStints?.[0]?.duration, 30);
+  assert.equal(restoredIntelligence.snapshot()?.pitStints?.[0]?.lapCount, 2);
   assert.equal(restoredStore.snapshot().session?.drivers[0]?.startingPosition, 4);
   assert.equal(restoredStore.snapshot().session?.drivers[0]?.positionChange, 2);
   await restoredPersistence.close();
