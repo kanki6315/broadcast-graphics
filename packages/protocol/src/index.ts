@@ -527,6 +527,16 @@ export interface DriverStintSummary {
   quality: TimingQuality;
 }
 
+/** Track running since the latest pit exit, independent of driver changes. */
+export interface PitStintSummary {
+  carIdx: number;
+  startedAt: number;
+  duration: number;
+  lapCount: number;
+  inPits: boolean;
+  quality: TimingQuality;
+}
+
 export interface TimingQualityWarning {
   id: string;
   carIdx?: number;
@@ -546,6 +556,7 @@ export interface RaceIntelligenceSnapshot {
   pitCycles: PitCycleSummary[];
   pitStops: PitStopSummary[];
   stints: DriverStintSummary[];
+  pitStints?: PitStintSummary[];
   qualityWarnings: TimingQualityWarning[];
 }
 

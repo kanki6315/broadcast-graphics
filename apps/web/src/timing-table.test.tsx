@@ -341,3 +341,26 @@ test("Battle Watch filters shared candidates by class and contains no control co
   assert.match(markup, /<summary>Evidence<\/summary>/);
   assert.doesNotMatch(markup, /camera\.command|control\.command|graphics\./);
 });
+
+test("main row shows pit stint independently of driver stints in the dropdown", () => {
+  const props = {
+    drivers: [driver()], expandedCarIdxs: new Set<number>(),
+    visibleColumns: new Set(defaultCommentatorColumns), groupByClass: false, onToggleExpanded: () => {},
+    stints: [{ carIdx: 7, currentDriverId: "41", currentDriverName: "Driver", startedAt: 100, duration: 372, lapCount: 5, quality: "valid" as const }],
+    pitStints: [{ carIdx: 7, startedAt: 400, duration: 72, lapCount: 1, inPits: false, quality: "valid" as const }],
+  };
+  const collapsed = renderToStaticMarkup(<CommentatorTimingTable {...props} />);
+  assert.match(collapsed, /Pit stint/);
+  assert.match(collapsed, /1:12/);
+  assert.doesNotMatch(collapsed, /6:12/);
+  const expanded = renderToStaticMarkup(<CommentatorTimingTable {...props} expandedCarIdxs={new Set([7])} />);
+  assert.match(expanded, /Current driver stint/);
+  assert.match(expanded, /Previous driver stint/);
+  assert.match(expanded, /6:12/);
+  const pitting = renderToStaticMarkup(<CommentatorTimingTable {...props} pitStints={[{ ...props.pitStints[0]!, inPits: true }]} />);
+  assert.match(pitting, /In pits/);
+  assert.doesNotMatch(pitting, /1:12/);
+  const missing = renderToStaticMarkup(<CommentatorTimingTable {...props} pitStints={[]} />);
+  assert.match(missing, /Pit stint unavailable/);
+  assert.doesNotMatch(missing, /6:12/);
+});
